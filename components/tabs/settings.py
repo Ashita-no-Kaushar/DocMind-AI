@@ -156,7 +156,7 @@ def settings():
         st.download_button(
             label="Download",
             data=json.dumps(st.session_state["messages"]),
-            file_name=f"local-rag-chat-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.json",
+            file_name=f"docmind-chat-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.json",
             mime="application/json",
         )
 

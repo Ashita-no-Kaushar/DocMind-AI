@@ -17,7 +17,7 @@ def clear_index_and_chat():
     st.session_state["messages"] = [
         {
             "role": "assistant",
-            "content": "Welcome to DocMind AI! To begin, please either ask a question directly or import some files/repositories to chat with your data.",
+            "content": "Welcome to **DocMind AI**! 👋\n\nYou can:\n- 💬 **Chat directly** with the LLM — just type a question below\n- 📂 **Import documents** (files, GitHub repo, or website) from the sidebar for grounded RAG answers\n\nHow can I help you today?",
         }
     ]
 

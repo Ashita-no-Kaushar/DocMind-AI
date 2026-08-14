@@ -30,8 +30,11 @@ def render_ingestion_settings_warning():
     if not missing:
         return
 
+    missing_str = " and ".join(missing)
     st.warning(
-        "Before importing data, go to **Settings** and configure a valid Ollama "
-        "chat model and a valid Ollama embedding model.",
-        icon="⚠️",
+        f"⚠️ **Ingestion unavailable.** Missing: {missing_str}.\n\n"
+        "Go to **Settings → Chat** and click **Refresh Models** to load your Ollama models, "
+        "then select a Chat Model and an Embedding Model.",
+        icon=None,
     )
+

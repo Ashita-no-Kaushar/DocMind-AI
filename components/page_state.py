@@ -62,7 +62,7 @@ def set_initial_state():
         st.session_state["embedding_backend"] = "Ollama"
 
     if "ollama_embedding_model" not in st.session_state:
-        st.session_state["ollama_embedding_model"] = "embeddinggemma:latest"
+        st.session_state["ollama_embedding_model"] = "nomic-embed-text:latest"
 
     if "embedding_model" not in st.session_state:
         st.session_state["embedding_model"] = "Default (gte-modernbert-base)"
@@ -96,7 +96,7 @@ def set_initial_state():
         st.session_state["messages"] = [
             {
                 "role": "assistant",
-                "content": "Welcome to DocMind AI! To begin, please either import some files or ingest a GitHub repo. Once you've completed those steps, we can continue the conversation and explore how I can assist you further.",
+                "content": "Welcome to **DocMind AI**! 👋\n\nYou can:\n- 💬 **Chat directly** with the LLM — just type a question below\n- 📂 **Import documents** (files, GitHub repo, or website) from the sidebar for grounded RAG answers\n\nHow can I help you today?",
             }
         ]
 

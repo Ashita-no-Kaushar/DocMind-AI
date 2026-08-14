@@ -1,13 +1,28 @@
 import streamlit as st
 
-from utils.ollama import chat, context_chat
+from utils.ollama import chat, context_chat, get_models, get_embedding_models
 
 
 def chatbox():
     if prompt := st.chat_input("How can I help?"):
         if not st.session_state.get("selected_model"):
-            st.warning("Please ensure Ollama is running and select a model in Settings.")
-            st.stop()
+            # Try to auto-discover models before giving up
+            try:
+                models = get_models()
+                if models:
+                    st.session_state["ollama_models"] = models
+                    st.session_state["selected_model"] = models[0]
+                    get_embedding_models()
+                    st.rerun()
+            except Exception:
+                pass
+            if not st.session_state.get("selected_model"):
+                st.warning(
+                    "⚠️ No chat model available. Please go to **Settings → Chat** "
+                    "and click **Refresh Models**, then select a model.",
+                    icon=None,
+                )
+                return
 
         # Add the user input to messages state
         st.session_state["messages"].append({"role": "user", "content": prompt})
@@ -30,3 +45,4 @@ def chatbox():
         # Add the final response to messages state
         if response:
             st.session_state["messages"].append({"role": "assistant", "content": response})
+
