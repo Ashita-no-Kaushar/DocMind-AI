@@ -11,8 +11,8 @@ def set_page_config():
         layout="wide",
         initial_sidebar_state=st.session_state["sidebar_state"],
         menu_items={
-            "Get Help": "https://github.com/jonfairbanks/local-rag/discussions",
-            "Report a bug": "https://github.com/jonfairbanks/local-rag/issues",
+            "Get Help": "https://github.com/Ashita-no-Kaushar/Docmind/discussions",
+            "Report a bug": "https://github.com/Ashita-no-Kaushar/Docmind/issues",
         },
     )
 

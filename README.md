@@ -1,11 +1,11 @@
-# Local RAG
+# Docmind (Local RAG)
 
 ![local-rag-demo](demo.gif)
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8588/badge)](https://www.bestpractices.dev/projects/8588)
-![GitHub Commit Activity](https://img.shields.io/github/commit-activity/t/jonfairbanks/local-rag)
-![GitHub Last Commit](https://img.shields.io/github/last-commit/jonfairbanks/local-rag)
-![GitHub License](https://img.shields.io/github/license/jonfairbanks/local-rag)
+![GitHub Commit Activity](https://img.shields.io/github/commit-activity/t/Ashita-no-Kaushar/Docmind)
+![GitHub Last Commit](https://img.shields.io/github/last-commit/Ashita-no-Kaushar/Docmind)
+![GitHub License](https://img.shields.io/github/license/Ashita-no-Kaushar/Docmind)
 
 Offline, open-source retrieval augmented generation.
 

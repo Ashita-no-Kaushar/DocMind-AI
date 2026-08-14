@@ -11,10 +11,7 @@ def about():
     links_html = """
     <ul style="list-style-type:none; padding-left:0;">
         <li>
-            <a href="https://github.com/jonfairbanks/local-rag" style="color: grey;">GitHub</a>
-        </li>
-        <li>
-            <a href="https://hub.docker.com/r/jonfairbanks/local-rag" style="color: grey;">Docker Hub</a>
+            <a href="https://github.com/Ashita-no-Kaushar/Docmind" style="color: grey;">GitHub</a>
         </li>
     </ul>
     """
@@ -37,13 +34,13 @@ def about():
     help_html = """
     <ul style="list-style-type:none; padding-left:0;">
         <li>
-            <a href="https://github.com/jonfairbanks/local-rag/issues" style="color: grey;">
+            <a href="https://github.com/Ashita-no-Kaushar/Docmind/issues" style="color: grey;">
                 Bug Reports
             </a>
         </li>
         <li>
-            <a href="https://github.com/jonfairbanks/local-rag/discussions/new?category=ideas" style="color: grey;">
-                Feature Requests
+            <a href="https://github.com/Ashita-no-Kaushar/Docmind/discussions" style="color: grey;">
+                Discussions
             </a>
         </li>
     </ul>

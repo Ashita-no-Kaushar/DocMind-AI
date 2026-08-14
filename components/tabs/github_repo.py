@@ -32,7 +32,7 @@ def github_repo():
         with st.form("github_repo_form"):
             st.text_input(
                 "Select a GitHub.com repo",
-                placeholder="jonfairbanks/local-rag",
+                placeholder="Ashita-no-Kaushar/Docmind",
                 key="github_repo",
             )
             repo_processed = st.form_submit_button("Process")
@@ -97,7 +97,7 @@ def github_repo():
     else:
         st.text_input(
             "Select a GitHub.com repo",
-            placeholder="jonfairbanks/local-rag",
+            placeholder="Ashita-no-Kaushar/Docmind",
             key="github_repo_disabled",
             disabled=True,
         )
