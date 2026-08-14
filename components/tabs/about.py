@@ -4,8 +4,8 @@ from datetime import datetime
 
 
 def about():
-    st.title("📚 Local RAG")
-    st.caption(f"Developed by Jon Fairbanks &copy; {datetime.now().year}")
+    st.title("📚 DocMind AI")
+    st.caption("LLMOps-Based Document Intelligence System")
     st.write("")
 
     links_html = """
@@ -40,7 +40,7 @@ def about():
         </li>
         <li>
             <a href="https://github.com/Ashita-no-Kaushar/Docmind/discussions" style="color: grey;">
-                Discussions
+                Feature Requests
             </a>
         </li>
     </ul>

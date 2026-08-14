@@ -90,7 +90,7 @@ def set_initial_state():
         st.session_state["messages"] = [
             {
                 "role": "assistant",
-                "content": "Welcome to Local RAG! To begin, please either import some files or ingest a GitHub repo. Once you've completed those steps, we can continue the conversation and explore how I can assist you further.",
+                "content": "Welcome to DocMind AI! To begin, please either import some files or ingest a GitHub repo. Once you've completed those steps, we can continue the conversation and explore how I can assist you further.",
             }
         ]
 

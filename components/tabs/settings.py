@@ -29,7 +29,7 @@ def _refresh_embedding_models():
 
 def settings():
     st.header("Settings")
-    st.caption("Configure Local RAG settings and integrations")
+    st.caption("Configure DocMind AI settings and integrations")
 
     st.subheader("Chat")
     chat_settings = st.container(border=True)

@@ -6,7 +6,7 @@ def set_page_config():
         st.session_state["sidebar_state"] = "expanded"
 
     st.set_page_config(
-        page_title="Local RAG",
+        page_title="DocMind AI",
         page_icon="📚",
         layout="wide",
         initial_sidebar_state=st.session_state["sidebar_state"],
