@@ -10,6 +10,7 @@ os.environ["OPENAI_API_KEY"] = "sk-abc123"
 
 from llama_index.llms.ollama import Ollama
 from llama_index.core import Settings
+from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.query_engine.retriever_query_engine import RetrieverQueryEngine
 
 ###################################
@@ -179,7 +180,7 @@ def create_ollama_llm(model: str, base_url: str, system_prompt: str = None, requ
 
 def chat(prompt: str):
     """
-    Initiates a chat with the Ollama language model using the provided parameters.
+    Initiates a chat with the Ollama language model using multi-turn conversational history.
 
     Parameters:
         - prompt (str): The starting prompt for the conversation.
@@ -187,17 +188,36 @@ def chat(prompt: str):
     Yields:
         - str: Successive chunks of conversation from the Ollama model.
     """
-
     try:
         llm = create_ollama_llm(
             st.session_state["selected_model"],
             st.session_state["ollama_endpoint"],
         )
-        stream = llm.stream_complete(prompt)
+
+        chat_messages = []
+        for msg in st.session_state.get("messages", []):
+            role_str = msg.get("role", "user")
+            content = msg.get("content", "")
+            if not content:
+                continue
+            if role_str == "assistant":
+                chat_messages.append(ChatMessage(role=MessageRole.ASSISTANT, content=content))
+            elif role_str == "user":
+                chat_messages.append(ChatMessage(role=MessageRole.USER, content=content))
+            elif role_str == "system":
+                chat_messages.append(ChatMessage(role=MessageRole.SYSTEM, content=content))
+
+        if not chat_messages or chat_messages[-1].content != prompt:
+            chat_messages.append(ChatMessage(role=MessageRole.USER, content=prompt))
+
+        # Pass recent history (up to 10 turns) to fit local model context windows
+        recent_messages = chat_messages[-10:]
+        stream = llm.stream_chat(recent_messages)
         for chunk in stream:
             yield chunk.delta
     except Exception as err:
         logs.log.error(f"Ollama chat stream error: {err}")
+        yield f"⚠️ **Error during chat:** {err}. Please ensure Ollama is running and model '{st.session_state.get('selected_model')}' is installed."
         return
 
 

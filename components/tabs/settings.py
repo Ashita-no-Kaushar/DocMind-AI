@@ -52,6 +52,10 @@ def settings():
             key="refresh_chat_models",
             on_click=_refresh_models,
         )
+        if len(st.session_state["ollama_models"]) == 0:
+            st.info(
+                "💡 **No chat models found.** Run in terminal:\n`ollama pull qwen2.5:0.5b`"
+            )
         if st.session_state["advanced"] == True:
             st.select_slider(
                 "Top K",

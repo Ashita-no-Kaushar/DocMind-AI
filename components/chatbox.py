@@ -5,9 +5,8 @@ from utils.ollama import chat, context_chat
 
 def chatbox():
     if prompt := st.chat_input("How can I help?"):
-        # Prevent submission if Ollama endpoint is not set
-        if not st.session_state["query_engine"]:
-            st.warning("Please confirm settings and upload files before proceeding.")
+        if not st.session_state.get("selected_model"):
+            st.warning("Please ensure Ollama is running and select a model in Settings.")
             st.stop()
 
         # Add the user input to messages state
@@ -15,17 +14,19 @@ def chatbox():
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Generate llama-index stream with user input
+        # Generate stream with user input (Context RAG vs General Chat)
         with st.chat_message("assistant"):
-            with st.spinner("Processing..."):
-                response = st.write_stream(
-                    # chat(
-                    #     prompt=prompt
-                    # )
-                    context_chat(
-                        prompt=prompt, query_engine=st.session_state["query_engine"]
+            with st.spinner("Thinking..."):
+                if st.session_state.get("query_engine"):
+                    stream = context_chat(
+                        prompt=prompt,
+                        query_engine=st.session_state["query_engine"],
                     )
-                )
+                else:
+                    stream = chat(prompt=prompt)
+
+                response = st.write_stream(stream)
 
         # Add the final response to messages state
-        st.session_state["messages"].append({"role": "assistant", "content": response})
+        if response:
+            st.session_state["messages"].append({"role": "assistant", "content": response})

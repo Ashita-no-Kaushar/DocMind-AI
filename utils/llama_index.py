@@ -165,9 +165,19 @@ def setup_embedding_model(
 ###################################
 
 
+EXCLUDED_FILE_PATTERNS = [
+    "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.ico", "*.svg", "*.webp",
+    "*.zip", "*.tar", "*.gz", "*.bz2", "*.7z", "*.rar",
+    "*.exe", "*.dll", "*.so", "*.dylib", "*.bin", "*.iso", "*.msi",
+    "*.pyc", "*.pyo", "*.pyd", "*.class",
+    "*.mp3", "*.mp4", "*.avi", "*.mov", "*.wav", "*.mkv",
+    "*.git*", "*.venv*", "*node_modules*",
+]
+
+
 def load_documents(data_dir: str):
     """
-    Loads documents from a directory of files.
+    Loads documents from a directory of files with binary and archive exclusions.
 
     Args:
         data_dir (str): The path to the directory containing the documents to be loaded.
@@ -177,12 +187,13 @@ def load_documents(data_dir: str):
 
     Raises:
         Exception: If there is an error creating the data index.
-
-    Notes:
-        The `data_dir` parameter should be a path to a directory containing files that represent the documents to be loaded. The function will iterate over all files in the directory, and load their contents into a list of strings.
     """
     try:
-        files = SimpleDirectoryReader(input_dir=data_dir, recursive=True)
+        files = SimpleDirectoryReader(
+            input_dir=data_dir,
+            recursive=True,
+            exclude=EXCLUDED_FILE_PATTERNS,
+        )
         documents = files.load_data()
         logs.log.info(f"Loaded {len(documents):,} documents from files")
         return documents
