@@ -38,12 +38,17 @@ def github_repo():
             repo_processed = st.form_submit_button("Process")
 
         if repo_processed:
+            input_repo = (st.session_state.get("github_repo") or "").strip()
+            if not input_repo:
+                input_repo = "Ashita-no-Kaushar/Docmind"
+                st.session_state["github_repo"] = input_repo
+
             status_container = st.empty()
             completed_stages = []
 
             with st.spinner("Processing..."):
                 try:
-                    repo = func.normalize_github_repo(st.session_state["github_repo"])
+                    repo = func.normalize_github_repo(input_repo)
                 except ValueError as err:
                     st.error(str(err))
                     st.stop()

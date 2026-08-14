@@ -113,10 +113,14 @@ def option_index(options, selected_value):
 
 
 def should_refresh_models_for_endpoint(state, models_key):
-    """Return whether cached Ollama models belong to a different endpoint."""
+    """Return whether cached Ollama models belong to a different endpoint or are empty."""
     endpoint = normalize_ollama_endpoint(state.get("ollama_endpoint"))
     endpoint_key = f"{models_key}_endpoint"
-    return models_key not in state or state.get(endpoint_key) != endpoint
+    return (
+        models_key not in state
+        or state.get(endpoint_key) != endpoint
+        or len(state.get(models_key, [])) == 0
+    )
 
 
 def restore_settings_from_browser_storage():

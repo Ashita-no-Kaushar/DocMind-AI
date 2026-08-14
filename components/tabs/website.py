@@ -51,12 +51,13 @@ def website():
     with col1:
         st.text_input(
             "Enter a Website",
+            placeholder="https://docs.python.org/3/",
             label_visibility="collapsed",
             key="new_website",
             on_change=add_website_from_input,
         )
     with col2:
-        add_button = st.button("➕")
+        add_button = st.button("➕", help="Add URL to list")
 
     if add_button:
         add_website_from_input()
@@ -64,44 +65,58 @@ def website():
     if st.session_state.get("website_input_error"):
         st.error(st.session_state["website_input_error"])
 
-    if st.session_state["websites"] != []:
+    if len(st.session_state.get("websites", [])) > 0:
         st.markdown(f"<p>Website(s)</p>", unsafe_allow_html=True)
         for site in st.session_state["websites"]:
             st.caption(f"- {site}")
         st.write("")
 
+    col_proc, col_clr = st.columns([1, 1])
+    with col_proc:
         process_button = st.button("Process", key="process_website")
+    with col_clr:
+        if len(st.session_state.get("websites", [])) > 0:
+            if st.button("Clear List", key="clear_websites"):
+                st.session_state["websites"] = []
+                st.session_state["new_website"] = ""
+                st.session_state["website_input_error"] = None
+                st.rerun()
 
-        if process_button:
-            status_container = st.empty()
-            completed_stages = []
+    if process_button:
+        if st.session_state.get("new_website", "").strip():
+            add_website_from_input()
 
-            with st.spinner("Processing..."):
-                try:
-                    rag.render_pipeline_status(
-                        status_container, completed_stages, "Fetching Websites"
-                    )
-                    documents = func.load_website_documents(st.session_state["websites"])
-                    completed_stages.append("Websites Fetched")
-                    rag.render_pipeline_status(status_container, completed_stages)
-                except Exception as err:
-                    st.exception(err)
-                    st.stop()
+        if len(st.session_state.get("websites", [])) == 0:
+            st.warning("Please enter a website URL (e.g. https://docs.python.org/3/) before processing.")
+            return
 
-                if len(documents) > 0:
-                    # Initiate the RAG pipeline, providing documents to be saved on disk if necessary
-                    error = rag.rag_pipeline(
-                        documents=documents,
-                        status_container=status_container,
-                        initial_stages=completed_stages,
-                        status_state_key="website_ingestion_stages",
-                        documents_loaded_stage="Website Content Loaded",
-                    )
+        status_container = st.empty()
+        completed_stages = []
 
-                    # Display errors (if any) or proceed
-                    if error is not None:
-                        st.exception(error)
-                    else:
-                        st.write(
-                            "Site processing completed. Let's chat! 😎"
-                        )  # TODO: This should be a button.
+        with st.spinner("Processing..."):
+            try:
+                rag.render_pipeline_status(
+                    status_container, completed_stages, "Fetching Websites"
+                )
+                documents = func.load_website_documents(st.session_state["websites"])
+                completed_stages.append("Websites Fetched")
+                rag.render_pipeline_status(status_container, completed_stages)
+            except Exception as err:
+                st.error(f"Failed to fetch website content: {err}")
+                st.stop()
+
+            if len(documents) > 0:
+                # Initiate the RAG pipeline, providing documents to be saved on disk if necessary
+                error = rag.rag_pipeline(
+                    documents=documents,
+                    status_container=status_container,
+                    initial_stages=completed_stages,
+                    status_state_key="website_ingestion_stages",
+                    documents_loaded_stage="Website Content Loaded",
+                )
+
+                # Display errors (if any) or proceed
+                if error is not None:
+                    st.exception(error)
+                else:
+                    st.write("Site processing completed. Let's chat! 😎")

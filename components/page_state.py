@@ -31,13 +31,19 @@ def default_chat_model(models):
 def ensure_valid_model_selections(state):
     """Keep selected model values consistent with discovered model lists."""
     chat_models = state.get("ollama_models", [])
-    if state.get("selected_model") not in chat_models:
-        state["selected_model"] = default_chat_model(chat_models)
+    if chat_models:
+        if state.get("selected_model") not in chat_models:
+            state["selected_model"] = default_chat_model(chat_models)
+    elif "selected_model" in state:
+        state["selected_model"] = None
 
     if state.get("embedding_backend") == "Ollama":
         embedding_models = state.get("ollama_embedding_models", [])
-        if state.get("ollama_embedding_model") not in embedding_models:
-            state["ollama_embedding_model"] = default_embedding_model(embedding_models)
+        if embedding_models:
+            if state.get("ollama_embedding_model") not in embedding_models:
+                state["ollama_embedding_model"] = default_embedding_model(embedding_models)
+        elif "ollama_embedding_model" in state:
+            state["ollama_embedding_model"] = None
 
 
 def set_initial_state():

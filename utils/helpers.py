@@ -272,8 +272,14 @@ def validate_github_repo(repo: str):
 
     repo_endpoint = f"https://github.com/{repo}.git"
     try:
-        resp = requests.head(repo_endpoint, timeout=10, allow_redirects=True)
-        return resp.status_code == 200
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) DocMind/1.0"}
+        resp = requests.head(repo_endpoint, timeout=10, allow_redirects=True, headers=headers)
+        if resp.status_code == 200:
+            return True
+        if resp.status_code in (301, 302, 403, 405):
+            get_resp = requests.get(f"https://github.com/{repo}", timeout=10, headers=headers)
+            return get_resp.status_code == 200
+        return False
     except Exception as err:
         logs.log.warning(f"Unable to validate GitHub repository {repo}: {err}")
         return False
@@ -317,8 +323,16 @@ def clone_github_repo(repo: str):
             logs.log.info(f"Removing existing repository directory: {destination}")
             shutil.rmtree(destination)
 
+        git_bin = shutil.which("git")
+        if not git_bin:
+            local_git = os.path.expandvars(r"%LOCALAPPDATA%\Programs\Git\cmd\git.exe")
+            if os.path.exists(local_git):
+                git_bin = local_git
+            else:
+                git_bin = "git"
+
         result = subprocess.run(
-            ["git", "clone", "--depth", "1", "-q", repo_endpoint, destination],
+            [git_bin, "clone", "--depth", "1", "-q", repo_endpoint, destination],
             check=False,
             capture_output=True,
             text=True,
