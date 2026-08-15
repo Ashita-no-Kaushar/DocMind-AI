@@ -140,7 +140,32 @@ class HybridRetriever:
             return True
         return False
 
+    def _apply_live_settings(self):
+        """Refresh Top K / similarity cutoff from session state.
+
+        The retriever is cached for the session, but the Advanced Settings
+        sliders change `session_state` directly. Reading them here makes slider
+        changes take effect on the very next query instead of after a re-ingest.
+        """
+        try:
+            top_k = max(int(st.session_state.get("top_k", self.top_k)), 1)
+            cutoff = float(
+                st.session_state.get("similarity_cutoff", self.similarity_cutoff)
+            )
+        except (TypeError, ValueError):
+            return
+        self.top_k = top_k
+        self.similarity_cutoff = cutoff
+        # The underlying vector retriever caps its candidate list too; raise it
+        # so a larger Top K can actually surface more chunks.
+        try:
+            if self.vector_retriever._similarity_top_k != top_k:
+                self.vector_retriever._similarity_top_k = top_k
+        except AttributeError:
+            pass
+
     def retrieve(self, query: str):
+        self._apply_live_settings()
         rewritten = _rewrite_query(query)
         rrf_scores = {}
         vector_scores = {}
@@ -636,7 +661,7 @@ def create_query_engine(documents, progress_callback=None):
 
         query_engine = index.as_query_engine(
             similarity_top_k=similarity_top_k,
-            response_mode=st.session_state["chat_mode"],
+            response_mode="compact",
             streaming=True,
         )
 

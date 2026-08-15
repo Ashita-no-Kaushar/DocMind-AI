@@ -97,21 +97,6 @@ def settings():
             #     value=st.session_state["system_prompt"],
             #     key="system_prompt",
             # )
-            st.selectbox(
-                "Chat Mode",
-                (
-                    "compact",
-                    "refine",
-                    "tree_summarize",
-                    "simple_summarize",
-                    "accumulate",
-                    "compact_accumulate",
-                ),
-                help="Sets the [Llama Index Query Engine chat mode](https://github.com/run-llama/llama_index/blob/main/docs/module_guides/deploying/query_engine/response_modes.md) used when creating the Query Engine. Default: `compact`.",
-                key="chat_mode",
-                disabled=True,
-            )
-            st.write("")
 
     st.subheader("Answer Style")
     style_settings = st.container(border=True)

@@ -13,7 +13,6 @@ PERSISTED_SETTING_TYPES = {
     "other_embedding_model": str,
     "selected_model": str,
     "top_k": int,
-    "chat_mode": str,
     "chunk_size": int,
     "chunk_overlap": int,
     "similarity_cutoff": float,

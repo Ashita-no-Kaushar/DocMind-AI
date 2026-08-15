@@ -56,7 +56,6 @@ def perform_project_reset(state):
 
     # Widget-backed keys: safe here only because no widgets exist yet.
     state["top_k"] = 3
-    state["chat_mode"] = "compact"
     state["chunk_size"] = 256
     state["chunk_overlap"] = 32
     state["advanced"] = False
@@ -214,9 +213,6 @@ def set_initial_state():
 
     if "retriever" not in st.session_state:
         st.session_state["retriever"] = None
-
-    if "chat_mode" not in st.session_state:
-        st.session_state["chat_mode"] = "compact"
 
     #####################
     # Advanced Settings #

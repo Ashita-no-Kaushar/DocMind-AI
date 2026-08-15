@@ -32,10 +32,10 @@ The UI stores completed ingestion stages in Streamlit session state so reruns ca
 
 Users can adjust these advanced settings:
 
-1. **`top_k`**: Number of similar chunks retrieved for each query. Higher values provide more context but may add noise.
-2. **`chunk_size`**: Maximum size of each text chunk before embedding. Smaller chunks can improve precision but increase embedding work.
-3. **`chunk_overlap`**: Overlap between consecutive chunks. This must be greater than or equal to `0` and less than `chunk_size`.
-4. **`chat_mode`**: LlamaIndex response mode. The current UI exposes this setting as disabled and defaults to `compact`.
+1. **`top_k`**: Number of similar chunks retrieved for each query. Higher values provide more context but may add noise. Applies to the next query immediately.
+2. **`similarity_cutoff`**: Minimum vector similarity score for a chunk to be used. Higher = only strong matches (less hallucination), lower = more recall. `0` disables the filter. Applies to the next query immediately.
+3. **`chunk_size`**: Maximum size of each text chunk before embedding. Smaller chunks can improve precision but increase embedding work. Applies to the next ingestion.
+4. **`chunk_overlap`**: Overlap between consecutive chunks. This must be greater than or equal to `0` and less than `chunk_size`. Applies to the next ingestion.
 
 ## Runtime State
 

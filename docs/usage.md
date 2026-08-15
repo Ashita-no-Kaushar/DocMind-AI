@@ -21,8 +21,8 @@ Settings are stored in browser `localStorage` and restored on the next visit fro
 | Ollama Endpoint | Ollama API base URL. Empty values are ignored and fall back to `http://localhost:11434`. | `http://localhost:11434` |
 | Chat Model | Installed Ollama model with `completion` capability. | Prefers `gemma4:latest`, then `llama3:8b`, then `llama2:7b`, then the first discovered chat model. |
 | Refresh Models | Reloads chat and embedding model lists for the current endpoint. | |
-| Top K | Number of most similar chunks to retrieve for each query. Advanced setting. | `3` |
-| Chat Mode | LlamaIndex response mode used by the query engine. Advanced setting. Currently shown as disabled. | `compact` |
+| Top K | Number of most similar chunks to retrieve for each query. Applies to the next query immediately. Advanced setting. | `3` |
+| Similarity Threshold | Minimum vector similarity score for a chunk to be used. Higher = stronger matches only, lower = more recall, `0` = disabled. Applies to the next query immediately. Advanced setting. | `0.3` |
 
 ### Embeddings
 
