@@ -26,6 +26,9 @@ llama-index-core = "*"
 fsspec = "*"
 
 [dev-packages]
+ruff = "*"
+black = "*"
+pytest = "*"
 
 [requires]
-python_version = "3.14"
+python_version = "3.13"
