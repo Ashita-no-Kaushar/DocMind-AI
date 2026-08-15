@@ -23,7 +23,7 @@ pipenv install
 pipenv run streamlit run main.py
 ```
 
-The app expects Python 3.14+ and an Ollama instance. The default Ollama endpoint is `http://localhost:11434`.
+The app expects Python 3.12-3.13 and an Ollama instance. The default Ollama endpoint is `http://localhost:11434`.
 
 ## Verification
 

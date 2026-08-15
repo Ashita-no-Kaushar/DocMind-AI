@@ -1,46 +1,27 @@
 # Contributing
 
-Thank you for considering contributing to this project! I appreciate your interest in helping us improve and grow. Please read this document carefully before submitting any pull requests, as it outlines the best practices for committing changes to our repository.
+Thank you for considering contributing to DocMind! This guide outlines how to report issues, suggest features, and submit changes.
 
-1. Use descriptive commit messages
+## Getting Started
 
-When committing changes, please use descriptive commit messages that clearly explain the purpose of the change. This helps us and other contributors understand the context of the change and why it was made.
+1. Fork the repository and create a feature branch.
+2. Set up the environment as described in [Setup](setup.md).
+3. Make your changes, keeping them focused on a single issue or feature.
 
-Here's an example of a good commit message:
+## Code Style
 
-```
-Added feature to calculate the area of a circle (#123)
-```
+- Follow [PEP 8](https://peps.python.org/pep-0008/) naming conventions: lowercase names separated by underscores.
+- Keep indentation consistent with the surrounding code.
+- `black` and `ruff` are available in the dev environment:
+  ```bash
+  pipenv run black .
+  pipenv run ruff check .
+  ```
+- Keep UI changes small and consistent with the existing Streamlit patterns.
 
-In this example, the commit message clearly states what was added (a feature to calculate the area of a circle) and which issue number it resolves (issue #123).
+## Testing
 
-2. Use consistent indentation
-
-We use consistent indentation throughout our codebase to make it easier to read and understand. Please ensure that your changes maintain the same level of indentation as the surrounding code.
-
-3. Follow PEP 8 naming conventions
-
-We follow the PEP 8 naming conventions for Python, which means using lowercase words separated by underscores, with no leading underscores. Please ensure that your changes use these conventions when defining variables, functions, and classes.
-
-4. Use meaningful commit titles
-
-When creating a pull request, please give the commit a meaningful title that accurately describes the changes made. This helps us quickly understand the purpose of the change and decide whether to approve or reject the pull request.
-
-Here's an example of a good commit title:
-
-```
-Fixed bug in calculation of circle area (#123)
-```
-
-In this example, the commit title clearly states what was fixed (a bug in calculating circle area) and which issue number it resolves (issue #123).
-
-5. Use pull requests for all changes
-
-We use pull requests for all changes to our repository, even if you're just fixing a small issue or adding a new feature. This helps us keep track of all changes and ensure that everything is properly tested and reviewed before being merged into the main branch.
-
-6. Test your changes thoroughly
-
-Before submitting a pull request, please test your changes thoroughly to ensure they work as expected. Run focused tests while iterating, then run the full local suite before handing off:
+Run focused tests while iterating, then the full local suite before submitting:
 
 ```bash
 pipenv run python -m unittest discover -s tests
@@ -56,10 +37,39 @@ curl -s http://127.0.0.1:8520/_stcore/health
 
 Stop the smoke-test Streamlit process after checking the health endpoint.
 
-7. Follow the issue tracking process
+Add or update tests for behavior changes, especially validation, persistence, ingestion safety, and model-selection state.
 
-When reporting an issue or suggesting a new feature, please follow the issue tracking process outlined in our repository. This helps us keep track of all issues and ensure that they are properly addressed.
+## Commit Messages
 
-Thank you for following these best practices when committing changes to our repository! By doing so, you help us maintain a high-quality codebase and make it easier for other contributors to understand and work with the code.
+Use descriptive commit messages that clearly explain the purpose of the change and reference the issue it resolves. For example:
 
-If you have any questions or concerns, please don't hesitate to reach out!
+```
+Fix GitHub repo ingestion failures caused by stale checkouts (#123)
+```
+
+## Pull Requests
+
+- Use pull requests for all changes, even small fixes.
+- Give the pull request a meaningful title that describes the change.
+- Ensure tests pass and the app runs cleanly before submitting.
+- Security-sensitive areas to review carefully:
+  - File uploads and path handling in `utils/helpers`
+  - Website ingestion and URL validation
+  - GitHub cloning and subprocess calls
+  - Ollama endpoint handling
+  - Any code that writes to disk or fetches remote content
+
+## Issue Tracking
+
+- Use the [issue templates](https://github.com/Ashita-no-Kaushar/DocMind/issues/new/choose) for bug reports and feature requests.
+- Bug reports should include the affected version or commit, your operating system, reproduction steps, and a copy of the `local-rag.log` file if possible.
+- Do not include sensitive documents, private repository contents, or credentials in public issues.
+
+## Dependencies
+
+- Dependencies are managed with `Pipfile` / `Pipfile.lock` (via Pipenv) and mirrored in `requirements.txt`.
+- Dependabot keeps dependencies up to date and automatically merges safe patch/minor updates.
+
+## License
+
+By contributing to DocMind, you agree that your contributions are licensed under the [GPL-3.0 license](../LICENSE).

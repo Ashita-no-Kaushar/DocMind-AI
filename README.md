@@ -1,34 +1,41 @@
-# Docmind (Local RAG)
+# DocMind (Local RAG)
 
 ![local-rag-demo](demo.gif)
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8588/badge)](https://www.bestpractices.dev/projects/8588)
-![GitHub Commit Activity](https://img.shields.io/github/commit-activity/t/Ashita-no-Kaushar/Docmind)
-![GitHub Last Commit](https://img.shields.io/github/last-commit/Ashita-no-Kaushar/Docmind)
-![GitHub License](https://img.shields.io/github/license/Ashita-no-Kaushar/Docmind)
+![GitHub Commit Activity](https://img.shields.io/github/commit-activity/t/Ashita-no-Kaushar/DocMind)
+![GitHub Last Commit](https://img.shields.io/github/last-commit/Ashita-no-Kaushar/DocMind)
+![GitHub License](https://img.shields.io/github/license/Ashita-no-Kaushar/DocMind)
 
-Offline, open-source retrieval augmented generation.
+Offline, open-source retrieval augmented generation (RAG).
 
-Ingest local files, GitHub repositories, and websites for retrieval augmented generation (RAG) with local Ollama models. Local RAG keeps chat, embeddings, and indexed source content on your machine or network.
+DocMind ingests local files, GitHub repositories, and websites for retrieval augmented generation with local Ollama models. Chat, embeddings, and indexed source content stay on your machine or network — nothing leaves your infrastructure.
 
-Features:
+## Features
 
-- Local Ollama chat models
-- Ollama or local Hugging Face embedding models
+- Local Ollama chat models (e.g. `qwen2.5`, `llama3`)
+- Ollama embedding models (`nomic-embed-text` recommended)
 - Multiple ingestion sources:
-  - Local files
-  - GitHub repositories
+  - Local files (PDF, DOCX, TXT, Markdown, and more)
+  - GitHub repositories (`owner/repo` or full URL)
   - Websites
 - Streaming RAG responses through LlamaIndex
-- Browser-local settings persistence
-- Chat history export
+- Live retrieval controls: Top K and similarity threshold sliders applied per query
+- 6 answer-style presets
+- Chat history export to Word (.docx)
+- Browser-local settings persistence (no server-side state)
 - Upload, URL, repository, and ingestion guardrails
+- Docker deployment with GPU support
+- Tested on Windows and Linux
 
-Learn More:
+## Getting Started
 
 - [Setup & Deploy the App](docs/setup.md)
-- [Using Local RAG](docs/usage.md)
+- [Using DocMind](docs/usage.md)
 - [RAG Pipeline](docs/pipeline.md)
+
+## Project Information
+
 - [Planned Features](docs/todo.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Known Bugs & Issues](docs/todo.md#known-issues--bugs)
@@ -36,3 +43,7 @@ Learn More:
 - [Contributing](docs/contributing.md)
 - [Security Policy](SECURITY.md)
 - [Changelog](CHANGELOG.md)
+
+## License
+
+DocMind is licensed under the [GPL-3.0 license](LICENSE). Copyright (C) 2026 Ashita-no-Kaushar.
