@@ -1,23 +1,9 @@
 import streamlit as st
 
-from components.page_state import WELCOME_MESSAGE
 from components.tabs.about import about
 from components.tabs.sources import sources
 from components.tabs.settings import settings
 from utils.browser_settings import persist_settings_to_browser_storage
-
-
-def clear_index_and_chat():
-    st.session_state["query_engine"] = None
-    st.session_state["retriever"] = None
-    st.session_state["file_list"] = []
-    st.session_state["processed_file_signature"] = None
-    st.session_state["processed_github_repo"] = None
-    st.session_state["processed_website_urls"] = None
-    st.session_state["github_ingestion_stages"] = []
-    st.session_state["website_ingestion_stages"] = []
-    st.session_state["last_doc_sources"] = []
-    st.session_state["messages"] = [dict(WELCOME_MESSAGE)]
 
 
 def reset_project():
@@ -46,11 +32,6 @@ def sidebar():
             st.success("🟢 **RAG Mode**: Grounded in documents")
         else:
             st.info("💬 **Chat Mode**: Direct LLM conversation")
-
-        # Clear Index & Reset Button
-        if st.button("🔄 Clear Index & Reset Chat", use_container_width=True):
-            clear_index_and_chat()
-            st.rerun()
 
         # Reset Project (danger zone)
         with st.expander("🗑️ Reset Project", expanded=False):
