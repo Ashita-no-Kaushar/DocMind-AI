@@ -28,10 +28,7 @@ Settings are stored in browser `localStorage` and restored on the next visit fro
 
 | Setting | Description | Default |
 | --- | --- | --- |
-| Backend | Choose between Ollama embeddings and local Hugging Face embeddings. | `Ollama` |
-| Ollama Embedding Model | Installed Ollama model with `embedding` capability. | `embeddinggemma`, when available |
-| Local Hugging Face Model | Local embedding model used when Backend is `Local Hugging Face`. | `Alibaba-NLP/gte-modernbert-base` |
-| Other HuggingFace Model | Custom Hugging Face model id used when Local Hugging Face model is `Other`. | |
+| Embedding Model | Installed Ollama model with `embedding` capability. | `embeddinggemma`, when available |
 | Chunk Size | Maximum chunk size for indexed source text. Advanced setting. | `1024` |
 | Chunk Overlap | Text overlap between consecutive chunks. Must be less than Chunk Size. Advanced setting. | `200` |
 
@@ -73,4 +70,4 @@ Guardrails:
 
 ## Export Data
 
-Use `Settings > Export Data > Chat History` to download the current chat transcript as JSON.
+Use `Settings > Export Data > Chat History` to download the current chat transcript as a Word document (`.docx`).

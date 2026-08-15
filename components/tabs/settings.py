@@ -1,6 +1,7 @@
-import json
+import io
 from datetime import datetime
 
+import docx
 import streamlit as st
 
 import utils.ollama as ollama
@@ -43,6 +44,32 @@ def _refresh_embedding_models():
     ensure_ollama_endpoint(st.session_state)
     ollama.get_embedding_models()
     st.session_state["ollama_embedding_models_endpoint"] = st.session_state["ollama_endpoint"]
+
+
+def _chat_history_signature(messages):
+    """Return a hashable snapshot of the chat history for cache keying."""
+    return tuple((m.get("role"), m.get("content")) for m in messages)
+
+
+@st.cache_data(show_spinner=False)
+def chat_history_docx(signature):
+    """Serialize chat history to a Word document, in memory.
+
+    Cached by content: the document is only rebuilt when the conversation
+    actually changes, so this costs a few milliseconds once per new message
+    instead of every rerun.
+    """
+    document = docx.Document()
+    document.add_heading("DocMind AI — Chat History", level=0)
+    document.add_paragraph(f"Exported: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    for role, content in signature:
+        paragraph = document.add_paragraph()
+        label = "User" if role == "user" else "Assistant"
+        paragraph.add_run(f"[{label}] ").bold = True
+        paragraph.add_run(str(content))
+    buffer = io.BytesIO()
+    document.save(buffer)
+    return buffer.getvalue()
 
 
 def settings():
@@ -111,32 +138,20 @@ def settings():
                 "Bulleted",
                 "Technical",
                 "Simple / ELI5",
-                "Custom",
             ],
             index=1,
             horizontal=True,
             key="answer_style",
-            help="Presets inject a style directive into the system prompt. "
-            "Pick 'Custom' to write your own.",
+            help="Presets inject a style directive into the system prompt.",
         )
-        if style == "Custom":
-            st.text_area(
-                "Custom System Prompt",
-                key="system_prompt",
-                height=120,
-                help="Write your own system prompt. Overrides the selected style.",
-            )
-        else:
-            # Apply the preset immediately (a keyed preview widget would hold a
-            # stale value and silently block style changes).
-            st.session_state["system_prompt"] = _style_to_prompt(style)
-            st.text_area(
-                "System Prompt (preview)",
-                value=_style_to_prompt(style),
-                height=120,
-                disabled=True,
-                help="Uneditable preview. Switch to 'Custom' to edit.",
-            )
+        st.session_state["system_prompt"] = _style_to_prompt(style)
+        st.text_area(
+            "System Prompt (preview)",
+            value=_style_to_prompt(style),
+            height=120,
+            disabled=True,
+            help="Uneditable preview of the active preset.",
+        )
 
     st.write("")
 
@@ -192,9 +207,9 @@ def settings():
         st.write("Chat History")
         st.download_button(
             label="Download",
-            data=json.dumps(st.session_state["messages"]),
-            file_name=f"docmind-chat-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.json",
-            mime="application/json",
+            data=chat_history_docx(_chat_history_signature(st.session_state["messages"])),
+            file_name=f"docmind-chat-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
 
     st.toggle("Advanced Settings", key="advanced")
