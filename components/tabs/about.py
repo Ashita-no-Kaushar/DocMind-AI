@@ -1,7 +1,5 @@
 import streamlit as st
 
-from datetime import datetime
-
 
 def about():
     st.title("📚 DocMind AI")

@@ -1,8 +1,11 @@
 import json
+from datetime import datetime
 
 import streamlit as st
 
 import utils.ollama as ollama
+from components.page_state import default_chat_model
+from utils.browser_settings import ensure_ollama_endpoint
 
 
 def _style_to_prompt(style: str) -> str:
@@ -22,10 +25,6 @@ def _style_to_prompt(style: str) -> str:
         "Simple / ELI5": " Explain simply, like you're talking to a 12-year-old. Avoid jargon.",
     }
     return base + style_instructions.get(style, style_instructions["Balanced (default)"])
-from components.page_state import default_chat_model
-from utils.browser_settings import ensure_ollama_endpoint
-
-from datetime import datetime
 
 
 def _refresh_models():
@@ -129,7 +128,7 @@ def settings():
                 "Simple / ELI5",
                 "Custom",
             ],
-            index=st.session_state.get("answer_style_index", 1),
+            index=1,
             horizontal=True,
             key="answer_style",
             help="Presets inject a style directive into the system prompt. "
@@ -138,16 +137,17 @@ def settings():
         if style == "Custom":
             st.text_area(
                 "Custom System Prompt",
-                value=st.session_state.get("system_prompt", ""),
                 key="system_prompt",
                 height=120,
                 help="Write your own system prompt. Overrides the selected style.",
             )
         else:
+            # Apply the preset immediately (a keyed preview widget would hold a
+            # stale value and silently block style changes).
+            st.session_state["system_prompt"] = _style_to_prompt(style)
             st.text_area(
                 "System Prompt (preview)",
                 value=_style_to_prompt(style),
-                key="system_prompt",
                 height=120,
                 disabled=True,
                 help="Uneditable preview. Switch to 'Custom' to edit.",

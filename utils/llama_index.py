@@ -59,12 +59,6 @@ TEXT_QA_TEMPLATE = PromptTemplate(
 # short to embed usefully, they only add embedding work and retrieval noise.
 MIN_CHUNK_CHARS = 50
 
-# Chunks whose best vector similarity falls below this are treated as
-# irrelevant: dropped from the context (and if ALL chunks are weak, the app
-# refuses to answer instead of hallucinating). nomic-embed relevant matches
-# typically score 0.4+; keep the cutoff conservative to avoid false misses.
-SIMILARITY_CUTOFF = 0.35
-
 # Rough token budget for the retrieved context sent to the LLM (chars/4).
 # Excess chunks are trimmed from the bottom of the ranking, keeping the
 # prompt comfortably inside the 2048-token window.

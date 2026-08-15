@@ -16,6 +16,7 @@ PERSISTED_SETTING_TYPES = {
     "chat_mode": str,
     "chunk_size": int,
     "chunk_overlap": int,
+    "similarity_cutoff": float,
     "advanced": bool,
 }
 BROWSER_STORAGE_KEY = "local-rag:settings"
