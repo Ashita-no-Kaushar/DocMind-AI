@@ -149,19 +149,7 @@ def rag_pipeline(
     # Determine embedding model to use #
     ####################################
 
-    embedding_backend = st.session_state["embedding_backend"]
-    embedding_model = st.session_state["embedding_model"]
-
-    if embedding_backend == "Ollama":
-        selected_embedding_model = st.session_state["ollama_embedding_model"]
-    elif embedding_model is None or embedding_model == "Default (gte-modernbert-base)":
-        selected_embedding_model = "Alibaba-NLP/gte-modernbert-base"
-    elif embedding_model == "Higher Quality (Qwen3-Embedding-0.6B)":
-        selected_embedding_model = "Qwen/Qwen3-Embedding-0.6B"
-    elif embedding_model == "Other":
-        selected_embedding_model = st.session_state["other_embedding_model"]
-    else:
-        raise ValueError(f"Unsupported embedding model selection: {embedding_model}")
+    selected_embedding_model = st.session_state["ollama_embedding_model"]
 
     try:
         chunk_size = int(st.session_state["chunk_size"])
@@ -177,7 +165,7 @@ def rag_pipeline(
             selected_embedding_model,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
-            backend=embedding_backend,
+            backend="Ollama",
             ollama_endpoint=st.session_state["ollama_endpoint"],
         )
         completed_stages.append("Embedding Model Ready")

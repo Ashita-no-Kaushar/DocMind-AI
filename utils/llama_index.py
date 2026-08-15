@@ -364,53 +364,30 @@ def setup_embedding_model(
     model: str,
     chunk_size: Optional[int] = None,
     chunk_overlap: Optional[int] = None,
-    backend: str = "Local Hugging Face",
+    backend: str = "Ollama",
     ollama_endpoint: Optional[str] = None,
 ):
     """
-    Sets up an embedding model using the Hugging Face library.
+    Sets up the embedding model used for document ingestion.
 
     Args:
         model (str): The name of the embedding model to use.
 
     Returns:
-        An instance of the HuggingFaceEmbedding class, configured with the specified model and device.
+        An instance of the configured embedding model.
 
     Raises:
         ValueError: If the specified model is not a valid embedding model.
-
-    Notes:
-        The `device` parameter can be set to 'cpu' or 'cuda' to specify the device to use for the embedding computations. If 'cuda' is used and CUDA is available, the embedding model will be run on the GPU. Otherwise, it will be run on the CPU.
     """
     try:
-        if backend == "Ollama":
-            if not ollama_endpoint:
-                raise ValueError("Ollama endpoint is required for Ollama embeddings")
-            Settings.embed_model = OllamaEmbedding(
-                model_name=model,
-                base_url=ollama_endpoint,
-                embed_batch_size=16,
-            )
-            logs.log.info(f"Using Ollama model {model} to generate embeddings (batched)")
-        else:
-            try:
-                from torch import cuda
-                device = "cpu" if not cuda.is_available() else "cuda"
-            except Exception:
-                device = "cpu"
-            if device == "cpu":
-                logs.log.warning(
-                    "CUDA is not available. Local HuggingFace embeddings will run on "
-                    "the CPU, which is slow and generates significant heat. Prefer the "
-                    "Ollama embedding backend, which runs on your GPU."
-                )
-            from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-
-            logs.log.info(f"Using {device} to generate embeddings")
-            Settings.embed_model = HuggingFaceEmbedding(
-                model_name=model,
-                device=device,
-            )
+        if not ollama_endpoint:
+            raise ValueError("Ollama endpoint is required for Ollama embeddings")
+        Settings.embed_model = OllamaEmbedding(
+            model_name=model,
+            base_url=ollama_endpoint,
+            embed_batch_size=16,
+        )
+        logs.log.info(f"Using Ollama model {model} to generate embeddings (batched)")
 
         if chunk_size is not None:
             Settings.chunk_size = chunk_size

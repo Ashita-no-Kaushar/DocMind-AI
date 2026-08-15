@@ -94,13 +94,12 @@ def ensure_valid_model_selections(state):
     elif "selected_model" in state:
         state["selected_model"] = None
 
-    if state.get("embedding_backend") == "Ollama":
-        embedding_models = state.get("ollama_embedding_models", [])
-        if embedding_models:
-            if state.get("ollama_embedding_model") not in embedding_models:
-                state["ollama_embedding_model"] = default_embedding_model(embedding_models)
-        elif "ollama_embedding_model" in state:
-            state["ollama_embedding_model"] = None
+    embedding_models = state.get("ollama_embedding_models", [])
+    if embedding_models:
+        if state.get("ollama_embedding_model") not in embedding_models:
+            state["ollama_embedding_model"] = default_embedding_model(embedding_models)
+    elif "ollama_embedding_model" in state:
+        state["ollama_embedding_model"] = None
 
 
 def set_initial_state():
@@ -122,14 +121,8 @@ def set_initial_state():
 
     ensure_ollama_endpoint(st.session_state)
 
-    if "embedding_backend" not in st.session_state:
-        st.session_state["embedding_backend"] = "Ollama"
-
     if "ollama_embedding_model" not in st.session_state:
         st.session_state["ollama_embedding_model"] = "nomic-embed-text:latest"
-
-    if "embedding_model" not in st.session_state:
-        st.session_state["embedding_model"] = "Default (gte-modernbert-base)"
 
     if should_refresh_models_for_endpoint(st.session_state, "ollama_models"):
         try:
@@ -232,12 +225,6 @@ def set_initial_state():
 
     if "top_k" not in st.session_state:
         st.session_state["top_k"] = 3
-
-    if "embedding_model" not in st.session_state:
-        st.session_state["embedding_model"] = None
-
-    if "other_embedding_model" not in st.session_state:
-        st.session_state["other_embedding_model"] = None
 
     if "chunk_size" not in st.session_state:
         st.session_state["chunk_size"] = 256

@@ -10,11 +10,10 @@ def missing_ingestion_settings():
     if not chat_model or chat_model not in chat_models:
         missing.append("a valid Ollama chat model")
 
-    if st.session_state.get("embedding_backend") == "Ollama":
-        embedding_model = st.session_state.get("ollama_embedding_model")
-        embedding_models = st.session_state.get("ollama_embedding_models", [])
-        if not embedding_model or embedding_model not in embedding_models:
-            missing.append("a valid Ollama embedding model")
+    embedding_model = st.session_state.get("ollama_embedding_model")
+    embedding_models = st.session_state.get("ollama_embedding_models", [])
+    if not embedding_model or embedding_model not in embedding_models:
+        missing.append("a valid Ollama embedding model")
 
     return missing
 

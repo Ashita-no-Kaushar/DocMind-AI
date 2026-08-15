@@ -22,9 +22,6 @@ class BrowserSettingsTests(unittest.TestCase):
             state,
             {
                 "ollama_endpoint": "http://192.168.4.2:11434",
-                "embedding_backend": "Local Hugging Face",
-                "embedding_model": "Higher Quality (Qwen3-Embedding-0.6B)",
-                "other_embedding_model": "custom/model",
                 "ollama_embedding_model": "embeddinggemma",
                 "top_k": "5",
                 "chunk_size": "2048",
@@ -96,7 +93,6 @@ class BrowserSettingsTests(unittest.TestCase):
             {
                 "ollama_endpoint": "http://192.168.4.2:11434",
                 "selected_model": "gemma4:latest",
-                "embedding_backend": "Ollama",
                 "ollama_embedding_model": "embeddinggemma",
             }
         )
@@ -110,7 +106,6 @@ class BrowserSettingsTests(unittest.TestCase):
         self.assertTrue(state["browser_settings_restored"])
         self.assertEqual(state["ollama_endpoint"], "http://192.168.4.2:11434")
         self.assertEqual(state["selected_model"], "gemma4:latest")
-        self.assertEqual(state["embedding_backend"], "Ollama")
         self.assertEqual(state["ollama_embedding_model"], "embeddinggemma")
 
     def test_persist_writes_ollama_endpoint_and_model_settings_after_restore(self):
@@ -118,9 +113,7 @@ class BrowserSettingsTests(unittest.TestCase):
             "browser_settings_restored": True,
             "ollama_endpoint": "http://192.168.4.2:11434",
             "selected_model": "gemma4:latest",
-            "embedding_backend": "Ollama",
             "ollama_embedding_model": "embeddinggemma",
-            "embedding_model": "Default (gte-modernbert-base)",
             "messages": ["do not persist"],
         }
         storage_component = Mock()
@@ -137,9 +130,7 @@ class BrowserSettingsTests(unittest.TestCase):
             persisted_settings,
             {
                 "ollama_endpoint": "http://192.168.4.2:11434",
-                "embedding_backend": "Ollama",
                 "ollama_embedding_model": "embeddinggemma",
-                "embedding_model": "Default (gte-modernbert-base)",
                 "selected_model": "gemma4:latest",
             },
         )

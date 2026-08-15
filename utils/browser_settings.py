@@ -7,10 +7,7 @@ import streamlit.components.v1 as components
 
 PERSISTED_SETTING_TYPES = {
     "ollama_endpoint": str,
-    "embedding_backend": str,
     "ollama_embedding_model": str,
-    "embedding_model": str,
-    "other_embedding_model": str,
     "selected_model": str,
     "top_k": int,
     "chunk_size": int,

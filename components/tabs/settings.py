@@ -146,56 +146,23 @@ def settings():
     )
     embedding_settings = st.container(border=True)
     with embedding_settings:
-        embedding_backend = st.selectbox(
-            "Backend",
-            ["Ollama", "Local Hugging Face"],
-            key="embedding_backend",
+        st.selectbox(
+            "Embedding Model",
+            st.session_state["ollama_embedding_models"],
+            key="ollama_embedding_model",
+            disabled=len(st.session_state["ollama_embedding_models"]) == 0,
+            placeholder=(
+                "Select Model"
+                if len(st.session_state["ollama_embedding_models"]) > 0
+                else "No Embedding Models Available"
+            ),
         )
-        if embedding_backend == "Ollama":
-            st.selectbox(
-                "Embedding Model",
-                st.session_state["ollama_embedding_models"],
-                key="ollama_embedding_model",
-                disabled=len(st.session_state["ollama_embedding_models"]) == 0,
-                placeholder=(
-                    "Select Model"
-                    if len(st.session_state["ollama_embedding_models"]) > 0
-                    else "No Embedding Models Available"
-                ),
-            )
-            st.button(
-                "Refresh Models",
-                key="refresh_embedding_models",
-                on_click=_refresh_embedding_models,
-            )
-            st.caption("Need one? Pull an Ollama embedding model first, e.g. `ollama pull embeddinggemma`.")
-        else:
-            try:
-                from torch import cuda as torch_cuda
-                _cuda_available = torch_cuda.is_available()
-            except Exception:
-                _cuda_available = False
-            if not _cuda_available:
-                st.warning(
-                    "⚠️ **No GPU (CUDA) available** for HuggingFace embeddings. They "
-                    "will run on your **CPU**, which is slow and heats up your laptop. "
-                    "Switch the Backend to **Ollama** to use your GPU instead."
-                )
-            embedding_model = st.selectbox(
-                "Model",
-                [
-                    "Default (gte-modernbert-base)",
-                    "Higher Quality (Qwen3-Embedding-0.6B)",
-                    "Other",
-                ],
-                key="embedding_model",
-            )
-            if embedding_model == "Other":
-                st.text_input(
-                    "HuggingFace Model",
-                    key="other_embedding_model",
-                    placeholder="Qwen/Qwen3-Embedding-0.6B",
-                )
+        st.button(
+            "Refresh Models",
+            key="refresh_embedding_models",
+            on_click=_refresh_embedding_models,
+        )
+        st.caption("Need one? Pull an Ollama embedding model first, e.g. `ollama pull embeddinggemma`.")
         if st.session_state["advanced"] == True:
             st.caption(
                 "View the [MTEB Embeddings Leaderboard](https://huggingface.co/spaces/mteb/leaderboard)"
