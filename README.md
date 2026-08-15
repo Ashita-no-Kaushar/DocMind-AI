@@ -3,9 +3,9 @@
 ![docmind-demo](demo.gif)
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8588/badge)](https://www.bestpractices.dev/projects/8588)
-![GitHub Commit Activity](https://img.shields.io/github/commit-activity/t/Ashita-no-Kaushar/DocMind)
-![GitHub Last Commit](https://img.shields.io/github/last-commit/Ashita-no-Kaushar/DocMind)
-![GitHub License](https://img.shields.io/github/license/Ashita-no-Kaushar/DocMind)
+![GitHub Commit Activity](https://img.shields.io/github/commit-activity/t/Ashita-no-Kaushar/DocMind-AI)
+![GitHub Last Commit](https://img.shields.io/github/last-commit/Ashita-no-Kaushar/DocMind-AI)
+![GitHub License](https://img.shields.io/github/license/Ashita-no-Kaushar/DocMind-AI)
 
 Offline, open-source retrieval augmented generation (RAG).
 

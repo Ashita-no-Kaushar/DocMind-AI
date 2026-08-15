@@ -9,7 +9,7 @@ def about():
     links_html = """
     <ul style="list-style-type:none; padding-left:0;">
         <li>
-            <a href="https://github.com/Ashita-no-Kaushar/DocMind" style="color: grey;">GitHub</a>
+            <a href="https://github.com/Ashita-no-Kaushar/DocMind-AI" style="color: grey;">GitHub</a>
         </li>
     </ul>
     """
@@ -32,12 +32,12 @@ def about():
     help_html = """
     <ul style="list-style-type:none; padding-left:0;">
         <li>
-            <a href="https://github.com/Ashita-no-Kaushar/DocMind/issues" style="color: grey;">
+            <a href="https://github.com/Ashita-no-Kaushar/DocMind-AI/issues" style="color: grey;">
                 Bug Reports
             </a>
         </li>
         <li>
-            <a href="https://github.com/Ashita-no-Kaushar/DocMind/discussions" style="color: grey;">
+            <a href="https://github.com/Ashita-no-Kaushar/DocMind-AI/discussions" style="color: grey;">
                 Feature Requests
             </a>
         </li>

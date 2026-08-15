@@ -4,9 +4,9 @@
 
 Please report suspected vulnerabilities through GitHub's private vulnerability reporting for this repository:
 
-https://github.com/Ashita-no-Kaushar/DocMind/security/advisories/new
+https://github.com/Ashita-no-Kaushar/DocMind-AI/security/advisories/new
 
-If private reporting is unavailable, open a [GitHub issue](https://github.com/Ashita-no-Kaushar/DocMind/issues) and avoid including exploit details, private data, credentials, or sensitive local files in the public report.
+If private reporting is unavailable, open a [GitHub issue](https://github.com/Ashita-no-Kaushar/DocMind-AI/issues) and avoid including exploit details, private data, credentials, or sensitive local files in the public report.
 
 ## Response Expectations
 
@@ -16,7 +16,7 @@ Security reports are reviewed as soon as practical, with an initial response tar
 
 The project currently supports the latest released version. Users should upgrade to the newest GitHub release when security fixes are published:
 
-https://github.com/Ashita-no-Kaushar/DocMind/releases
+https://github.com/Ashita-no-Kaushar/DocMind-AI/releases
 
 ## Scope
 

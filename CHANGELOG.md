@@ -2,7 +2,7 @@
 
 Release notes for DocMind are published with GitHub Releases:
 
-https://github.com/Ashita-no-Kaushar/DocMind/releases
+https://github.com/Ashita-no-Kaushar/DocMind-AI/releases
 
 ## Vulnerability Disclosure in Release Notes
 

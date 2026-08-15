@@ -32,7 +32,7 @@ def github_repo():
         with st.form("github_repo_form"):
             st.text_input(
                 "Select a GitHub.com repo",
-                placeholder="Ashita-no-Kaushar/DocMind",
+                placeholder="Ashita-no-Kaushar/DocMind-AI",
                 key="github_repo",
             )
             repo_processed = st.form_submit_button("Process")
@@ -40,7 +40,7 @@ def github_repo():
         if repo_processed:
             input_repo = (st.session_state.get("github_repo") or "").strip()
             if not input_repo:
-                input_repo = "Ashita-no-Kaushar/DocMind"
+                input_repo = "Ashita-no-Kaushar/DocMind-AI"
                 st.session_state["github_repo"] = input_repo
 
             status_container = st.empty()
@@ -102,7 +102,7 @@ def github_repo():
     else:
         st.text_input(
             "Select a GitHub.com repo",
-            placeholder="Ashita-no-Kaushar/DocMind",
+            placeholder="Ashita-no-Kaushar/DocMind-AI",
             key="github_repo_disabled",
             disabled=True,
         )

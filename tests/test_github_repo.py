@@ -13,8 +13,8 @@ class GitHubIngestionStatusTests(unittest.TestCase):
     def test_shows_status_for_processed_repo_with_query_engine(self):
         self.assertTrue(
             should_show_github_ingestion_status(
-                current_repo="Ashita-no-Kaushar/DocMind",
-                processed_repo="Ashita-no-Kaushar/DocMind",
+                current_repo="Ashita-no-Kaushar/DocMind-AI",
+                processed_repo="Ashita-no-Kaushar/DocMind-AI",
                 ingestion_stages=["Repository Validated", "Index Ready"],
                 query_engine=object(),
             )
@@ -23,8 +23,8 @@ class GitHubIngestionStatusTests(unittest.TestCase):
     def test_shows_status_when_current_repo_is_full_github_url(self):
         self.assertTrue(
             should_show_github_ingestion_status(
-                current_repo="https://github.com/Ashita-no-Kaushar/DocMind",
-                processed_repo="Ashita-no-Kaushar/DocMind",
+                current_repo="https://github.com/Ashita-no-Kaushar/DocMind-AI",
+                processed_repo="Ashita-no-Kaushar/DocMind-AI",
                 ingestion_stages=["Repository Validated", "Index Ready"],
                 query_engine=object(),
             )
@@ -34,7 +34,7 @@ class GitHubIngestionStatusTests(unittest.TestCase):
         self.assertFalse(
             should_show_github_ingestion_status(
                 current_repo="other/repo",
-                processed_repo="Ashita-no-Kaushar/DocMind",
+                processed_repo="Ashita-no-Kaushar/DocMind-AI",
                 ingestion_stages=["Repository Validated", "Index Ready"],
                 query_engine=object(),
             )
@@ -43,8 +43,8 @@ class GitHubIngestionStatusTests(unittest.TestCase):
     def test_hides_status_without_query_engine(self):
         self.assertFalse(
             should_show_github_ingestion_status(
-                current_repo="Ashita-no-Kaushar/DocMind",
-                processed_repo="Ashita-no-Kaushar/DocMind",
+                current_repo="Ashita-no-Kaushar/DocMind-AI",
+                processed_repo="Ashita-no-Kaushar/DocMind-AI",
                 ingestion_stages=["Repository Validated", "Index Ready"],
                 query_engine=None,
             )
