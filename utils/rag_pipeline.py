@@ -190,15 +190,22 @@ def rag_pipeline(
             record_completed_stages()
             render_pipeline_status(status_container, completed_stages)
         else:
+            uploaded_paths = None
             if uploaded_files is not None:
+                uploaded_paths = []
                 for uploaded_file in uploaded_files:
                     with st.spinner(f"Processing {uploaded_file.name}..."):
                         func.save_uploaded_file(uploaded_file, save_dir)
+                        uploaded_paths.append(
+                            os.path.join(save_dir, uploaded_file.name)
+                        )
                 completed_stages.append("Files Uploaded")
                 record_completed_stages()
                 render_pipeline_status(status_container, completed_stages)
 
-            ingested_documents = llama_index.load_documents(ingest_dir)
+            ingested_documents = llama_index.load_documents(
+                ingest_dir, input_files=uploaded_paths
+            )
             if len(ingested_documents) == 0:
                 raise ValueError("No files were found to process.")
             validate_ingested_documents(ingested_documents)
@@ -248,11 +255,9 @@ def rag_pipeline(
     # Remove transient on-disk ingestion files (uploads/clones) after indexing.
     # Only clean up if indexing completed and query_engine is confirmed set.
     if st.session_state.get("query_engine") is not None and os.path.isdir(save_dir):
-        try:
-            shutil.rmtree(save_dir)
-        except Exception as err:
+        if not func.remove_dir_retry(save_dir):
             logs.log.warning(
-                f"Unable to delete data files, you may want to clean-up manually: {str(err)}"
+                "Unable to delete data files, you may want to clean-up manually."
             )
 
     return error  # If no errors occurred, None is returned

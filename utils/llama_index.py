@@ -419,12 +419,14 @@ EXCLUDED_FILE_PATTERNS = [
 ]
 
 
-def load_documents(data_dir: str):
+def load_documents(data_dir: str, input_files: list = None):
     """
     Loads documents from a directory of files with binary and archive exclusions.
 
     Args:
         data_dir (str): The path to the directory containing the documents to be loaded.
+        input_files (list, optional): An explicit list of files to load. When provided,
+            only these files are read, ignoring anything else in the directory.
 
     Returns:
         A list of documents, where each document is a string representing the content of the corresponding file.
@@ -433,11 +435,17 @@ def load_documents(data_dir: str):
         Exception: If there is an error creating the data index.
     """
     try:
-        files = SimpleDirectoryReader(
-            input_dir=data_dir,
-            recursive=True,
-            exclude=EXCLUDED_FILE_PATTERNS,
-        )
+        if input_files:
+            files = SimpleDirectoryReader(
+                input_files=input_files,
+                exclude=EXCLUDED_FILE_PATTERNS,
+            )
+        else:
+            files = SimpleDirectoryReader(
+                input_dir=data_dir,
+                recursive=True,
+                exclude=EXCLUDED_FILE_PATTERNS,
+            )
         documents = files.load_data()
         logs.log.info(f"Loaded {len(documents):,} documents from files")
         return documents

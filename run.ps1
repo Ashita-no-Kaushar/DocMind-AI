@@ -13,6 +13,12 @@ if (Test-Path "$env:LOCALAPPDATA\Programs\Git\cmd") {
     $env:PATH = "$env:LOCALAPPDATA\Programs\Git\cmd;$env:LOCALAPPDATA\Programs\Git\bin;" + $env:PATH
 }
 
+# Purge stale Python bytecode so the app always runs the current source.
+# Outdated .pyc files (e.g. after git operations) have served old feature
+# logic and old default values in the past.
+Get-ChildItem -Path "." -Recurse -Directory -Filter "__pycache__" -ErrorAction SilentlyContinue |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
 # Ollama GPU/performance tuning (reduces CPU load and laptop heat)
 $env:OLLAMA_FLASH_ATTENTION = "1"          # Faster, lower-power attention on CUDA
 $env:OLLAMA_KEEP_ALIVE = "2m"              # Unload models when idle (less heat)

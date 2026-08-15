@@ -3,6 +3,7 @@ import ipaddress
 import re
 import shutil
 import socket
+import time
 import requests
 import subprocess
 from pathlib import Path
@@ -36,6 +37,17 @@ MAX_UPLOAD_FILES = 10
 MAX_UPLOAD_FILE_BYTES = 25 * 1024 * 1024
 MAX_TOTAL_UPLOAD_BYTES = 100 * 1024 * 1024
 GIT_CLONE_TIMEOUT_SECONDS = 120
+
+
+def remove_dir_retry(path, attempts=8, delay=0.75):
+    """Delete a directory tree, retrying transient file locks (Windows)."""
+    for _ in range(attempts):
+        try:
+            shutil.rmtree(path)
+            return True
+        except OSError:
+            time.sleep(delay)
+    return False
 
 
 def _is_blocked_ip(ip_address: str) -> bool:
@@ -319,7 +331,18 @@ def clone_github_repo(repo: str):
         # Ensure retries of the same repo don't fail because a stale checkout exists.
         if os.path.isdir(destination):
             logs.log.info(f"Removing existing repository directory: {destination}")
-            shutil.rmtree(destination)
+            if not remove_dir_retry(destination):
+                logs.log.warning(
+                    "Stale repository checkout is locked; "
+                    f"cloning into a timestamped directory instead: {destination}"
+                )
+                destination = os.path.normpath(
+                    os.path.join(
+                        save_dir,
+                        f"clone_{int(time.time())}",
+                        repo.replace("/", "__"),
+                    )
+                )
 
         git_bin = shutil.which("git")
         if not git_bin:
