@@ -105,10 +105,40 @@ class HybridRetriever:
         self.top_k = top_k
         self.similarity_cutoff = similarity_cutoff if similarity_cutoff is not None else 0.3
         self._bm25 = BM25Okapi([self._tokenize(node_id) for node_id in corpus])
+        self.intro_node_ids = self._intro_node_ids()
 
     def _tokenize(self, node_id):
         node = self.docstore.get_node(node_id)
         return _bm25_tokens(node.get_content())
+
+    def _intro_node_ids(self, count=2):
+        """Return the opening chunks of the corpus (document introductions)."""
+        try:
+            def sort_key(node_id):
+                node = self.docstore.get_node(node_id)
+                metadata = node.metadata or {}
+                start = getattr(node, "start_char_idx", None) or 0
+                return (metadata.get("file_name", ""), start)
+
+            return sorted(self.corpus, key=sort_key)[:count]
+        except Exception:
+            return []
+
+    @staticmethod
+    def _is_doc_level_query(query: str, rewritten: str) -> bool:
+        """Heuristically detect questions about the document itself.
+
+        "What is this document about?", "summarize the document", "tell me
+        about the uploaded file" are answered best by the document's opening
+        chunks, which state the topic explicitly. Specific fact questions keep
+        many meaningful tokens after query cleaning and are left untouched.
+        """
+        lower = query.lower()
+        if "summar" in lower or "overview" in lower:
+            return True
+        if "document" in lower and len(rewritten.split()) <= 3:
+            return True
+        return False
 
     def retrieve(self, query: str):
         rewritten = _rewrite_query(query)
@@ -168,12 +198,36 @@ class HybridRetriever:
             used_chars += len(content)
             selected.append((node_id, rrf_score))
 
+        max_nodes = self.top_k
+        if self._is_doc_level_query(query, rewritten):
+            # Document-level questions ("what is this document about?", "summarize
+            # it") are best answered from the document's introduction, which states
+            # the topic explicitly. Prepending the opening chunks gives the small
+            # local model the summary material it needs instead of mid-document
+            # fragments (which made it refuse). Ranked results are trimmed from
+            # the tail to make room inside the context budget.
+            existing_ids = {node_id for node_id, _ in selected}
+            intro = []
+            for node_id in self.intro_node_ids:
+                if node_id in existing_ids:
+                    continue
+                intro.append((node_id, rrf_scores.get(node_id, 0.0)))
+            selected = intro + selected
+            total_chars = used_chars + sum(
+                len(self.docstore.get_node(node_id).get_content())
+                for node_id, _ in intro
+            )
+            while selected and total_chars > CONTEXT_CHAR_BUDGET:
+                removed_id, _ = selected.pop()
+                total_chars -= len(self.docstore.get_node(removed_id).get_content())
+            max_nodes = self.top_k + len(intro)
+
         return [
             NodeWithScore(
                 node=self.docstore.get_node(node_id),
                 score=vector_scores.get(node_id, rrf_score),
             )
-            for node_id, rrf_score in selected[: self.top_k]
+            for node_id, rrf_score in selected[:max_nodes]
         ]
 
 
