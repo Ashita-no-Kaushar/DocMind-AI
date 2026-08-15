@@ -3,6 +3,25 @@ import json
 import streamlit as st
 
 import utils.ollama as ollama
+
+
+def _style_to_prompt(style: str) -> str:
+    """Return the system prompt for a given answer style preset."""
+    base = (
+        "You are DocMind AI, a helpful and accurate virtual assistant. "
+        "When document context is provided, answer strictly from that context "
+        "and do not invent information. Otherwise answer from your general "
+        "knowledge. Be factual and conversational."
+    )
+    style_instructions = {
+        "Concise": " Keep answers as short as possible — one or two sentences.",
+        "Balanced (default)": " Keep answers concise but complete.",
+        "Detailed": " Provide thorough explanations with context and examples.",
+        "Bulleted": " Structure answers as bullet points for readability.",
+        "Technical": " Use precise terminology; assume a technical audience.",
+        "Simple / ELI5": " Explain simply, like you're talking to a 12-year-old. Avoid jargon.",
+    }
+    return base + style_instructions.get(style, style_instructions["Balanced (default)"])
 from components.page_state import default_chat_model
 from utils.browser_settings import ensure_ollama_endpoint
 
@@ -64,6 +83,16 @@ def settings():
                 value=st.session_state["top_k"],
                 key="top_k",
             )
+            st.slider(
+                "Similarity Threshold",
+                min_value=0.0,
+                max_value=1.0,
+                step=0.05,
+                value=st.session_state.get("similarity_cutoff", 0.3),
+                help="Minimum similarity score (0-1) for a chunk to be considered. "
+                "Lower = more recall, higher = only very relevant chunks. 0 = disabled.",
+                key="similarity_cutoff",
+            )
             # st.text_area(
             #     "System Prompt",
             #     value=st.session_state["system_prompt"],
@@ -84,6 +113,47 @@ def settings():
                 disabled=True,
             )
             st.write("")
+
+    st.subheader("Answer Style")
+    style_settings = st.container(border=True)
+    with style_settings:
+        st.caption("Choose how the assistant formats its answers. This adjusts the system prompt.")
+        style = st.radio(
+            "Style",
+            options=[
+                "Concise",
+                "Balanced (default)",
+                "Detailed",
+                "Bulleted",
+                "Technical",
+                "Simple / ELI5",
+                "Custom",
+            ],
+            index=st.session_state.get("answer_style_index", 1),
+            horizontal=True,
+            key="answer_style",
+            help="Presets inject a style directive into the system prompt. "
+            "Pick 'Custom' to write your own.",
+        )
+        if style == "Custom":
+            st.text_area(
+                "Custom System Prompt",
+                value=st.session_state.get("system_prompt", ""),
+                key="system_prompt",
+                height=120,
+                help="Write your own system prompt. Overrides the selected style.",
+            )
+        else:
+            st.text_area(
+                "System Prompt (preview)",
+                value=_style_to_prompt(style),
+                key="system_prompt",
+                height=120,
+                disabled=True,
+                help="Uneditable preview. Switch to 'Custom' to edit.",
+            )
+
+    st.write("")
 
     st.subheader(
         "Embeddings",

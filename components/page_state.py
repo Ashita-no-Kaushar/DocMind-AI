@@ -246,5 +246,8 @@ def set_initial_state():
     if "chunk_size" not in st.session_state:
         st.session_state["chunk_size"] = 256
 
-    if "chunk_overlap" not in st.session_state:
-        st.session_state["chunk_overlap"] = 32
+    if "similarity_cutoff" not in st.session_state:
+        st.session_state["similarity_cutoff"] = 0.3
+
+    if "answer_style_index" not in st.session_state:
+        st.session_state["answer_style_index"] = 1  # Balanced (default)

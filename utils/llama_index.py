@@ -101,13 +101,15 @@ class HybridRetriever:
     BM25 runs entirely on the CPU in a few milliseconds per query and catches
     exact keyword matches (names, codes, numbers) that vector search misses.
     Fusion uses Reciprocal Rank Fusion (RRF): no extra GPU work, no LLM calls.
+    Includes similarity cutoff, duplicate filtering, and context budgeting.
     """
 
-    def __init__(self, vector_retriever, docstore, corpus, top_k):
+    def __init__(self, vector_retriever, docstore, corpus, top_k, similarity_cutoff=None):
         self.vector_retriever = vector_retriever
         self.docstore = docstore
         self.corpus = corpus
         self.top_k = top_k
+        self.similarity_cutoff = similarity_cutoff if similarity_cutoff is not None else 0.3
         self._bm25 = BM25Okapi([self._tokenize(node_id) for node_id in corpus])
 
     def _tokenize(self, node_id):
@@ -140,7 +142,7 @@ class HybridRetriever:
         filtered = {
             node_id: rrf
             for node_id, rrf in rrf_scores.items()
-            if vector_scores.get(node_id, 0.0) >= SIMILARITY_CUTOFF
+            if vector_scores.get(node_id, 0.0) >= self.similarity_cutoff
         }
         if not filtered:
             return []
@@ -150,8 +152,23 @@ class HybridRetriever:
         ranked = sorted(filtered.items(), key=lambda kv: kv[1], reverse=True)
         selected = []
         used_chars = 0
+
+        # Deduplicate: skip chunks whose content is nearly identical to an
+        # already-selected chunk (cosine similarity > 0.95 on embeddings would
+        # be ideal, but we approximate with simple text overlap ratio to avoid
+        # extra embedding calls — fast, zero GPU, good enough for near-dups).
+        def _overlap_ratio(a, b):
+            wa = set(_bm25_tokens(a))
+            wb = set(_bm25_tokens(b))
+            if not wa or not wb:
+                return 0.0
+            return len(wa & wb) / min(len(wa), len(wb))
+
         for node_id, rrf_score in ranked:
             content = self.docstore.get_node(node_id).get_content()
+            # Duplicate check against already-selected chunks
+            if any(_overlap_ratio(content, self.docstore.get_node(sid).get_content()) > 0.95 for sid, _ in selected):
+                continue
             if selected and used_chars + len(content) > CONTEXT_CHAR_BUDGET:
                 break
             used_chars += len(content)
@@ -160,24 +177,25 @@ class HybridRetriever:
         return [
             NodeWithScore(
                 node=self.docstore.get_node(node_id),
-                # Report the real vector similarity for the UI; nodes found
-                # only via BM25 fall back to their RRF fusion score.
                 score=vector_scores.get(node_id, rrf_score),
             )
             for node_id, rrf_score in selected[: self.top_k]
         ]
 
 
-def build_hybrid_retriever(vector_retriever, index, top_k):
+def build_hybrid_retriever(vector_retriever, index, top_k, similarity_cutoff=None):
     """Return a vector+BM25 hybrid retriever over the index's docstore."""
     try:
         docstore = index.docstore
         corpus = list(docstore.docs.keys())
+        if similarity_cutoff is None:
+            similarity_cutoff = st.session_state.get("similarity_cutoff", 0.3)
         return HybridRetriever(
             vector_retriever=vector_retriever,
             docstore=docstore,
             corpus=corpus,
             top_k=top_k,
+            similarity_cutoff=similarity_cutoff,
         )
     except Exception as err:
         logs.log.warning(f"Hybrid retriever unavailable, falling back to vector: {err}")
@@ -586,7 +604,8 @@ def create_query_engine(documents, progress_callback=None):
         # BM25 hybrid catches keyword matches that pure vector search misses.
         vector_retriever = index.as_retriever(similarity_top_k=similarity_top_k)
         st.session_state["retriever"] = build_hybrid_retriever(
-            vector_retriever, index, similarity_top_k
+            vector_retriever, index, similarity_top_k,
+            st.session_state.get("similarity_cutoff", 0.3)
         )
 
         st.session_state["query_engine"] = query_engine

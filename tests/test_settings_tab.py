@@ -17,6 +17,7 @@ class _StreamlitStub:
     def __init__(self, state):
         self.session_state = state
         self.selectbox_calls = []
+        self.radio_calls = []
 
     def header(self, *args, **kwargs):
         pass
@@ -37,6 +38,10 @@ class _StreamlitStub:
         self.selectbox_calls.append((label, kwargs))
         return self.session_state.get(kwargs.get("key"))
 
+    def radio(self, label, options, **kwargs):
+        self.radio_calls.append((label, kwargs))
+        return self.session_state.get(kwargs.get("key"), options[0] if options else None)
+
     def button(self, *args, **kwargs):
         pass
 
@@ -47,6 +52,9 @@ class _StreamlitStub:
         pass
 
     def download_button(self, *args, **kwargs):
+        pass
+
+    def text_area(self, *args, **kwargs):
         pass
 
 
