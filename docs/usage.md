@@ -1,10 +1,10 @@
-# Using Local RAG
+# Using DocMind
 
 ## Quick Start
 
 1. Open Settings and confirm the Ollama endpoint.
 2. Select a valid chat model.
-3. Select an embedding backend and model.
+3. Select a chat model and an embedding model.
 4. Import data from local files, a GitHub repository, or websites.
 5. Once ingestion completes, ask questions in the chat box.
 
@@ -19,7 +19,7 @@ Settings are stored in browser `localStorage` and restored on the next visit fro
 | Setting | Description | Default |
 | --- | --- | --- |
 | Ollama Endpoint | Ollama API base URL. Empty values are ignored and fall back to `http://localhost:11434`. | `http://localhost:11434` |
-| Chat Model | Installed Ollama model with `completion` capability. | Prefers `gemma4:latest`, then `llama3:8b`, then `llama2:7b`, then the first discovered chat model. |
+| Chat Model | Installed Ollama model with `completion` capability. | Prefers `qwen2.5:0.5b`, then `llama3`, then the first discovered chat model. |
 | Refresh Models | Reloads chat and embedding model lists for the current endpoint. | |
 | Top K | Number of most similar chunks to retrieve for each query. Applies to the next query immediately. Advanced setting. | `3` |
 | Similarity Threshold | Minimum vector similarity score for a chunk to be used. Higher = stronger matches only, lower = more recall, `0` = disabled. Applies to the next query immediately. Advanced setting. | `0.3` |
@@ -28,7 +28,7 @@ Settings are stored in browser `localStorage` and restored on the next visit fro
 
 | Setting | Description | Default |
 | --- | --- | --- |
-| Embedding Model | Installed Ollama model with `embedding` capability. | `embeddinggemma`, when available |
+| Embedding Model | Installed Ollama model with `embedding` capability. | `nomic-embed-text`, when available |
 | Chunk Size | Maximum chunk size for indexed source text. Advanced setting. | `1024` |
 | Chunk Overlap | Text overlap between consecutive chunks. Must be less than Chunk Size. Advanced setting. | `200` |
 
@@ -57,7 +57,7 @@ Only `github.com` repository URLs are supported. URLs must point directly to a r
 
 ### Websites
 
-Website ingestion accepts up to 5 public HTTPS URLs at a time. If you enter a hostname without a scheme, Local RAG adds `https://`.
+Website ingestion accepts up to 5 public HTTPS URLs at a time. If you enter a hostname without a scheme, DocMind adds `https://`.
 
 Guardrails:
 

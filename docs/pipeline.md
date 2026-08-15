@@ -1,14 +1,13 @@
 # RAG Pipeline
 
-Local RAG builds an in-memory LlamaIndex query engine from one source at a time: local file uploads, a GitHub repository clone, or fetched website documents.
+DocMind builds an in-memory LlamaIndex query engine from one source at a time: local file uploads, a GitHub repository clone, or fetched website documents.
 
 ## Ingestion Flow
 
 1. Validate the current Ollama chat model and embedding settings.
 2. Initialize the selected Ollama chat model.
-3. Configure the selected embedding backend:
+3. Configure the embedding backend:
    - Ollama embeddings through the configured Ollama endpoint
-   - Local Hugging Face embeddings through `llama-index-embeddings-huggingface`
 4. Load documents:
    - Local files and GitHub repositories are loaded with LlamaIndex `SimpleDirectoryReader`.
    - Websites are fetched with request size, redirect, content type, and network guardrails, then converted to text.

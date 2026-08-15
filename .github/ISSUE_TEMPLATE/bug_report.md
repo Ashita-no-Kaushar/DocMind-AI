@@ -11,7 +11,7 @@ assignees: ''
 A clear and concise description of what the bug is.
 
 **Troubleshooting**
-I have read the Local RAG [troubleshooting guide](../../docs/troubleshooting.md), reviewed my application state and log file:
+I have read the DocMind [troubleshooting guide](../../docs/troubleshooting.md), reviewed my application state and log file:
 - [ ] Yes
 - [ ] No
 
@@ -29,7 +29,7 @@ A clear and concise description of what you expected to happen.
 If applicable, attach screenshots to help explain your problem. **A screenshot of your Settings > Advanced > Application State section can greatly aid in troubleshooting.**
 
 **Logs**
-If applicable, attach log files to help explain your problem. **Reproducing your issue and sharing a copy of your `local-rag.log` can greatly aid in troubleshooting.**
+If applicable, attach log files to help explain your problem. **Reproducing your issue and sharing a copy of your `docmind.log` can greatly aid in troubleshooting.**
 
 **Desktop (please complete the following information):**
  - OS: [e.g. iOS]

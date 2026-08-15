@@ -1,19 +1,19 @@
 # Troubleshooting
 
-In the event that an error occurs when using Local RAG, checking out the current application state and logfile can provide insights into what is happening behind the scenes.
+In the event that an error occurs when using DocMind, checking out the current application state and logfile can provide insights into what is happening behind the scenes.
 
 Note: To better understand what is happening under the hood and aid in troubleshooting, check out the [Pipeline documentation](pipeline.md) as well.
 
 ## Ingestion Is Disabled
 
-Data import controls are disabled until Settings contains a valid Ollama chat model and, when the embedding backend is `Ollama`, a valid Ollama embedding model.
+Data import controls are disabled until Settings contains a valid Ollama chat model and a valid Ollama embedding model.
 
 To fix this:
 
 - Confirm Ollama is running.
 - Confirm the endpoint in Settings, usually `http://localhost:11434`.
-- Pull at least one chat-capable model, such as `gemma4:latest`.
-- Pull at least one embedding-capable model, such as `embeddinggemma`, or switch the embedding backend to `Local Hugging Face`.
+- Pull at least one chat-capable model, such as `qwen2.5:0.5b`.
+- Pull at least one embedding-capable model, such as `nomic-embed-text:latest`.
 - Use the Refresh Models buttons after changing the endpoint or pulling new models.
 
 ## Settings Restore Problems
@@ -60,7 +60,7 @@ Common website import errors:
 
 ## Log File
 
-By default, Local RAG will create a `local-rag.log` file in the root application folder.
+By default, DocMind will create a `docmind.log` file in the root application folder.
 
 Each step of the RAG process is logged into this file whether the required step was successful or encountered an error. 
 

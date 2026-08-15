@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Project Overview
 
-Local RAG is a Streamlit application for offline retrieval augmented generation with Ollama, LlamaIndex, local files, GitHub repositories, and websites.
+DocMind is a Streamlit application for offline retrieval augmented generation with Ollama, LlamaIndex, local files, GitHub repositories, and websites.
 
 Primary entry points:
 

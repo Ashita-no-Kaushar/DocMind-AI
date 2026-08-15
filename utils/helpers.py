@@ -113,7 +113,7 @@ def load_website_documents(urls: list[str]) -> list[Document]:
                 allow_redirects=False,
                 stream=True,
                 timeout=WEBSITE_REQUEST_TIMEOUT,
-                headers={"User-Agent": "local-rag/website-ingestion"},
+                headers={"User-Agent": "docmind/website-ingestion"},
             )
 
             if response.is_redirect:

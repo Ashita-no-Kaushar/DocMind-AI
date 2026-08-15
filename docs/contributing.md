@@ -62,7 +62,7 @@ Fix GitHub repo ingestion failures caused by stale checkouts (#123)
 ## Issue Tracking
 
 - Use the [issue templates](https://github.com/Ashita-no-Kaushar/DocMind/issues/new/choose) for bug reports and feature requests.
-- Bug reports should include the affected version or commit, your operating system, reproduction steps, and a copy of the `local-rag.log` file if possible.
+- Bug reports should include the affected version or commit, your operating system, reproduction steps, and a copy of the `docmind.log` file if possible.
 - Do not include sensitive documents, private repository contents, or credentials in public issues.
 
 ## Dependencies

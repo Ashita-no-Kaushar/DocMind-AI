@@ -15,7 +15,7 @@ PERSISTED_SETTING_TYPES = {
     "similarity_cutoff": float,
     "advanced": bool,
 }
-BROWSER_STORAGE_KEY = "local-rag:settings"
+BROWSER_STORAGE_KEY = "docmind:settings"
 DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434"
 PERSISTED_SETTINGS_HASH_STATE_KEY = "browser_settings_persisted_hash"
 _COMPONENT_PATH = os.path.join(os.path.dirname(__file__), "browser_storage_component")

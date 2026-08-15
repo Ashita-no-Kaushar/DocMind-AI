@@ -5,13 +5,13 @@ from typing import Union
 
 
 def setup_logger(
-    log_file: str = "local-rag.log", level: Union[int, str] = logging.INFO
+    log_file: str = "docmind.log", level: Union[int, str] = logging.INFO
 ):
     """
     Sets up a logger for this module.
 
     Args:
-        log_file (str, optional): The file to which the logs should be written. Defaults to "local-rag.log".
+        log_file (str, optional): The file to which the logs should be written. Defaults to "docmind.log".
         level (str, optional): The logging level at which to log messages. Defaults to logging.INFO.
 
     Returns:

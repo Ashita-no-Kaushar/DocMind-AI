@@ -1,7 +1,7 @@
 services:
-  local-rag:
-    container_name: local-rag
-    image: jonfairbanks/local-rag
+  docmind:
+    container_name: docmind
+    image: ashita-no-kaushar/docmind
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -12,7 +12,7 @@ services:
       - /tmp:rw,noexec,nosuid,nodev,size=512m
       - /home/appuser/.cache:rw,noexec,nosuid,nodev,size=2g
     volumes:
-      - local-rag-data:/home/appuser/data
+      - docmind-data:/home/appuser/data
     environment:
       - TZ=America/Los_Angeles
     ports:
@@ -24,4 +24,4 @@ services:
       - /dev/dri:/dev/dri
 
 volumes:
-  local-rag-data:
+  docmind-data:
