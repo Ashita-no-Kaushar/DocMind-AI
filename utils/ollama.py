@@ -1,17 +1,43 @@
 import ollama
 import os
+import time
 
 import streamlit as st
 
 import utils.logs as logs
 
-# This is not used but required by llama-index and must be imported FIRST
+# OpenAI API Key placeholder required by llama-index
 os.environ["OPENAI_API_KEY"] = "sk-abc123"
 
 from llama_index.llms.ollama import Ollama
 from llama_index.core import Settings
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.query_engine.retriever_query_engine import RetrieverQueryEngine
+from utils.llama_index import TEXT_QA_TEMPLATE
+
+# Model context budget (tokens) reserved for chat history, leaving room for
+# the current prompt and the model's reply. Keep it below num_ctx (2048) so
+# the KV cache stays small: less GPU compute per token = less heat.
+CHAT_HISTORY_TOKEN_BUDGET = 1200
+
+
+def _estimate_tokens(text: str) -> int:
+    """Rough token estimate (~4 chars per token) for history trimming."""
+    return max(1, len(text or "") // 4)
+
+
+def _trim_history(messages, budget_tokens: int = CHAT_HISTORY_TOKEN_BUDGET):
+    """Keep the most recent messages that fit within a token budget."""
+    recent = []
+    used = 0
+    for message in reversed(messages):
+        estimated = _estimate_tokens(message.content)
+        if recent and used + estimated > budget_tokens:
+            break
+        recent.append(message)
+        used += estimated
+    recent.reverse()
+    return recent
 
 ###################################
 #
@@ -150,20 +176,31 @@ def create_ollama_llm(model: str, base_url: str, system_prompt: str = None, requ
     Parameters:
         - model (str): The name of the model to use for language processing.
         - base_url (str): The base URL for making API requests.
+        - system_prompt (str, optional): Kept for call-site compatibility. The
+            installed Ollama wrapper does not support a system_prompt field, so
+            the system message is injected into the chat history instead.
         - request_timeout (int, optional): The timeout for API requests in seconds. Defaults to 300.
 
     Returns:
         - llm: An instance of the Ollama language model with the specified configuration.
     """
     try:
-        kwargs = {
-            "model": model,
-            "base_url": base_url,
-            "request_timeout": request_timeout,
-        }
-        if system_prompt:
-            kwargs["system_prompt"] = system_prompt
-        Settings.llm = Ollama(**kwargs)
+        Settings.llm = Ollama(
+            model=model,
+            base_url=base_url,
+            request_timeout=request_timeout,
+            # Keep num_ctx modest: RAG context + chat history + answer all fit
+            # in 2048 tokens. Smaller KV cache = less GPU compute = less heat.
+            context_window=2048,
+            # Moderate temperature: focused answers without being robotic.
+            temperature=0.4,
+            # Unload models after 2 minutes idle: no wasted VRAM/heat when the
+            # app sits unused.
+            keep_alive="2m",
+            # Cap output length: answers stop at ~512 tokens (~400 words),
+            # which keeps the model from rambling on and generating heat.
+            additional_kwargs={"num_predict": 512},
+        )
         logs.log.info("Ollama LLM instance created successfully")
         return Settings.llm
     except Exception as e:
@@ -195,6 +232,11 @@ def chat(prompt: str):
         )
 
         chat_messages = []
+        system_prompt = st.session_state.get("system_prompt")
+        if system_prompt:
+            chat_messages.append(
+                ChatMessage(role=MessageRole.SYSTEM, content=system_prompt)
+            )
         for msg in st.session_state.get("messages", []):
             role_str = msg.get("role", "user")
             content = msg.get("content", "")
@@ -207,11 +249,14 @@ def chat(prompt: str):
             elif role_str == "system":
                 chat_messages.append(ChatMessage(role=MessageRole.SYSTEM, content=content))
 
-        if not chat_messages or chat_messages[-1].content != prompt:
-            chat_messages.append(ChatMessage(role=MessageRole.USER, content=prompt))
+        # Trim the conversational history (not the system message) so it fits
+        # comfortably inside the model's context window. Oversized histories
+        # silently truncate and degrade response quality.
+        history = _trim_history(chat_messages[1:]) if system_prompt else _trim_history(chat_messages)
+        if not history or history[-1].content != prompt:
+            history.append(ChatMessage(role=MessageRole.USER, content=prompt))
 
-        # Pass recent history (up to 10 turns) to fit local model context windows
-        recent_messages = chat_messages[-10:]
+        recent_messages = ([chat_messages[0]] + history) if system_prompt else history
         stream = llm.stream_chat(recent_messages)
         for chunk in stream:
             yield chunk.delta
@@ -232,34 +277,79 @@ def context_chat(prompt: str, query_engine: RetrieverQueryEngine):
     """
     Initiates a chat with context using the Llama-Index query_engine.
 
+    Retrieves the most relevant document chunks, then streams the grounded
+    answer token-by-token. llama-index's compact synthesizer buffers the full
+    response (no real streaming), so we bypass it: retrieve + stream_chat.
+
     Parameters:
         - prompt (str): The starting prompt for the conversation.
-        - query_engine (RetrieverQueryEngine): The Llama-Index query engine to use for retrieving answers.
+        - query_engine (RetrieverQueryEngine): The Llama-Index query engine.
 
     Yields:
         - str: Successive chunks of conversation from the Llama-Index model with context.
 
     Raises:
         - Exception: If there is an error retrieving answers from the Llama-Index model.
-
-    Notes:
-        This function initiates a chat with context using the Llama-Index language model and index.
-
-        It takes two parameters, `prompt` and `query_engine`, which should be the starting prompt for the conversation and the Llama-Index query engine to use for retrieving answers, respectively.
-
-        The function returns an iterable yielding successive chunks of conversation from the Llama-Index index with context.
-
-        If there is an error retrieving answers from the Llama-Index instance, the function raises an exception.
-
-    Side Effects:
-        - The chat conversation is generated and returned as successive chunks of text.
     """
 
     try:
-        stream = query_engine.query(prompt)
-        for text in stream.response_gen:
-            # print(str(text), end="", flush=True)
-            yield str(text)
+        llm = create_ollama_llm(
+            st.session_state["selected_model"],
+            st.session_state["ollama_endpoint"],
+        )
+
+        retriever = st.session_state.get("retriever")
+        if retriever is None:
+            retriever = getattr(query_engine, "_retriever", None)
+        if retriever is None:
+            yield "⚠️ **No retriever available.** Please re-ingest your documents."
+            return
+
+        t0 = time.time()
+        nodes = retriever.retrieve(prompt)
+        if not nodes:
+            st.session_state["last_doc_sources"] = []
+            yield "I could not find this information in the documents."
+            return
+
+        # Number the context chunks [1], [2], ... and remember their source
+        # files so the UI can show citations under the answer.
+        numbered_context = []
+        sources = []
+        for index, node_score in enumerate(nodes, start=1):
+            metadata = node_score.node.metadata or {}
+            file_name = metadata.get(
+                "file_name", metadata.get("source", "document")
+            )
+            numbered_context.append(
+                f"[{index}]:\n{node_score.node.get_content()}"
+            )
+            sources.append((file_name, node_score.score))
+        st.session_state["last_doc_sources"] = sources
+
+        context = "\n\n".join(numbered_context)
+
+        # System message first, then the grounded QA template with the
+        # retrieved context. Using stream_chat yields deltas as they arrive.
+        messages = []
+        system_prompt = st.session_state.get("system_prompt")
+        if system_prompt:
+            messages.append(ChatMessage(role=MessageRole.SYSTEM, content=system_prompt))
+        messages.append(
+            ChatMessage(
+                role=MessageRole.USER,
+                content=TEXT_QA_TEMPLATE.format(context_str=context, query_str=prompt),
+            )
+        )
+
+        logs.log.info(
+            f"Doc query: {len(nodes)} chunks | top score {nodes[0].score:.3f}"
+        )
+
+        stream = llm.stream_chat(messages)
+        for chunk in stream:
+            yield chunk.delta
+        logs.log.info(f"Doc query answered in {time.time() - t0:.1f}s")
     except Exception as err:
         logs.log.error(f"Ollama chat stream error: {err}")
         yield f"⚠️ **Error generating response:** {err}. If the model is taking longer to respond on CPU, please try again."

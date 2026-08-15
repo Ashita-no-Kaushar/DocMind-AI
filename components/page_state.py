@@ -1,13 +1,71 @@
+import os
+import shutil
+import time
+
 import streamlit as st
 
 import utils.logs as logs
 
+from utils.llama_index import INDEX_CACHE_DIR
 from utils.ollama import default_embedding_model, get_models, get_embedding_models
 from utils.browser_settings import (
+    PERSISTED_SETTINGS_HASH_STATE_KEY,
     ensure_ollama_endpoint,
     restore_settings_from_browser_storage,
     should_refresh_models_for_endpoint,
 )
+
+WELCOME_MESSAGE = {
+    "role": "assistant",
+    "content": "Welcome to **DocMind AI**! 👋\n\nYou can:\n- 💬 **Chat directly** with the LLM — just type a question below\n- 📂 **Import documents** (files, GitHub repo, or website) from the sidebar for grounded RAG answers\n\nHow can I help you today?",
+}
+
+
+def _remove_dir_retry(path, attempts=5, delay=0.5):
+    """Delete a directory tree, retrying transient Windows file locks."""
+    for _ in range(attempts):
+        try:
+            shutil.rmtree(path)
+            return
+        except OSError:
+            time.sleep(delay)
+
+
+def perform_project_reset(state):
+    """Wipe all stored data and restore the app to a fresh-project state.
+
+    Must run BEFORE any widget with a session key is instantiated in the
+    current script run, otherwise Streamlit rejects modifying widget keys.
+    """
+    _remove_dir_retry(INDEX_CACHE_DIR)
+    _remove_dir_retry(os.path.join(os.getcwd(), "data"))
+
+    state["query_engine"] = None
+    state["retriever"] = None
+    state["llm"] = None
+    state["documents"] = None
+    state["file_list"] = []
+    state["processed_file_signature"] = None
+    state["processing_file_signature"] = None
+    state["processed_github_repo"] = None
+    state["processed_website_urls"] = None
+    state["github_ingestion_stages"] = []
+    state["website_ingestion_stages"] = []
+    state["file_ingestion_stages"] = []
+    state["messages"] = [dict(WELCOME_MESSAGE)]
+
+    # Widget-backed keys: safe here only because no widgets exist yet.
+    state["top_k"] = 3
+    state["chat_mode"] = "compact"
+    state["chunk_size"] = 256
+    state["chunk_overlap"] = 32
+    state["advanced"] = False
+
+    # Force the next persist round to write clean defaults to localStorage
+    # instead of the stale pre-reset values.
+    state[PERSISTED_SETTINGS_HASH_STATE_KEY] = None
+
+    logs.log.info("Project reset: caches and data cleared")
 
 
 def default_chat_model(models):
@@ -48,6 +106,13 @@ def ensure_valid_model_selections(state):
 
 def set_initial_state():
     restore_settings_from_browser_storage()
+
+    # A pending project reset (requested from the sidebar button) must be
+    # executed here: widgets are not instantiated yet, so resetting
+    # widget-backed keys is still legal.
+    if st.session_state.get("reset_requested"):
+        perform_project_reset(st.session_state)
+        st.session_state["reset_requested"] = False
 
     ###########
     # General #
@@ -93,12 +158,7 @@ def set_initial_state():
     ensure_valid_model_selections(st.session_state)
 
     if "messages" not in st.session_state:
-        st.session_state["messages"] = [
-            {
-                "role": "assistant",
-                "content": "Welcome to **DocMind AI**! 👋\n\nYou can:\n- 💬 **Chat directly** with the LLM — just type a question below\n- 📂 **Import documents** (files, GitHub repo, or website) from the sidebar for grounded RAG answers\n\nHow can I help you today?",
-            }
-        ]
+        st.session_state["messages"] = [dict(WELCOME_MESSAGE)]
 
     ################################
     #  Files, Documents & Websites #
@@ -152,6 +212,9 @@ def set_initial_state():
     if "query_engine" not in st.session_state:
         st.session_state["query_engine"] = None
 
+    if "retriever" not in st.session_state:
+        st.session_state["retriever"] = None
+
     if "chat_mode" not in st.session_state:
         st.session_state["chat_mode"] = "compact"
 
@@ -164,7 +227,11 @@ def set_initial_state():
 
     if "system_prompt" not in st.session_state:
         st.session_state["system_prompt"] = (
-            "You are a sophisticated virtual assistant designed to assist users in comprehensively understanding and extracting insights from a wide range of documents at their disposal. Your expertise lies in tackling complex inquiries and providing insightful analyses based on the information contained within these documents."
+            "You are DocMind AI, a helpful and accurate virtual assistant. "
+            "When document context is provided, answer strictly from that context "
+            "and do not invent information. If you are unsure, say so directly. "
+            "Otherwise answer from your general knowledge. "
+            "Be concise, factual, and conversational."
         )
 
     if "top_k" not in st.session_state:
@@ -177,7 +244,7 @@ def set_initial_state():
         st.session_state["other_embedding_model"] = None
 
     if "chunk_size" not in st.session_state:
-        st.session_state["chunk_size"] = 1024
+        st.session_state["chunk_size"] = 256
 
     if "chunk_overlap" not in st.session_state:
-        st.session_state["chunk_overlap"] = 200
+        st.session_state["chunk_overlap"] = 32

@@ -59,8 +59,8 @@ def settings():
         if st.session_state["advanced"] == True:
             st.select_slider(
                 "Top K",
-                options=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                help="The number of most similar documents to retrieve in response to a query.",
+                options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                help="The number of most similar document chunks to retrieve in response to a query.",
                 value=st.session_state["top_k"],
                 key="top_k",
             )
@@ -115,6 +115,17 @@ def settings():
             )
             st.caption("Need one? Pull an Ollama embedding model first, e.g. `ollama pull embeddinggemma`.")
         else:
+            try:
+                from torch import cuda as torch_cuda
+                _cuda_available = torch_cuda.is_available()
+            except Exception:
+                _cuda_available = False
+            if not _cuda_available:
+                st.warning(
+                    "⚠️ **No GPU (CUDA) available** for HuggingFace embeddings. They "
+                    "will run on your **CPU**, which is slow and heats up your laptop. "
+                    "Switch the Backend to **Ollama** to use your GPU instead."
+                )
             embedding_model = st.selectbox(
                 "Model",
                 [
@@ -135,17 +146,20 @@ def settings():
                 "View the [MTEB Embeddings Leaderboard](https://huggingface.co/spaces/mteb/leaderboard)"
             )
             st.text_input(
-                "Chunk Size",
-                help="Reducing `chunk_size` improves embedding precision by focusing on smaller text portions. This enhances information retrieval accuracy but escalates computational demands due to processing more chunks.",
+                "Chunk Size (tokens)",
+                help="Reducing `chunk_size` improves embedding precision by focusing on smaller text portions. "
+                "This enhances information retrieval accuracy but escalates computational demands due to "
+                "processing more chunks. In tokens (~4 characters each); 256 is a good balance.",
                 key="chunk_size",
-                placeholder="1024",
+                placeholder="256",
                 value=st.session_state["chunk_size"],
             )
             st.text_input(
-                "Chunk Overlap",
-                help="The amount of overlap between two consecutive chunks. A higher overlap value helps maintain continuity and context across chunks.",
+                "Chunk Overlap (tokens)",
+                help="The amount of overlap between two consecutive chunks. A higher overlap value helps "
+                "maintain continuity and context across chunks.",
                 key="chunk_overlap",
-                placeholder="200",
+                placeholder="32",
                 value=st.session_state["chunk_overlap"],
             )
 

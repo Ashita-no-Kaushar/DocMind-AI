@@ -8,8 +8,8 @@ import utils.ollama as ollama
 import utils.llama_index as llama_index
 import utils.logs as logs
 
-MAX_INGESTED_DOCUMENTS = 1000
-MAX_INGESTED_TEXT_CHARS = 10 * 1024 * 1024
+MAX_INGESTED_DOCUMENTS = 300
+MAX_INGESTED_TEXT_CHARS = 4 * 1024 * 1024
 
 
 def _document_text(document):

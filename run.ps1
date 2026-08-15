@@ -13,6 +13,13 @@ if (Test-Path "$env:LOCALAPPDATA\Programs\Git\cmd") {
     $env:PATH = "$env:LOCALAPPDATA\Programs\Git\cmd;$env:LOCALAPPDATA\Programs\Git\bin;" + $env:PATH
 }
 
+# Ollama GPU/performance tuning (reduces CPU load and laptop heat)
+$env:OLLAMA_FLASH_ATTENTION = "1"          # Faster, lower-power attention on CUDA
+$env:OLLAMA_KEEP_ALIVE = "2m"              # Unload models when idle (less heat)
+$env:OLLAMA_NUM_PARALLEL = "1"             # One request at a time
+$env:OLLAMA_MAX_LOADED_MODELS = "2"        # Keep chat + embedding models resident (no reload churn)
+$env:CUDA_VISIBLE_DEVICES = "0"            # Use the discrete NVIDIA GPU, not the iGPU
+
 # Check if Ollama is running
 Write-Host "[1/2] Checking Ollama server..." -ForegroundColor Yellow
 try {
@@ -31,7 +38,7 @@ try {
 # Start Streamlit application
 Write-Host "[2/2] Launching DocMind AI on http://localhost:8501..." -ForegroundColor Yellow
 if (Test-Path ".\.venv\Scripts\python.exe") {
-    & ".\.venv\Scripts\python.exe" -m streamlit run main.py --server.port=8501 --server.address=127.0.0.1
+    & ".\.venv\Scripts\python.exe" -m streamlit run main.py --server.port=8501 --server.address=127.0.0.1 --server.fileWatcherType=none
 } else {
-    streamlit run main.py --server.port=8501 --server.address=127.0.0.1
+    streamlit run main.py --server.port=8501 --server.address=127.0.0.1 --server.fileWatcherType=none
 }

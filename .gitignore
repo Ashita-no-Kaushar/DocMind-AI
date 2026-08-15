@@ -13,6 +13,7 @@ ENV/
 
 # Data and caches
 data/*
+.index_cache/
 .cache/*
 .nv/*
 .DS_Store

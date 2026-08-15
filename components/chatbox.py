@@ -38,9 +38,25 @@ def chatbox():
                         query_engine=st.session_state["query_engine"],
                     )
                 else:
+                    st.session_state["last_doc_sources"] = []
                     stream = chat(prompt=prompt)
 
                 response = st.write_stream(stream)
+
+            # Show the document sources the answer was grounded in.
+            sources = st.session_state.get("last_doc_sources") or []
+            if sources:
+                best = {}
+                for name, score in sources:
+                    if name not in best or score > best[name]:
+                        best[name] = score
+                labels = []
+                for name, score in best.items():
+                    if score >= 0.15:
+                        labels.append(f"`{name}` ({score:.0%})")
+                    else:
+                        labels.append(f"`{name}` (keyword match)")
+                st.caption("📄 **Sources:** " + ", ".join(labels))
 
         # Add the final response to messages state
         if response:

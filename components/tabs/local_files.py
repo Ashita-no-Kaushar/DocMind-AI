@@ -86,6 +86,19 @@ def local_files():
             st.error(str(err))
             st.stop()
 
+        large_files = [
+            f.name
+            for f in uploaded_files
+            if getattr(f, "size", 0) > 8 * 1024 * 1024
+        ]
+        if large_files:
+            st.info(
+                "💡 **Large file(s):** "
+                + ", ".join(large_files)
+                + ". Big files take minutes to embed and heat up your laptop. "
+                "Consider splitting them into 10-20 page PDFs or smaller documents."
+            )
+
         st.session_state["file_list"] = uploaded_files
         current_upload_signature = uploaded_files_signature(uploaded_files)
         needs_processing = should_process_uploads(
