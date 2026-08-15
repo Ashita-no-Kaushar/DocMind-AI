@@ -27,7 +27,6 @@ def sources():
     with st.expander("🌐 &nbsp; **Website**", expanded=False):
         website()
 
-    st.write("")
     with st.expander("💡 &nbsp; **Cooling & Speed Tips**", expanded=False):
         st.markdown(
             "- **Prefer short documents:** 10-20 page PDFs (or `.txt`/`.md`) embed in seconds. "
