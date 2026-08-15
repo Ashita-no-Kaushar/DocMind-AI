@@ -210,8 +210,3 @@ def settings():
         )
 
     st.toggle("Advanced Settings", key="advanced")
-
-    if st.session_state["advanced"] == True:
-        with st.expander("Current Application State"):
-            state = dict(sorted(st.session_state.items()))
-            st.write(state)
