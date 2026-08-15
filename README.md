@@ -1,6 +1,5 @@
 # DocMind AI
 
-![docmind-demo](demo.gif)
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8588/badge)](https://www.bestpractices.dev/projects/8588)
 ![GitHub Commit Activity](https://img.shields.io/github/commit-activity/t/Ashita-no-Kaushar/DocMind-AI)
