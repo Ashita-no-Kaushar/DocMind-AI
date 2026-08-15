@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "377e0aebeed57ef7244ab74e5ae04541583599f8e0740fd06cdfbb82af84abc4"
+            "sha256": "02e9ea54ca63d3a9a00331ec0b2d0b71f4f2596559b4ba32721e56b46561ccb9"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -2986,6 +2986,14 @@
             "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2'",
             "version": "==2.9.0.post0"
         },
+        "python-docx": {
+            "hashes": [
+                "sha256:3fd478f3250fbbbfd3b94fe1e985955737c145627498896a8a6bf81f4baf66c7",
+                "sha256:7bc9d7b7d8a69c9c02ca09216118c86552704edc23bac179283f2e38f86220ce"
+            ],
+            "markers": "python_version >= '3.9'",
+            "version": "==1.2.0"
+        },
         "python-dotenv": {
             "hashes": [
                 "sha256:1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a",
@@ -3241,6 +3249,13 @@
             ],
             "markers": "python_version >= '3.10'",
             "version": "==1.9.0"
+        },
+        "rank-bm25": {
+            "hashes": [
+                "sha256:7bd4a95571adadfc271746fa146a4bcfd89c0cf731e49c3d1ad863290adbe8ae",
+                "sha256:096ccef76f8188563419aaf384a02f0ea459503fdf77901378d4fd9d87e5e51d"
+            ],
+            "version": "==0.2.2"
         },
         "referencing": {
             "hashes": [
