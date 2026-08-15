@@ -162,7 +162,8 @@ def settings():
             key="refresh_embedding_models",
             on_click=_refresh_embedding_models,
         )
-        st.caption("Need one? Pull an Ollama embedding model first, e.g. `ollama pull embeddinggemma`.")
+        if len(st.session_state["ollama_embedding_models"]) == 0:
+            st.caption("Need one? Pull an Ollama embedding model first, e.g. `ollama pull embeddinggemma`.")
         if st.session_state["advanced"] == True:
             st.caption(
                 "View the [MTEB Embeddings Leaderboard](https://huggingface.co/spaces/mteb/leaderboard)"
