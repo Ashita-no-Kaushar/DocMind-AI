@@ -1,0 +1,32 @@
+services:
+  docmind:
+    container_name: docmind
+    image: ashita-no-kaushar/docmind
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=512m
+      - /home/appuser/.cache:rw,noexec,nosuid,nodev,size=2g
+    volumes:
+      - docmind-data:/home/appuser/data
+    environment:
+      - TZ=America/Los_Angeles
+    ports:
+      - '8501:8501/tcp'
+    mem_limit: 8g
+    cpus: 4
+    pids_limit: 512
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+
+volumes:
+  docmind-data:

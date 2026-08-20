@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+Pipfile.lock
+
+# App data & caches
+data/
+.index_cache/
+*.log
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
