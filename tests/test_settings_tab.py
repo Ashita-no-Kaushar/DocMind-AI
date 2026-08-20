@@ -1,5 +1,4 @@
 import unittest
-from types import SimpleNamespace
 from unittest.mock import patch
 from components.tabs import settings as settings_tab
 class _Container:

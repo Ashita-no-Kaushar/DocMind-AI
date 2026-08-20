@@ -16,6 +16,10 @@ DocMind release tags use semantic versioning, for example `v1.5.0`.
 
 ## [Unreleased]
 
+- Remove dead dependencies (torch, torchvision, transformers, huggingface-hub, sentence-transformers, streamlit-tags, streamlit-extras, pyexiftool): the venv shrinks by ~500 MB and app startup is lighter; Ollama serves both embeddings and chat, so no local deep-learning stack is needed.
+- Remove unused assets (demo.gif, logo.png) and the broken requirements.txt (Pipfile is the canonical dependency file).
+- Remove unused imports in utils/rag_pipeline.py and two tests.
+
 - Add optional R2R (RAG to Riches) backend: uploaded files are ingested, embedded and indexed on an R2R server instead of locally (less RAM, heat and disk use).
 - Validate the embedding model against the live Ollama server before ingestion; clear guidance when it is missing or not embedding-capable.
 - Handle GPU out-of-memory during embedding: batches are shrunk and retried automatically so ingestion completes instead of crashing.

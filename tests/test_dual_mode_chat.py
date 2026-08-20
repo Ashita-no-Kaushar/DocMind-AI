@@ -1,6 +1,6 @@
 import unittest
 
-from utils.llama_index import EXCLUDED_FILE_PATTERNS, load_documents
+from utils.llama_index import EXCLUDED_FILE_PATTERNS
 
 
 class DualModeChatTests(unittest.TestCase):
