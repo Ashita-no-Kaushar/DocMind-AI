@@ -13,7 +13,7 @@ rank-bm25 = "*"
 llama-index-readers-web = "*"
 llama-index-readers-file = "*"
 html2text = "*"
-colorama = { version = "*", sys_platform = "== 'win32'" }
+colorama = {version = "*", markers = "sys_platform == 'win32'"}
 ebooklib = "*"
 llama-index-core = "*"
 fsspec = "*"
