@@ -17,7 +17,14 @@ from utils.browser_settings import (
 
 WELCOME_MESSAGE = {
     "role": "assistant",
-    "content": "Welcome to **DocMind AI**! 👋\n\nYou can:\n- 💬 **Chat directly** with the LLM — just type a question below\n- 📂 **Import documents** (files, GitHub repo, or website) from the sidebar for grounded RAG answers\n\nHow can I help you today?",
+    "content": (
+        "Hi! I'm **DocMind AI** — your private document assistant. 👋\n\n"
+        "**How to use — 3 simple steps:**\n"
+        "1. Add your files, GitHub repo, or a website from the left sidebar\n"
+        "2. Wait a moment while it reads them\n"
+        "3. Ask anything below — answers come from your documents\n\n"
+        "_No documents? Just chat — ask me anything._"
+    ),
 }
 
 

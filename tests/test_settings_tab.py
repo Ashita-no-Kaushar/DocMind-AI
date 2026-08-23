@@ -47,6 +47,12 @@ class _StreamlitStub:
         pass
     def error(self, *args, **kwargs):
         pass
+    def expander(self, *args, **kwargs):
+        return _Container()
+    def divider(self, *args, **kwargs):
+        pass
+    def markdown(self, *args, **kwargs):
+        pass
 class SettingsTabTests(unittest.TestCase):
     def test_keyed_selectboxes_do_not_pass_explicit_default_indexes(self):
         state = {

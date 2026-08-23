@@ -97,12 +97,7 @@ def _chat_history_signature(messages):
 
 @st.cache_data(show_spinner=False)
 def chat_history_docx(signature):
-    """Serialize chat history to a Word document, in memory.
-
-    Cached by content: the document is only rebuilt when the conversation
-    actually changes, so this costs a few milliseconds once per new message
-    instead of every rerun.
-    """
+    """Serialize chat history to a Word document, in memory."""
     document = docx.Document()
     document.add_heading("DocMind AI — Chat History", level=0)
     document.add_paragraph(f"Exported: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -118,33 +113,26 @@ def chat_history_docx(signature):
 
 def settings():
     st.header("Settings")
-    st.caption("Configure DocMind AI settings and integrations")
+    st.caption("Pick your models and answer style — everything else is optional.")
 
+    # ── 1. Chat model ──────────────────────────────────────────────
     st.subheader("Chat")
-    chat_settings = st.container(border=True)
-    with chat_settings:
+    st.caption("The model that writes your answers.")
+    with st.container(border=True):
         backend = st.selectbox(
-            "LLM Backend",
+            "Provider",
             options=list(BACKEND_PRESETS.keys()),
             key="llm_backend",
             on_change=_apply_backend_preset,
-            help="Ollama runs models locally. The OpenAI-compatible presets "
-            "point at any server exposing the OpenAI API (LM Studio, TabbyAPI, "
-            "vLLM, llama.cpp server, ...).",
+            help="Ollama runs offline on your device. Other options connect to a compatible server (LM Studio, TabbyAPI, OpenAI, etc.).",
         )
         if backend == "Ollama":
-            st.text_input(
-                "Ollama Endpoint",
-                key="ollama_endpoint",
-                placeholder="http://localhost:11434",
-                on_change=_refresh_models,
-            )
             st.selectbox(
                 "Chat Model",
                 st.session_state["ollama_models"],
                 key="selected_model",
-                disabled= len(st.session_state["ollama_models"])==0,
-                placeholder= "Select Chat Model" if len(st.session_state["ollama_models"])>0 else "No Models Available",
+                disabled=len(st.session_state["ollama_models"]) == 0,
+                placeholder="Select Chat Model" if len(st.session_state["ollama_models"]) > 0 else "No Models Available",
             )
             st.button(
                 "Refresh Models",
@@ -152,28 +140,32 @@ def settings():
                 on_click=_refresh_models,
             )
             if len(st.session_state["ollama_models"]) == 0:
-                st.info(
-                    "💡 **No chat models found.** Run in terminal:\n`ollama pull qwen2.5:0.5b`"
+                st.info("No models found. In a terminal run: `ollama pull qwen2.5:0.5b`")
+            with st.expander("Connection", expanded=False):
+                st.text_input(
+                    "Ollama Endpoint",
+                    key="ollama_endpoint",
+                    placeholder="http://localhost:11434",
+                    on_change=_refresh_models,
+                    help="Change only if Ollama runs on a different address.",
                 )
         else:
             st.text_input(
-                "OpenAI-Compatible Base URL",
+                "Server URL",
                 key="openai_base_url",
                 placeholder=ollama.DEFAULT_OPENAI_BASE_URL,
-                help="Include the API path if your server uses one (e.g. "
-                "http://localhost:1234/v1 for LM Studio).",
+                help="Example: http://localhost:1234/v1 for LM Studio.",
             )
             st.text_input(
-                "API Key (optional)",
+                "API Key",
                 key="openai_api_key",
                 type="password",
-                help="Used for OpenAI or authenticated local servers. Not stored "
-                "in the browser.",
+                help="Leave empty for local servers without auth.",
             )
             st.text_input(
                 "Chat Model",
                 key="openai_model",
-                placeholder="gpt-4o-mini / local-model",
+                placeholder="gpt-4o-mini  or  local-model",
             )
             st.button(
                 "Fetch Models from Server",
@@ -182,83 +174,12 @@ def settings():
             )
             fetched = st.session_state.get("openai_models") or []
             if fetched:
-                st.caption("Server models: " + ", ".join(fetched[:10]) +
-                           ("…" if len(fetched) > 10 else ""))
-            st.caption(
-                "💡 Tip: LM Studio exposes `http://localhost:1234/v1`, TabbyAPI "
-                "exposes `http://localhost:5000/v1`, Ollama exposes "
-                "`http://localhost:11434/v1`."
-            )
-        if st.session_state["advanced"] == True:
-            st.select_slider(
-                "Top K",
-                options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                help="The number of most similar document chunks to retrieve in response to a query.",
-                value=st.session_state["top_k"],
-                key="top_k",
-            )
-            st.slider(
-                "Similarity Threshold",
-                min_value=0.0,
-                max_value=1.0,
-                step=0.05,
-                value=st.session_state.get("similarity_cutoff", 0.3),
-                help="Minimum similarity score (0-1) for a chunk to be considered. "
-                "Lower = more recall, higher = only very relevant chunks. 0 = disabled.",
-                key="similarity_cutoff",
-            )
-            st.slider(
-                "Temperature",
-                min_value=0.0,
-                max_value=1.5,
-                step=0.05,
-                value=float(st.session_state.get("temperature", 0.4)),
-                help="Sampling temperature. Lower = focused and deterministic "
-                "answers, higher = more creative but riskier answers.",
-                key="temperature",
-            )
-            # st.text_area(
-            #     "System Prompt",
-            #     value=st.session_state["system_prompt"],
-            #     key="system_prompt",
-            # )
+                st.caption("Found: " + ", ".join(fetched[:10]) + ("…" if len(fetched) > 10 else ""))
 
-    st.subheader("Answer Style")
-    style_settings = st.container(border=True)
-    with style_settings:
-        st.caption("Choose how the assistant formats its answers. This adjusts the system prompt.")
-        style = st.radio(
-            "Style",
-            options=[
-                "Concise",
-                "Balanced (default)",
-                "Detailed",
-                "Bulleted",
-                "Technical",
-                "Simple / ELI5",
-            ],
-            index=1,
-            horizontal=True,
-            key="answer_style",
-            help="Presets inject a style directive into the system prompt.",
-        )
-        st.session_state["system_prompt"] = _style_to_prompt(style)
-        st.text_area(
-            "System Prompt (preview)",
-            value=_style_to_prompt(style),
-            height=120,
-            disabled=True,
-            help="Uneditable preview of the active preset.",
-        )
-
-    st.write("")
-
-    st.subheader(
-        "Embeddings",
-        help="Embeddings are numerical representations of data, useful for tasks like document clustering and similarity detection when processing files, as they encode semantic meaning for efficient manipulation and retrieval.",
-    )
-    embedding_settings = st.container(border=True)
-    with embedding_settings:
+    # ── 2. Embeddings ──────────────────────────────────────────────
+    st.subheader("Document Search")
+    st.caption("The model that understands your documents. Change only if answers feel off.")
+    with st.container(border=True):
         if backend == "Ollama":
             st.selectbox(
                 "Embedding Model",
@@ -277,123 +198,138 @@ def settings():
                 on_click=_refresh_embedding_models,
             )
             if len(st.session_state["ollama_embedding_models"]) == 0:
-                st.caption("Need one? Pull an Ollama embedding model first, e.g. `ollama pull embeddinggemma`.")
+                st.caption("Need one? Try: `ollama pull nomic-embed-text`")
         else:
             st.text_input(
                 "Embedding Model",
                 key="openai_embedding_model",
                 placeholder="text-embedding-3-small",
-                help="Model id on the OpenAI-compatible server. LM Studio "
-                "embeddings are served through the same /v1 base URL.",
             )
-        if st.session_state["advanced"] == True:
+
+    # ── 3. Answer Style ────────────────────────────────────────────
+    st.subheader("Answer Style")
+    st.caption("How the assistant should sound.")
+    with st.container(border=True):
+        style = st.radio(
+            "Style",
+            options=[
+                "Concise",
+                "Balanced (default)",
+                "Detailed",
+                "Bulleted",
+                "Technical",
+                "Simple / ELI5",
+            ],
+            index=1,
+            horizontal=True,
+            key="answer_style",
+        )
+        st.session_state["system_prompt"] = _style_to_prompt(style)
+        with st.expander("Preview prompt", expanded=False):
+            st.caption(_style_to_prompt(style))
+
+    # ── 4. Everyday toggles ────────────────────────────────────────
+    st.subheader("Preferences")
+    with st.container(border=True):
+        st.toggle(
+            "Eco Mode — save power & stay cool",
+            key="eco_mode",
+            help="Fewer chunks, shorter answers, smaller batches. Turn on if the laptop gets hot or slow.",
+        )
+        if st.session_state.get("eco_mode"):
+            st.caption("On: smaller batches · shorter answers · fewer chunks.")
+        else:
+            st.caption("Off: best quality. Turn on when the machine runs hot.")
+        st.divider()
+        st.toggle("Show advanced controls", key="advanced")
+        st.caption("Reveals fine-tuning sliders and server options below.")
+
+    # ── 5. Advanced (only when enabled) ─────────────────────────────
+    if st.session_state.get("advanced"):
+        with st.container(border=True):
+            st.markdown("**Fine-tuning**")
+            st.select_slider(
+                "Sources per answer",
+                options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                value=st.session_state["top_k"],
+                key="top_k",
+                help="How many document chunks to include when answering.",
+            )
+            st.slider(
+                "Relevance threshold",
+                min_value=0.0,
+                max_value=1.0,
+                step=0.05,
+                value=st.session_state.get("similarity_cutoff", 0.3),
+                help="Higher = stricter, only very relevant chunks.",
+                key="similarity_cutoff",
+            )
+            st.slider(
+                "Creativity",
+                min_value=0.0,
+                max_value=1.5,
+                step=0.05,
+                value=float(st.session_state.get("temperature", 0.4)),
+                help="Lower = focused & factual, higher = more creative.",
+                key="temperature",
+            )
             st.text_input(
-                "Chunk Size (tokens)",
-                help="Reducing `chunk_size` improves embedding precision by focusing on smaller text portions. "
-                "This enhances information retrieval accuracy but escalates computational demands due to "
-                "processing more chunks. In tokens (~4 characters each); 256 is a good balance.",
+                "Chunk Size",
                 key="chunk_size",
-                placeholder="256",
                 value=st.session_state["chunk_size"],
+                help="Tokens per document piece (~4 chars each). Smaller = more precise, more work.",
             )
             chunk_overlap_pct = st.slider(
-                "Chunk Overlap (% of chunk size)",
+                "Chunk Overlap",
                 min_value=0,
                 max_value=50,
                 step=1,
                 value=st.session_state.get("chunk_overlap_pct", 12),
-                help="Overlap between consecutive chunks as a percentage of the chunk size. "
-                "Higher overlap keeps more continuity between chunks but adds embedding work. "
-                "12% (~32 tokens at chunk size 256) is a good balance.",
+                help="Overlap between chunks as % of chunk size. Keeps context across boundaries.",
                 key="chunk_overlap_pct",
             )
             chunk_size = int(st.session_state.get("chunk_size") or 256)
-            st.session_state["chunk_overlap"] = max(
-                0, chunk_size * int(chunk_overlap_pct) // 100
-            )
-            st.caption(f"→ {st.session_state['chunk_overlap']} tokens of overlap per chunk")
+            st.session_state["chunk_overlap"] = max(0, chunk_size * int(chunk_overlap_pct) // 100)
+            st.caption(f"→ {st.session_state['chunk_overlap']} tokens overlap")
 
-    st.subheader("Export Data")
-    export_data_settings = st.container(border=True)
-    with export_data_settings:
-        st.write("Chat History")
-        st.download_button(
-            label="Download",
-            data=chat_history_docx(_chat_history_signature(st.session_state["messages"])),
-            file_name=f"docmind-chat-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
-
-    st.subheader(
-        "R2R Backend",
-        help="R2R (RAG to Riches) is an external RAG server. When enabled, "
-        "uploaded files are ingested, embedded and indexed on the R2R server "
-        "instead of this machine: less RAM, less heat, less disk usage.",
-    )
-    r2r_settings = st.container(border=True)
-    with r2r_settings:
+    # ── 6. R2R (collapsed by default) ──────────────────────────────
+    with st.expander("External RAG server (R2R) — optional", expanded=False):
+        st.caption("Use an external R2R server instead of local indexing. Most users can ignore this.")
         st.toggle(
-            "Enable R2R Backend",
+            "Enable R2R",
             key="r2r_enabled",
-            help="When enabled, uploaded files are served by R2R instead of the "
-            "local LlamaIndex pipeline.",
+            help="When on, files are indexed on the R2R server.",
         )
         st.text_input(
-            "R2R Base URL",
+            "R2R URL",
             key="r2r_base_url",
             placeholder=r2r.DEFAULT_R2R_BASE_URL,
             on_change=_clear_r2r_connection_check,
         )
         st.text_input(
-            "R2R API Key (optional)",
+            "API Key (optional)",
             key="r2r_api_key",
             type="password",
-            help="Sent as a Bearer token. Not stored in the browser.",
         )
         st.button(
-            "Check Connection",
+            "Test Connection",
             key="check_r2r_connection",
             on_click=_check_r2r_connection,
         )
         if st.session_state.get("r2r_connection_ok") is True:
-            st.success("✅ R2R server reachable.")
+            st.success("R2R server reachable.")
         elif st.session_state.get("r2r_connection_ok") is False:
-            st.error(
-                "❌ Could not reach the R2R server. Start it (default: "
-                "http://localhost:7272) or disable the R2R backend."
-            )
-        if st.session_state.get("r2r_enabled") and not st.session_state.get(
-            "r2r_document_ids"
-        ):
-            st.info(
-                "💡 **R2R mode is on.** Upload files in **Data Sources → Local "
-                "Files** — they will be ingested by the R2R server, not locally."
-            )
+            st.error("Could not reach R2R. Check the URL or disable R2R.")
+        if st.session_state.get("r2r_enabled") and not st.session_state.get("r2r_document_ids"):
+            st.info("R2R is on — upload files in Data Sources → Local Files.")
 
-    st.subheader(
-        "Eco Mode",
-        help="Low-power mode for weak or hot machines. Reduces heat by doing "
-        "less work per question: fewer retrieved chunks, shorter answers, "
-        "smaller embedding batches and a tighter context budget.",
-    )
-    eco_settings = st.container(border=True)
-    with eco_settings:
-        st.toggle(
-            "Enable Eco Mode",
-            key="eco_mode",
-            help="Reduces CPU/GPU load and heat: embedding batches shrink to 4, "
-            "answers cap at ~256 tokens, retrieval keeps at most 3 chunks, "
-            "and the prompt context is trimmed.",
+    # ── 7. Export ──────────────────────────────────────────────────
+    st.subheader("Export")
+    with st.container(border=True):
+        st.caption("Save your conversation as a Word file.")
+        st.download_button(
+            label="Download chat (.docx)",
+            data=chat_history_docx(_chat_history_signature(st.session_state["messages"])),
+            file_name=f"docmind-chat-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
-        if st.session_state.get("eco_mode"):
-            st.caption(
-                "Active now: embedding batch 4 · answers ≤ ~256 tokens · "
-                "at most 3 retrieved chunks · smaller context."
-            )
-        else:
-            st.caption(
-                "Off by default. Turn it on when the machine runs hot or "
-                "answers feel slow."
-            )
-
-    st.toggle("Advanced Settings", key="advanced")

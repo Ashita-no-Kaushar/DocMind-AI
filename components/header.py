@@ -2,7 +2,13 @@ import streamlit as st
 
 
 def set_page_header():
-    st.header("📚 LLMOps-Based Document Intelligence System", anchor=False)
-    st.caption(
-        "Ingest your data for retrieval augmented generation (RAG) with open-source Large Language Models (LLMs), all without 3rd parties or sensitive information leaving your network."
+    st.markdown(
+        """
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:2px;">
+            <span style="font-size:1.65rem;">🧠</span>
+            <span style="font-size:1.45rem; font-weight:700; letter-spacing:-0.02em;">DocMind AI</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
+    st.caption("Your private docs, answered. Everything runs offline on this device.")

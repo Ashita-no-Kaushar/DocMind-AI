@@ -1,7 +1,6 @@
 import streamlit as st
 
 from components.page_state import WELCOME_MESSAGE
-from components.tabs.about import about
 from components.tabs.sources import sources
 from components.tabs.settings import settings
 from utils.browser_settings import persist_settings_to_browser_storage
@@ -15,16 +14,13 @@ def reset_project():
 
 def sidebar():
     with st.sidebar:
-        tab1, tab2, tab3 = st.sidebar.tabs(["Data Sources", "Settings", "About"])
+        tab1, tab2 = st.sidebar.tabs(["Data Sources", "Settings"])
 
         with tab1:
             sources()
 
         with tab2:
             settings()
-
-        with tab3:
-            about()
 
         st.divider()
 
@@ -36,15 +32,20 @@ def sidebar():
         else:
             st.info("💬 **Chat Mode**: Direct LLM conversation")
 
-        if st.button("🗑️ Clear Chat", use_container_width=True):
-            st.session_state["messages"] = [dict(WELCOME_MESSAGE)]
-            st.session_state["last_doc_sources"] = []
-            st.session_state["last_rag_no_result"] = False
-            st.session_state["last_rag_question"] = None
-            st.rerun()
+        with st.expander("🧹 Clear Chat & Reset", expanded=False):
+            if st.button("💬 Clear Chat", use_container_width=True):
+                st.session_state["messages"] = [dict(WELCOME_MESSAGE)]
+                st.session_state["last_doc_sources"] = []
+                st.session_state["last_rag_no_result"] = False
+                st.session_state["last_rag_question"] = None
+                st.rerun()
 
-        # Reset Project (danger zone)
-        with st.expander("🗑️ Reset Project", expanded=False):
+            st.markdown(
+                "Clears only the conversation above. To wipe everything "
+                "(indexes, uploads, settings), use **Reset Project** below."
+            )
+
+            # Reset Project (danger zone)
             st.warning(
                 "Deletes ALL cached indexes and uploaded data, and restores "
                 "default settings. The app becomes a fresh project. "

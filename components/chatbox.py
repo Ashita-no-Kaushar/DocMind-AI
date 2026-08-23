@@ -38,24 +38,97 @@ def _apply_quick_answer_style():
     st.session_state["system_prompt"] = _style_to_prompt(style)
 
 
+def _suggested_questions():
+    """Starter questions shown while the conversation is still empty."""
+    if st.session_state.get("query_engine") or r2r.r2r_is_ready(st.session_state):
+        return [
+            "Summarize my documents",
+            "What are the key points?",
+            "Explain the main terms",
+        ]
+    return [
+        "What is RAG in simple words?",
+        "Help me write a polite email",
+        "Give me 3 study tips",
+    ]
+
+
+def _process_prompt(prompt):
+    """Handle one user turn end-to-end: render, stream the answer, and store it."""
+    if st.session_state.get("llm_backend", "Ollama") == "OpenAI":
+        if not st.session_state.get("openai_model"):
+            st.warning(
+                "⚠️ No chat model configured. Please go to **Settings → Chat** "
+                "and enter a Chat Model for the OpenAI-compatible backend.",
+                icon=None,
+            )
+            return
+    elif not st.session_state.get("selected_model"):
+        try:
+            models = get_models()
+            if models:
+                st.session_state["ollama_models"] = models
+                st.session_state["selected_model"] = models[0]
+                get_embedding_models()
+                st.rerun()
+        except Exception:
+            pass
+        if not st.session_state.get("selected_model"):
+            st.warning(
+                "⚠️ No chat model available. Please go to **Settings → Chat** "
+                "and click **Refresh Models**, then select a model.",
+                icon=None,
+            )
+            return
+
+    st.session_state["messages"].append({"role": "user", "content": prompt})
+    st.session_state["last_rag_no_result"] = False
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            if r2r.r2r_is_ready(st.session_state):
+                st.session_state["last_doc_sources"] = []
+                stream = r2r.r2r_chat(prompt=prompt)
+            elif st.session_state.get("query_engine"):
+                stream = context_chat(
+                    prompt=prompt,
+                    query_engine=st.session_state["query_engine"],
+                )
+            else:
+                st.session_state["last_doc_sources"] = []
+                stream = chat(prompt=prompt)
+
+            response = st.write_stream(stream)
+
+        sources = st.session_state.get("last_doc_sources") or []
+        if sources:
+            best = {}
+            for name, score in sources:
+                if name not in best or score > best[name]:
+                    best[name] = score
+            labels = []
+            for name, score in best.items():
+                if score >= 0.15:
+                    labels.append(f"`{name}` ({score:.0%})")
+                else:
+                    labels.append(f"`{name}` (keyword match)")
+            st.caption("📄 **Sources:** " + ", ".join(labels))
+
+    if st.session_state.get("last_rag_no_result"):
+        if st.button("💬 Ask without documents", key="ask_without_docs_btn"):
+            st.session_state["ask_without_docs"] = True
+            st.rerun()
+
+    if response:
+        st.session_state["messages"].append({"role": "assistant", "content": response})
+
+
 def chatbox():
-    quick_style = st.selectbox(
-        "Answer tone",
-        options=ANSWER_STYLE_OPTIONS,
-        key="quick_answer_style",
-        label_visibility="collapsed",
-        help="Choose how the assistant formats its answers for this conversation. "
-        "Overrides the Answer Style preset in Settings.",
-        on_change=_apply_quick_answer_style,
-    )
-    # Keep the system prompt in sync with the visible quick selector. The
-    # Settings page writes the same derived prompt via its own radio widget.
     if st.session_state.get("system_prompt") is None:
         _apply_quick_answer_style()
 
-    # The last RAG question found no matches and the user clicked
-    # "Ask without documents": answer the same question from general
-    # knowledge so a failed retrieval never leaves the user hanging.
     if st.session_state.pop("ask_without_docs", False):
         prompt = st.session_state.get("last_rag_question")
         st.session_state["last_rag_no_result"] = False
@@ -69,79 +142,32 @@ def chatbox():
                     {"role": "assistant", "content": response}
                 )
 
-    if prompt := st.chat_input("How can I help?"):
-        if st.session_state.get("llm_backend", "Ollama") == "OpenAI":
-            if not st.session_state.get("openai_model"):
-                st.warning(
-                    "⚠️ No chat model configured. Please go to **Settings → Chat** "
-                    "and enter a Chat Model for the OpenAI-compatible backend.",
-                    icon=None,
-                )
-                return
-        elif not st.session_state.get("selected_model"):
-            # Try to auto-discover models before giving up
-            try:
-                models = get_models()
-                if models:
-                    st.session_state["ollama_models"] = models
-                    st.session_state["selected_model"] = models[0]
-                    get_embedding_models()
-                    st.rerun()
-            except Exception:
-                pass
-            if not st.session_state.get("selected_model"):
-                st.warning(
-                    "⚠️ No chat model available. Please go to **Settings → Chat** "
-                    "and click **Refresh Models**, then select a model.",
-                    icon=None,
-                )
-                return
+    messages = st.session_state.get("messages", [])
+    is_empty_chat = (
+        len(messages) == 1
+        and messages[0].get("role") == "assistant"
+        and not st.session_state.get("last_doc_sources")
+    )
+    if is_empty_chat:
+        selected = st.pills(
+            "Try asking",
+            _suggested_questions(),
+            label_visibility="collapsed",
+            selection_mode="single",
+        )
+        if selected:
+            _process_prompt(selected)
 
-        # Add the user input to messages state
-        st.session_state["messages"].append({"role": "user", "content": prompt})
-        st.session_state["last_rag_no_result"] = False
-        with st.chat_message("user"):
-            st.markdown(prompt)
+    if prompt := st.chat_input("Ask about your documents or just chat..."):
+        _process_prompt(prompt)
 
-        # Generate stream with user input (Context RAG vs General Chat)
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                if r2r.r2r_is_ready(st.session_state):
-                    st.session_state["last_doc_sources"] = []
-                    stream = r2r.r2r_chat(prompt=prompt)
-                elif st.session_state.get("query_engine"):
-                    stream = context_chat(
-                        prompt=prompt,
-                        query_engine=st.session_state["query_engine"],
-                    )
-                else:
-                    st.session_state["last_doc_sources"] = []
-                    stream = chat(prompt=prompt)
-
-                response = st.write_stream(stream)
-
-            # Show the document sources the answer was grounded in.
-            sources = st.session_state.get("last_doc_sources") or []
-            if sources:
-                best = {}
-                for name, score in sources:
-                    if name not in best or score > best[name]:
-                        best[name] = score
-                labels = []
-                for name, score in best.items():
-                    if score >= 0.15:
-                        labels.append(f"`{name}` ({score:.0%})")
-                    else:
-                        labels.append(f"`{name}` (keyword match)")
-                st.caption("📄 **Sources:** " + ", ".join(labels))
-
-        # If RAG found nothing in the documents, offer an ungrounded answer.
-        if st.session_state.get("last_rag_no_result"):
-            if st.button("💬 Ask without documents", key="ask_without_docs_btn"):
-                st.session_state["ask_without_docs"] = True
-                st.rerun()
-
-        # Add the final response to messages state
-        if response:
-            st.session_state["messages"].append({"role": "assistant", "content": response})
-
+    if is_empty_chat:
+        with st.expander("Answer style", expanded=False):
+            st.caption("How should answers sound? You can also change this anytime in Settings.")
+            st.selectbox(
+                "Answer tone",
+                options=ANSWER_STYLE_OPTIONS,
+                key="quick_answer_style",
+                label_visibility="collapsed",
+                on_change=_apply_quick_answer_style,
+            )
