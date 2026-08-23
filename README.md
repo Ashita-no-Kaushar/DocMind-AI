@@ -59,6 +59,10 @@ DocMind is a **streamlit + LlamaIndex + Ollama** system with a **hybrid retrieva
 | **Near-duplicate filter** | Jaccard on stemmed tokens drops repeated headers/footers before embedding — less GPU work (`utils/llama_index.py:108`) |
 | **Grounded prompt + citations** | “Answer ONLY from context, quote numbers, cite `[n]`” + compact numbered context (`utils/llama_index.py:43`) |
 | **Cache & Eco Mode** | On-disk `.index_cache` reuses embeddings; Eco trims batches/context for cool & fast weak-machine answers (`utils/llama_index.py:834` / `166`) |
+| **Numeric word → digit** | `thirty days` ≠ `30 days` for BM25 | `thirty → 30` before stemming so `thirty days` matches `30 days` (`utils/llama_index.py:239`) |
+| **Exact-phrase boost** | `"refund policy"` is bag-of-words | Quoted phrase gets +0.5 RRF if found verbatim (`utils/llama_index.py:358`) |
+| **Tabular verbalization** | `id,info / 1,HR leave` is not a sentence | CSV/JSON rows → `Row 1: info is HR leave…` making tables retrievable (`utils/llama_index.py:175`) |
+| **Code fence aware** | `requests.get(` split across chunks | ` ``` ` odd-count chunks merged before embed (`utils/llama_index.py:808`) |
 
 No hallucination fallback: if retrieval returns 0 nodes the assistant says *“I could not find this information in the documents.”* and offers **Ask without documents** (`utils/ollama.py:528`, `components/chatbox.py:125`).
 
@@ -82,6 +86,10 @@ Plain RAG (vector search + LLM) is the baseline every student builds. DocMind ke
 | 8 | **No-hallucination UX** | Silent hallucination | Grounded template (`Answer ONLY from context, cite [n]`) + `I could not find…` + **Ask without documents** button | `utils/llama_index.py:43` `utils/ollama.py:528` | `no_hallucination` 100%, `generation` 100% |
 | 9 | **No heavy ML at runtime** | Needs `torch`/`transformers` | `rank-bm25` + `nltk` stemmer only — **~500 MB saved**, no torch import (`tests/test_import_boundaries.py`) | `Pipfile:6` | `no_torch_at_import` 100% |
 | 10 | **Security & validation** | Trusts any path/URL | GitHub URL normalize, SSRF/IP block, upload limits, excluded `*.png/*.zip` | `utils/helpers.py:19`/`254`/`80` | `robustness` 6/6 |
+| 11 | **Numeric word → digit** | `thirty days` missed | `thirty → 30`, `twenty → 20` before stemming | `utils/llama_index.py:239` | `numeric` 100% |
+| 12 | **Exact-phrase boost** | Quoted search ignored | `"refund policy"` +0.5 RRF if verbatim in chunk | `utils/llama_index.py:358` | `phrase` 100% |
+| 13 | **Tabular verbalization** | CSV/JSON not sentence-like | `Row 1: info is HR leave…` making tables answerable | `utils/llama_index.py:175` | `ingestion` 7/7 |
+| 14 | **Code fence aware** | Code split mid-` ``` ` | Odd-fence chunks merged before embed | `utils/llama_index.py:808` | `ingestion` 7/7 |
 
 ### Why this is defensible
 
@@ -217,6 +225,10 @@ Beyond raw scores — what a plain student RAG (vector search + LLM) *lacks* vs 
 | **File types** | 1–2 (txt/pdf) | **26 types** + GitHub + 5 websites | `helpers.py:19` |
 | **Upload safety** | No checks | **Name/size/SSRF/IP/host validation**, 34 excluded patterns | `helpers.py:19`/`:80` |
 | **Export** | Copy-paste | **Download chat `.docx`** | `settings.py:287` |
+| **Numeric words** | `thirty` ≠ `30` | **`thirty → 30`** before stemming | `llama_index.py:239` — 100% |
+| **Exact phrase** | `"refund policy"` bag-of-words | **Quoted phrase +0.5 RRF** if verbatim | `llama_index.py:358` — 100% |
+| **Tabular** | CSV/JSON not sentence | **`Row 1: info is …`** verbalization | `llama_index.py:175` — 100% |
+| **Code blocks** | Split mid-` ``` ` | **Odd-fence merge** before embed | `llama_index.py:808` — 100% |
 | **Heavy deps** | Needs `torch` ~500 MB | **No torch at import** | `test_import_boundaries.py` — 0 torch |
 | **Tests** | Manual | **112 unit + 43 eval** tests, CI green | `tests/` + `eval_harness.py:1` |
 
