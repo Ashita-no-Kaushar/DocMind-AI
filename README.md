@@ -7,6 +7,8 @@
 ![Python](https://img.shields.io/badge/python-3.13-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+> **Try it in 3 clicks:** `1` Upload files / paste GitHub or website → `2` Wait ~5 s (index built, cached) → `3` Ask anything — answers are cited from *your* docs. No account, no upload to cloud.
+
 ---
 
 ## Table of Contents
@@ -16,7 +18,8 @@
 3. [Novelty — What Makes This Different](#novelty--what-makes-this-different)
 4. [System Architecture & Workflow](#system-architecture--workflow)
 5. [Behind the Scenes — What Happens When You Add Content](#behind-the-scenes--what-happens-when-you-add-content)
-6. [Tech Stack](#tech-stack)
+6. [Plain RAG vs DocMind — Feature Matrix](#plain-rag-vs-docmind--feature-matrix)
+7. [Tech Stack](#tech-stack)
 6. [Features — Everything the App Does](#features--everything-the-app-does)
 7. [Supported Documents & Sources](#supported-documents--sources)
 8. [Modes & Options](#modes--options)
@@ -25,7 +28,8 @@
 11. [Evaluation](#evaluation)
 12. [Expected Outcomes](#expected-outcomes)
 13. [Project Structure](#project-structure)
-14. [Roadmap](#roadmap)
+14. [Troubleshooting & Security](#troubleshooting--security)
+15. [Roadmap](#roadmap)
 
 ---
 
@@ -188,6 +192,35 @@ This is the “explain to a non-technical examiner” section — exactly what r
 | **Observability** | `utils/logs.py`, 112 unit tests, eval harness | Verified via CI |
 
 No `torch`/`transformers` at runtime — removed for lightness (`Pipfile:6`).
+
+---
+
+## Plain RAG vs DocMind — Feature Matrix
+
+Beyond raw scores — what a plain student RAG (vector search + LLM) *lacks* vs what DocMind ships. Use this in viva when asked “what’s different?”
+
+| Feature | Plain RAG (baseline) | **DocMind** | Eval / Code |
+|---|:---:|:---:|---|
+| **Retrieval** | Vector only | **Hybrid BM25 + vector (RRF)** + evidence floor 0.5 | `llama_index.py:260`/`:75` — rejection 0% → **100%** |
+| **Synonyms** | `money back` ≠ `refund` | **Curated synonym expansion** (short queries, BM25-only) | `llama_index.py:201` — 100% |
+| **Hyphen** | `30-day` is one token | **`30-day → 30 day`** split | `llama_index.py:184` — 100% |
+| **Hinglish** | `batao/kya/hai` are keywords | **Filler filtered** (`batao/kya/hai` removed, `please/tell` too) | `llama_index.py:239` — 100% |
+| **Stemming** | `refunded ≠ refund` | **Porter stemmer** symmetric on docs + query | `llama_index.py:184` — 100% |
+| **Title-aware** | Chunks anonymous | **Every chunk prefixed with title** | `llama_index.py:141` — 100% |
+| **Dedup** | Embeds every duplicate | **Jaccard dedup** before embed | `llama_index.py:108` — 100% |
+| **Cache** | Re-embeds every run | **Disk ` .index_cache`** (5, content-hashed) | `llama_index.py:832` — instant reload |
+| **Eco / Heat** | One-size compute | **Eco Mode**: batch 4, 256 tokens, ≤3 chunks, 3200-char budget | `llama_index.py:166` — cooler |
+| **No-hallucination** | Hallucinates on no-match | **Grounded prompt + `I could not find…` + Ask without docs** | `llama_index.py:43` / `ollama.py:528` — 100% |
+| **Multi-turn** | Forgets history | **RAG history budget** (1200 / Eco 500) in prompt | `ollama.py:115` — 100% |
+| **Answer style** | Fixed tone | **6 presets** (Concise/Balanced/Detailed/Bulleted/Technical/ELI5) | `chatbox.py:6` |
+| **Privacy** | Cloud API | **100% offline** (Ollama); OpenAI-compatible optional | `Pipfile:6` — no torch |
+| **File types** | 1–2 (txt/pdf) | **26 types** + GitHub + 5 websites | `helpers.py:19` |
+| **Upload safety** | No checks | **Name/size/SSRF/IP/host validation**, 34 excluded patterns | `helpers.py:19`/`:80` |
+| **Export** | Copy-paste | **Download chat `.docx`** | `settings.py:287` |
+| **Heavy deps** | Needs `torch` ~500 MB | **No torch at import** | `test_import_boundaries.py` — 0 torch |
+| **Tests** | Manual | **112 unit + 43 eval** tests, CI green | `tests/` + `eval_harness.py:1` |
+
+> Plain hallucinates on every no-match; DocMind is **measured** 100% correct rejection on the same `nomic-embed-text` model.
 
 ---
 
@@ -394,6 +427,26 @@ For a final-year project the *novelty is system design* (hybrid + evidence gatin
 ├── Dockerfile + docker-compose.yml
 └── .github/workflows/quality.yml + main.yaml  # tests + Docker build
 ```
+
+---
+
+## Troubleshooting & Security
+
+**Common issues → docs:**
+
+* **Ollama not running / model not found** → `docs/troubleshooting.md` — check `http://localhost:11434`, `ollama list`, `ollama pull qwen2.5:0.5b` / `nomic-embed-text:latest`, and Settings → Connection.
+* **No usable content / empty index** → file may be scanned PDF or binary — try `.txt`/`.md` export; check `MIN_CHUNK_CHARS=50` (`utils/llama_index.py:62`).
+* **CUDA OOM during embed** → Eco Mode on, or lower `Chunk Size`; batch auto-halves (`utils/llama_index.py:540`).
+* **Website fails / SSRF block** → only `https`, no `localhost/metadata`, ≤5 URLs, ≤5 MB, HTML/plain only (`utils/helpers.py:80`). Use a public URL.
+* **GitHub clone fails** → use `owner/repo` or `https://github.com/owner/repo`, check `git` is installed, ensure repo is public (`utils/helpers.py:254`).
+* **Slow answers / hot laptop** → turn on **Eco Mode** (`Settings → Preferences`), split 300-page PDFs into chapters.
+
+**Security model → `SECURITY.md`:**
+
+* Uploads validated by `SAFE_UPLOAD_NAME_PATTERN` + extension allow-list + size caps (10 files / 25 MB / 100 MB total).
+* Websites: SSRF-guarded via DNS→IP check (`_is_blocked_ip`), blocked hosts, redirect & size limits.
+* GitHub: strict `owner/repo` regex, only `github.com` over `https`.
+* No torch at runtime, no egress unless you point to an OpenAI-compatible server.
 
 ---
 
