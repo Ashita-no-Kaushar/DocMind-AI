@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-08-23 18:12",
+    "generated": "2026-08-23 18:38",
     "overall": {
       "overall_score": 1.0,
       "passed": 43,
@@ -23,7 +23,7 @@
           "test": "excluded_patterns",
           "pass": true,
           "detail": "loaded=1 patterns=34",
-          "ms": 361
+          "ms": 321
         },
         {
           "test": "title_aware",
@@ -35,31 +35,31 @@
           "test": "dedupe",
           "pass": true,
           "detail": "3 -> 2",
-          "ms": 1154
+          "ms": 989
         },
         {
           "test": "multiformat_index",
           "pass": true,
           "detail": "docs=4 docx=yes",
-          "ms": 152
+          "ms": 118
         },
         {
           "test": "cache_key_and_persist",
           "pass": true,
           "detail": "key=fa6b2b5cd02345e34802 persist=hit",
-          "ms": 80
+          "ms": 69
         },
         {
           "test": "min_chunk_filter",
           "pass": true,
           "detail": "MIN_CHARS=15 docs_in=2",
-          "ms": 16
+          "ms": 13
         },
         {
           "test": "helpers_github_normalize",
           "pass": true,
           "detail": "owner/repo=True url=True reject_gitlab=True",
-          "ms": 7
+          "ms": 5
         }
       ],
       "passed": 7,
@@ -77,10 +77,10 @@
           "hybrid_hit": true,
           "plain_top": "refund_policy.txt",
           "hybrid_top": "refund_policy.txt",
-          "plain_score": 0.714,
-          "hybrid_score": 0.54,
-          "plain_latency": 0.0541,
-          "hybrid_latency": 0.0372
+          "plain_score": 0.72,
+          "hybrid_score": 0.542,
+          "plain_latency": 0.0234,
+          "hybrid_latency": 0.0244
         },
         {
           "query": "money back rules",
@@ -90,10 +90,10 @@
           "hybrid_hit": true,
           "plain_top": "refund_policy.txt",
           "hybrid_top": "refund_policy.txt",
-          "plain_score": 0.567,
-          "hybrid_score": 0.563,
-          "plain_latency": 0.0349,
-          "hybrid_latency": 0.0326
+          "plain_score": 0.566,
+          "hybrid_score": 0.56,
+          "plain_latency": 0.0227,
+          "hybrid_latency": 0.0233
         },
         {
           "query": "30-day returns",
@@ -103,10 +103,10 @@
           "hybrid_hit": true,
           "plain_top": "refund_policy.txt",
           "hybrid_top": "refund_policy.txt",
-          "plain_score": 0.64,
-          "hybrid_score": 0.603,
-          "plain_latency": 0.0262,
-          "hybrid_latency": 0.028
+          "plain_score": 0.649,
+          "hybrid_score": 0.614,
+          "plain_latency": 0.0223,
+          "hybrid_latency": 0.0243
         },
         {
           "query": "refund policy batao",
@@ -117,9 +117,9 @@
           "plain_top": "refund_policy.txt",
           "hybrid_top": "refund_policy.txt",
           "plain_score": 0.652,
-          "hybrid_score": 0.54,
-          "plain_latency": 0.0363,
-          "hybrid_latency": 0.0264
+          "hybrid_score": 0.542,
+          "plain_latency": 0.0231,
+          "hybrid_latency": 0.0222
         },
         {
           "query": "annual report revenue growth",
@@ -129,10 +129,10 @@
           "hybrid_hit": true,
           "plain_top": "annual_report.txt",
           "hybrid_top": "annual_report.txt",
-          "plain_score": 0.663,
-          "hybrid_score": 0.625,
-          "plain_latency": 0.0253,
-          "hybrid_latency": 0.0365
+          "plain_score": 0.664,
+          "hybrid_score": 0.626,
+          "plain_latency": 0.022,
+          "hybrid_latency": 0.0225
         },
         {
           "query": "How to fetch a URL in Python?",
@@ -144,8 +144,8 @@
           "hybrid_top": "python_guide.txt",
           "plain_score": 0.752,
           "hybrid_score": 0.744,
-          "plain_latency": 0.0408,
-          "hybrid_latency": 0.0274
+          "plain_latency": 0.0285,
+          "hybrid_latency": 0.0247
         },
         {
           "query": "How many leave days per year?",
@@ -155,10 +155,10 @@
           "hybrid_hit": true,
           "plain_top": "hr_policy.txt",
           "hybrid_top": "hr_policy.txt",
-          "plain_score": 0.71,
-          "hybrid_score": 0.568,
-          "plain_latency": 0.0283,
-          "hybrid_latency": 0.0303
+          "plain_score": 0.711,
+          "hybrid_score": 0.569,
+          "plain_latency": 0.0247,
+          "hybrid_latency": 0.028
         },
         {
           "query": "pasta cooking time",
@@ -168,10 +168,10 @@
           "hybrid_hit": true,
           "plain_top": "cooking.txt",
           "hybrid_top": "cooking.txt",
-          "plain_score": 0.691,
-          "hybrid_score": 0.688,
-          "plain_latency": 0.0264,
-          "hybrid_latency": 0.0273
+          "plain_score": 0.696,
+          "hybrid_score": 0.693,
+          "plain_latency": 0.0246,
+          "hybrid_latency": 0.0234
         },
         {
           "query": "What is the capital of France?",
@@ -181,10 +181,10 @@
           "hybrid_hit": true,
           "plain_top": "annual_report.txt",
           "hybrid_top": null,
-          "plain_score": 0.386,
+          "plain_score": 0.392,
           "hybrid_score": 0.0,
-          "plain_latency": 0.0252,
-          "hybrid_latency": 0.0265
+          "plain_latency": 0.0247,
+          "hybrid_latency": 0.0223
         },
         {
           "query": "quantum physics equations",
@@ -194,10 +194,10 @@
           "hybrid_hit": true,
           "plain_top": "python_guide.txt",
           "hybrid_top": null,
-          "plain_score": 0.421,
+          "plain_score": 0.422,
           "hybrid_score": 0.0,
-          "plain_latency": 0.0258,
-          "hybrid_latency": 0.0265
+          "plain_latency": 0.022,
+          "hybrid_latency": 0.0227
         },
         {
           "query": "refunded purchases",
@@ -207,10 +207,10 @@
           "hybrid_hit": true,
           "plain_top": "refund_policy.txt",
           "hybrid_top": "refund_policy.txt",
-          "plain_score": 0.644,
-          "hybrid_score": 0.605,
-          "plain_latency": 0.0257,
-          "hybrid_latency": 0.0275
+          "plain_score": 0.65,
+          "hybrid_score": 0.611,
+          "plain_latency": 0.0273,
+          "hybrid_latency": 0.023
         },
         {
           "query": "tell me about the annual report",
@@ -220,10 +220,10 @@
           "hybrid_hit": true,
           "plain_top": "annual_report.txt",
           "hybrid_top": "annual_report.txt",
-          "plain_score": 0.589,
-          "hybrid_score": 0.633,
-          "plain_latency": 0.0266,
-          "hybrid_latency": 0.0381
+          "plain_score": 0.587,
+          "hybrid_score": 0.63,
+          "plain_latency": 0.0219,
+          "hybrid_latency": 0.0235
         }
       ],
       "summary": {
@@ -231,8 +231,8 @@
         "hybrid_hit_rate": 1.0,
         "plain_rejection": 0.0,
         "hybrid_rejection": 1.0,
-        "plain_avg_ms": 31.3,
-        "hybrid_avg_ms": 30.4,
+        "plain_avg_ms": 23.9,
+        "hybrid_avg_ms": 23.7,
         "is_hybrid": true,
         "embedding": "nomic-embed-text:latest",
         "hybrid_basic_rate": 1.0,
@@ -267,7 +267,7 @@
           "test": "no_hallucination_fallback",
           "pass": true,
           "detail": "fallback=hit",
-          "ms": 5
+          "ms": 4
         },
         {
           "test": "tone_presets",
@@ -279,13 +279,13 @@
           "test": "multi_turn_history",
           "pass": true,
           "detail": "messages_in_prompt=4",
-          "ms": 111
+          "ms": 109
         },
         {
           "test": "e2e_real_llm",
           "pass": true,
-          "detail": "answer_len=210 has_30days=True preview='The refund policy is: Full refunds are available within 30 days of purchase. Ele'",
-          "ms": 6151
+          "detail": "answer_len=233 has_30days=True preview='The refund policy is as follows: (from [1]). Full refunds are available within 3'",
+          "ms": 5101
         }
       ],
       "passed": 6,
@@ -298,20 +298,20 @@
         {
           "test": "ingest_5_docs",
           "pass": true,
-          "detail": "2.4s for 5 docs",
-          "ms": 4676
+          "detail": "2.5s for 5 docs",
+          "ms": 4733
         },
         {
           "test": "cache_hit_faster",
           "pass": true,
           "detail": "cold 0.0s vs cache 0.03s",
-          "ms": 75
+          "ms": 93
         },
         {
           "test": "retrieval_latency",
           "pass": true,
-          "detail": "vector 26ms hybrid 26ms",
-          "ms": 116
+          "detail": "vector 24ms hybrid 23ms",
+          "ms": 107
         },
         {
           "test": "eco_mode_trims",
@@ -379,7 +379,7 @@
         {
           "test": "export_docx",
           "pass": true,
-          "detail": "docx 36712 bytes"
+          "detail": "docx 36713 bytes"
         },
         {
           "test": "browser_settings_keys",

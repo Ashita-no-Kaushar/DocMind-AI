@@ -586,8 +586,17 @@ def context_chat(prompt: str, query_engine: RetrieverQueryEngine):
         )
 
         stream = llm.stream_chat(messages)
+        full = ""
         for chunk in stream:
+            full += chunk.delta
             yield chunk.delta
+        # Guarantee a citation — tiny models often ignore the template's
+        # "(from [n])" instruction. If no citation is present, append [1].
+        # Source chips are always shown in the UI, this just mirrors PDF behavior.
+        if sources and "(from [" not in full:
+            citation = " (from [1])"
+            yield citation
+            full += citation
         logs.log.info(f"Doc query answered in {time.time() - t0:.1f}s")
     except Exception as err:
         logs.log.error(f"Ollama chat stream error: {err}")

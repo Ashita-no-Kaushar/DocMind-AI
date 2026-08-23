@@ -1,6 +1,6 @@
 # DocMind AI — Full Project Evaluation Report
 
-_Generated 2026-08-23 18:12 — overall score **100%** (43/43 tests)_
+_Generated 2026-08-23 18:38 — overall score **100%** (43/43 tests)_
 
 ## Summary (suite scores)
 
@@ -22,7 +22,7 @@ _Embedding: `nomic-embed-text:latest` — hit = expected doc in top-3, correct r
 |---|---:|---:|
 | Factual hit rate | 100% | **100%** |
 | Correct rejection | 0% | **100%** |
-| Avg latency | 31 ms | 30 ms |
+| Avg latency | 24 ms | 24 ms |
 
 | # | Query | Expected | Feature | Plain | Hybrid | Plain top | Hybrid top |
 |---|---|---|---|:---:|:---:|---|---|
@@ -43,13 +43,13 @@ _Embedding: `nomic-embed-text:latest` — hit = expected doc in top-3, correct r
 
 | Test | Pass | Detail |
 |---|:---:|---|
-| excluded_patterns | ✓ | loaded=1 patterns=34 361ms |
+| excluded_patterns | ✓ | loaded=1 patterns=34 321ms |
 | title_aware | ✓ | title='Annual Report' 0ms |
-| dedupe | ✓ | 3 -> 2 1154ms |
-| multiformat_index | ✓ | docs=4 docx=yes 152ms |
-| cache_key_and_persist | ✓ | key=fa6b2b5cd02345e34802 persist=hit 80ms |
-| min_chunk_filter | ✓ | MIN_CHARS=15 docs_in=2 16ms |
-| helpers_github_normalize | ✓ | owner/repo=True url=True reject_gitlab=True 7ms |
+| dedupe | ✓ | 3 -> 2 989ms |
+| multiformat_index | ✓ | docs=4 docx=yes 118ms |
+| cache_key_and_persist | ✓ | key=fa6b2b5cd02345e34802 persist=hit 69ms |
+| min_chunk_filter | ✓ | MIN_CHARS=15 docs_in=2 13ms |
+| helpers_github_normalize | ✓ | owner/repo=True url=True reject_gitlab=True 5ms |
 
 ## Suite: generation (6/6 — 100%)
 
@@ -57,18 +57,18 @@ _Embedding: `nomic-embed-text:latest` — hit = expected doc in top-3, correct r
 |---|:---:|---|
 | qa_template_guards | ✓ | has_guards=True len=579 0ms |
 | query_helpers | ✓ | hyphen=True hinglish=True synonym=True 0ms |
-| no_hallucination_fallback | ✓ | fallback=hit 5ms |
+| no_hallucination_fallback | ✓ | fallback=hit 4ms |
 | tone_presets | ✓ | presets=6 distinct=True 1ms |
-| multi_turn_history | ✓ | messages_in_prompt=4 111ms |
-| e2e_real_llm | ✓ | answer_len=210 has_30days=True preview='The refund policy is: Full refunds are available within 30 days of purchase. Ele 6151ms |
+| multi_turn_history | ✓ | messages_in_prompt=4 109ms |
+| e2e_real_llm | ✓ | answer_len=233 has_30days=True preview='The refund policy is as follows: (from [1]). Full refunds are available within 3 5101ms |
 
 ## Suite: performance (5/5 — 100%)
 
 | Test | Pass | Detail |
 |---|:---:|---|
-| ingest_5_docs | ✓ | 2.4s for 5 docs 4676ms |
-| cache_hit_faster | ✓ | cold 0.0s vs cache 0.03s 75ms |
-| retrieval_latency | ✓ | vector 26ms hybrid 26ms 116ms |
+| ingest_5_docs | ✓ | 2.5s for 5 docs 4733ms |
+| cache_hit_faster | ✓ | cold 0.0s vs cache 0.03s 93ms |
+| retrieval_latency | ✓ | vector 24ms hybrid 23ms 107ms |
 | eco_mode_trims | ✓ | ctx 4800->3200 pred 512->256 batch 16->4 0ms |
 | batch_oom_resilience | ✓ | shrunk to 4 after OOM 0ms |
 
@@ -88,7 +88,7 @@ _Embedding: `nomic-embed-text:latest` — hit = expected doc in top-3, correct r
 | Test | Pass | Detail |
 |---|:---:|---|
 | backend_presets | ✓ | presets=['Ollama', 'OpenAI', 'LM Studio (Local AI)', 'TabbyAPI'] |
-| export_docx | ✓ | docx 36712 bytes |
+| export_docx | ✓ | docx 36713 bytes |
 | browser_settings_keys | ✓ | key=browser_settings_persisted_hash |
 | ollama_helpers | ✓ | estimate=2 trim=1 |
 | embedding_verify | ✓ | mock verify |
