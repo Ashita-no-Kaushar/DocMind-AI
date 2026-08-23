@@ -97,9 +97,11 @@ def _is_eco_mode() -> bool:
         return False
 
 
-def _num_predict() -> int:
+def _num_predict(eco: bool | None = None) -> int:
     """Return the max answer length, shortened in Eco Mode to save heat."""
-    return 256 if _is_eco_mode() else 512
+    if eco is None:
+        eco = _is_eco_mode()
+    return 256 if eco else 512
 
 
 def _embed_batch_size() -> int:
@@ -314,6 +316,7 @@ def create_ollama_llm(
     system_prompt: str = None,
     request_timeout: int = 300,
     temperature: float = None,
+    eco_mode: bool | None = None,
 ) -> Ollama:
     """
     Create an instance of the Ollama language model.
@@ -333,6 +336,8 @@ def create_ollama_llm(
     """
     if temperature is None:
         temperature = float(st.session_state.get("temperature", DEFAULT_TEMPERATURE))
+    if eco_mode is None:
+        eco_mode = _is_eco_mode()
     try:
         Settings.llm = Ollama(
             model=model,
@@ -348,7 +353,7 @@ def create_ollama_llm(
             keep_alive="2m",
             # Cap output length: answers stop at ~512 tokens (~400 words) by
             # default; Eco Mode halves that to keep weak machines cool.
-            additional_kwargs={"num_predict": _num_predict()},
+            additional_kwargs={"num_predict": _num_predict(eco_mode)},
         )
         logs.log.info("Ollama LLM instance created successfully")
         return Settings.llm
@@ -370,6 +375,7 @@ def create_openai_llm(
     base_url: str,
     api_key: str = "",
     temperature: float = None,
+    eco_mode: bool | None = None,
 ) -> OpenAI:
     """Create an LLM backed by any OpenAI-compatible endpoint.
 
@@ -378,13 +384,15 @@ def create_openai_llm(
     """
     if temperature is None:
         temperature = float(st.session_state.get("temperature", DEFAULT_TEMPERATURE))
+    if eco_mode is None:
+        eco_mode = _is_eco_mode()
     try:
         Settings.llm = OpenAI(
             model=model,
             api_key=api_key or "sk-docmind-local",
             api_base=base_url,
             temperature=temperature,
-            max_tokens=_num_predict(),
+            max_tokens=_num_predict(eco_mode),
             timeout=300.0,
         )
         logs.log.info(
@@ -411,9 +419,10 @@ def create_llm(
     supported; the difference is only in which wrapper is instantiated.
     """
     backend = backend or st.session_state.get("llm_backend", "Ollama")
+    eco_mode = st.session_state.get("eco_mode", False)
     if backend == "OpenAI":
-        return create_openai_llm(model, base_url, api_key, temperature)
-    return create_ollama_llm(model, base_url, system_prompt, temperature=temperature)
+        return create_openai_llm(model, base_url, api_key, temperature, eco_mode=eco_mode)
+    return create_ollama_llm(model, base_url, system_prompt, temperature=temperature, eco_mode=eco_mode)
 
 
 ###################################

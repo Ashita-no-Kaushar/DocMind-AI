@@ -154,7 +154,7 @@ class CreateLLMDispatchTests(unittest.TestCase):
         ) as ollama_llm:
             create_llm("my-model", "http://x/v1", "key", None, 0.7)
 
-        openai_llm.assert_called_once_with("my-model", "http://x/v1", "key", 0.7)
+        openai_llm.assert_called_once_with("my-model", "http://x/v1", "key", 0.7, eco_mode=False)
         ollama_llm.assert_not_called()
 
     def test_dispatches_to_ollama_by_default(self):
@@ -167,7 +167,7 @@ class CreateLLMDispatchTests(unittest.TestCase):
             create_llm("qwen2.5:0.5b", "http://localhost:11434", system_prompt="sys")
 
         ollama_llm.assert_called_once_with(
-            "qwen2.5:0.5b", "http://localhost:11434", "sys", temperature=None
+            "qwen2.5:0.5b", "http://localhost:11434", "sys", temperature=None, eco_mode=False
         )
         openai_llm.assert_not_called()
 

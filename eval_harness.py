@@ -24,17 +24,12 @@ Outputs:
 
 import argparse
 import csv
-import hashlib
-import io
 import json
 import os
-import re
 import shutil
-import sys
 import tempfile
 import time
 from pathlib import Path
-from dataclasses import dataclass, asdict
 
 # ---------------------------------------------------------------------------
 # Corpus — 5 core docs + fixtures for file-type / ingestion suite
@@ -318,7 +313,7 @@ def suite_ingestion(mock: bool):
 
     # 5 — cache: same docs produce same cache key and hit on second build
     def t_cache():
-        from utils.llama_index import index_cache_key, load_documents, create_index, index_cache_dir, load_index_from_cache, persist_index_to_cache, INDEX_CACHE_DIR
+        from utils.llama_index import index_cache_key, load_documents, create_index, index_cache_dir, load_index_from_cache, persist_index_to_cache
         d = tempfile.mkdtemp()
         try:
             for name, content in list(DOCS.items())[:2]:
@@ -514,7 +509,6 @@ def suite_generation(mock: bool, endpoint="http://localhost:11434"):
         from llama_index.core.schema import TextNode, NodeWithScore
         from utils import ollama as oll_mod
         import streamlit as st
-        from llama_index.core.llms import ChatMessage
         _setup_streamlit_state()
         st.session_state["messages"] = [
             {"role": "user", "content": "What is refund policy?"},
@@ -550,7 +544,7 @@ def suite_generation(mock: bool, endpoint="http://localhost:11434"):
             return True, "skipped (mock mode)"
         try:
             import streamlit as st
-            from utils.llama_index import setup_embedding_model, create_index, load_documents, build_hybrid_retriever
+            from utils.llama_index import create_index, load_documents, build_hybrid_retriever
             from utils.ollama import context_chat
             import tempfile
             from pathlib import Path
@@ -656,7 +650,6 @@ def suite_performance(mock: bool, endpoint="http://localhost:11434", model="nomi
             for n, c in list(DOCS.items())[:3]:
                 Path(d, n).write_text(c, encoding="utf-8")
             from utils.llama_index import load_documents, create_index, build_hybrid_retriever
-            import streamlit as st
             docs = load_documents(d)
             idx = create_index(docs)
             vr = idx.as_retriever(similarity_top_k=3)
@@ -671,7 +664,7 @@ def suite_performance(mock: bool, endpoint="http://localhost:11434", model="nomi
 
     # 4 — eco mode trims context/batches
     def t_eco():
-        from utils.llama_index import _context_char_budget, _is_eco_mode
+        from utils.llama_index import _context_char_budget
         from utils.ollama import _num_predict, _embed_batch_size
         import streamlit as st
         st.session_state["eco_mode"] = False
@@ -775,7 +768,7 @@ def suite_robustness(mock: bool):
     check("empty_docs_rejected", t_empty_docs)
 
     def t_binary_exclusion():
-        from utils.llama_index import EXCLUDED_FILE_PATTERNS, load_documents
+        from utils.llama_index import load_documents
         d = tempfile.mkdtemp()
         try:
             Path(d, "a.txt").write_text("real content " * 20, encoding="utf-8")
@@ -837,8 +830,7 @@ def suite_architecture(mock: bool):
     check("browser_settings_keys", t_browser_settings)
 
     def t_ollama_helpers():
-        from utils.ollama import _active_backend, _active_chat_model, _estimate_tokens, _trim_history
-        import streamlit as st
+        from utils.ollama import _estimate_tokens, _trim_history
         _setup_streamlit_state()
         est = _estimate_tokens("hello world")
         ok1 = est == 2 or est == 3
@@ -863,7 +855,7 @@ def suite_architecture(mock: bool):
     check("embedding_verify", t_embedding_verify_mock)
 
     def t_r2r_mock():
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import patch
         from utils import r2r as r2r_mod
         with patch.object(r2r_mod, "get_client") as gc:
             gc.return_value.health.return_value = True

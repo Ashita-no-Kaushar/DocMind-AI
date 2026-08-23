@@ -1,4 +1,7 @@
+import csv
 import hashlib
+import io
+import json
 import os
 import re
 import shutil
@@ -78,7 +81,7 @@ CONTEXT_CHAR_BUDGET = 4800
 VECTOR_EVIDENCE_FLOOR = 0.5
 
 # Bump when retrieval/ingestion logic changes so stale caches rebuild once.
-INDEX_CACHE_VERSION = 6
+INDEX_CACHE_VERSION = 7
 
 # Lazy Porter stemmer (pure Python, no model data): normalizes word endings
 # ("running" -> "run") so BM25 keyword matching understands inflected forms
@@ -158,6 +161,122 @@ def _prepend_document_title(nodes):
     return nodes
 
 
+def _verbalize_tabular_docs(documents):
+    """Rewrite CSV/JSON documents into natural sentences for better retrieval.
+
+    A raw CSV like 'id,info\\n1,HR leave 20 days' is poor for embedding
+    search — the header and values are not linked as a sentence. Converting
+    to 'Row 1: info is HR leave 20 days.' makes the fact retrievable.
+    Pure Python, no model, negligible cost.
+    """
+    for doc in documents:
+        fname = (doc.metadata or {}).get("file_name") or ""
+        lower = fname.lower()
+        text = doc.text or ""
+        if not text.strip():
+            continue
+        # CSV / TSV
+        if lower.endswith(".csv") or lower.endswith(".tsv"):
+            try:
+                delimiter = "\t" if lower.endswith(".tsv") else ","
+                reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+                if reader.fieldnames is None:
+                    continue
+                rows = list(reader)
+                if not rows:
+                    continue
+                verbalized = []
+                for idx, row in enumerate(rows, start=1):
+                    parts = []
+                    for k, v in row.items():
+                        if k is None or v is None:
+                            continue
+                        k = str(k).strip()
+                        v = str(v).strip()
+                        if not k or not v:
+                            continue
+                        parts.append(f"{k} is {v}")
+                    if parts:
+                        verbalized.append(f"Row {idx}: " + ", ".join(parts) + ".")
+                if verbalized:
+                    title = _document_title(doc)  # type: ignore[arg-type]
+                    header = f"{title}. " if title and title.lower() not in text.lower()[:80] else ""
+                    new_text = header + "\n".join(verbalized) + f"\n\nOriginal table:\n{text[:600]}"
+                    try:
+                        doc.set_content(new_text)
+                    except Exception:
+                        try:
+                            doc.text = new_text
+                        except Exception:
+                            object.__setattr__(doc, "text", new_text)
+            except Exception:
+                continue
+        # JSON / JSONL
+        elif lower.endswith(".json") or lower.endswith(".jsonl"):
+            try:
+                data = json.loads(text)
+                # Normalize to list of records
+                if isinstance(data, dict):
+                    data = [data]
+                if not isinstance(data, list) or not data:
+                    continue
+                # Only verbalize if list of flat dicts
+                if not all(isinstance(r, dict) for r in data[:5]):
+                    continue
+                verbalized = []
+                for idx, rec in enumerate(data[:50], start=1):  # cap 50 rows
+                    parts = []
+                    for k, v in rec.items():
+                        if v is None or str(v).strip() == "":
+                            continue
+                        parts.append(f"{k} is {v}")
+                    if parts:
+                        verbalized.append(f"Record {idx}: " + ", ".join(parts) + ".")
+                if verbalized:
+                    title = _document_title(doc)  # type: ignore[arg-type]
+                    header = f"{title}. " if title and title.lower() not in text.lower()[:80] else ""
+                    new_text = header + "\n".join(verbalized) + f"\n\nOriginal JSON:\n{text[:800]}"
+                    try:
+                        doc.set_content(new_text)
+                    except Exception:
+                        try:
+                            doc.text = new_text
+                        except Exception:
+                            object.__setattr__(doc, "text", new_text)
+            except Exception:
+                continue
+    return documents
+
+
+def _merge_code_blocks(nodes):
+    """Merge chunks split inside a markdown code fence (```).
+
+    LlamaIndex splitters can cut a ```python block in half, leaving an
+    unclosed fence that embeddings and small LLMs mis-handle. If a chunk
+    contains an odd number of ``` fences, it is inside a code block that
+    was split — merge it with the next chunk.
+    """
+    if not nodes:
+        return nodes
+    merged = []
+    idx = 0
+    while idx < len(nodes):
+        node = nodes[idx]
+        text = node.get_content()
+        # Odd number of fences means we are inside an unclosed block
+        if text.count("```") % 2 == 1 and idx + 1 < len(nodes):
+            nxt = nodes[idx + 1]
+            # Merge the two and keep the first node's metadata
+            node.text = text + "\n\n" + nxt.get_content()
+            # Preserve file_name, etc. from first node (already in metadata)
+            merged.append(node)
+            idx += 2  # skip next as merged
+        else:
+            merged.append(node)
+            idx += 1
+    return merged
+
+
 def _is_eco_mode() -> bool:
     """Return whether Eco Mode is enabled (light load / weak hardware)."""
     try:
@@ -235,6 +354,18 @@ def _bm25_expanded_tokens(tokens):
     return expanded
 
 
+# Numeric words → digits so "thirty days" matches "30 days" without embedding help.
+_NUMBER_WORDS = {
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+    "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+    "ten": "10", "eleven": "11", "twelve": "12", "thirteen": "13",
+    "fourteen": "14", "fifteen": "15", "sixteen": "16", "seventeen": "17",
+    "eighteen": "18", "nineteen": "19", "twenty": "20", "thirty": "30",
+    "forty": "40", "fifty": "50", "sixty": "60", "seventy": "70",
+    "eighty": "80", "ninety": "90", "hundred": "100",
+}
+
+
 # Filler words that carry no retrieval value: removing them helps BM25
 # weight the real terms and slightly improves vector matching too.
 # Includes common Hinglish/Hindi question words (batao, kya, hai, ...) so
@@ -254,8 +385,12 @@ def _rewrite_query(query):
     Stems words so "documents", "documented" and "documenting" all match
     "document" in the index, which materially helps small local models answer.
     """
+    # Normalize numeric words before tokenization so "thirty days" == "30 days"
+    lowered = query.lower()
+    for word, digit in _NUMBER_WORDS.items():
+        lowered = re.sub(rf"\b{re.escape(word)}\b", digit, lowered)
     stemmer = _stemmer()
-    text = " ".join(stemmer.stem(word) for word in _bm25_tokens(query))
+    text = " ".join(stemmer.stem(word) for word in _bm25_tokens(lowered))
     words = [word for word in text.split() if word not in _QUERY_FILLER_WORDS]
     return " ".join(words) or text
 
@@ -395,6 +530,23 @@ class HybridRetriever:
         }
         if not filtered:
             return []
+
+        # Exact-phrase boost: if the user quoted "refund policy", chunks
+        # containing that exact phrase (case-insensitive) get +0.5 RRF.
+        # Zero cost, catches user-intended exact search.
+        phrases = re.findall(r'"([^"]+)"', query)
+        # also handle single quotes for convenience
+        phrases += re.findall(r"'([^']+)'", query)
+        if phrases:
+            for node_id in list(filtered.keys()):
+                try:
+                    content = self.docstore.get_node(node_id).get_content().lower()
+                    for phrase in phrases:
+                        if phrase.lower().strip() and phrase.lower().strip() in content:
+                            filtered[node_id] = filtered[node_id] + 0.5
+                            break
+                except Exception:
+                    continue
 
         # Keep the top chunks within a token budget that fits the model's
         # context window (light context compression).
@@ -752,9 +904,6 @@ def load_documents(data_dir: str, input_files: list = None):
                 for root, _, filenames in os.walk(data_dir):
                     for fname in filenames:
                         fpath = os.path.join(root, fname)
-                        # Respect exclude patterns quickly
-                        if any(Path(fname).match(pat.lstrip("*")) or fname.endswith(pat.lstrip("*")) for pat in EXCLUDED_FILE_PATTERNS if "*" in pat):
-                            continue
                         try:
                             reader = SimpleDirectoryReader(
                                 input_files=[fpath],
@@ -765,6 +914,8 @@ def load_documents(data_dir: str, input_files: list = None):
                         except Exception as per_file_err:
                             logs.log.warning(f"Skipping {fpath}: {per_file_err}")
                             continue
+        # Verbalize tabular docs (CSV/JSON) into sentences for better retrieval
+        documents = _verbalize_tabular_docs(documents)
         logs.log.info(f"Loaded {len(documents):,} documents from files")
         return documents
     except Exception as err:
@@ -802,6 +953,10 @@ def create_index(documents, progress_callback=None):
             Settings.transformations,
             show_progress=True,
         )
+
+        # Keep code fences intact before any filtering — a ``` block split
+        # across two chunks leaves an unclosed fence that confuses embeddings.
+        nodes = _merge_code_blocks(nodes)
 
         # Skip too-short / empty chunks: they add embedding work and retrieval
         # noise without carrying any useful facts.
