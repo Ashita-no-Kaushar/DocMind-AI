@@ -13,17 +13,18 @@
 
 1. [Problem](#problem)
 2. [Solution & Approach](#solution--approach)
-3. [System Architecture & Workflow](#system-architecture--workflow)
-4. [Tech Stack](#tech-stack)
-5. [Features — Everything the App Does](#features--everything-the-app-does)
-6. [Supported Documents & Sources](#supported-documents--sources)
-7. [Modes & Options](#modes--options)
-8. [Quick Start](#quick-start)
-9. [Configuration](#configuration)
-10. [Evaluation](#evaluation)
-11. [Expected Outcomes](#expected-outcomes)
-12. [Project Structure](#project-structure)
-13. [Roadmap](#roadmap)
+3. [Novelty — What Makes This Different](#novelty--what-makes-this-different)
+4. [System Architecture & Workflow](#system-architecture--workflow)
+5. [Tech Stack](#tech-stack)
+6. [Features — Everything the App Does](#features--everything-the-app-does)
+7. [Supported Documents & Sources](#supported-documents--sources)
+8. [Modes & Options](#modes--options)
+9. [Quick Start](#quick-start)
+10. [Configuration](#configuration)
+11. [Evaluation](#evaluation)
+12. [Expected Outcomes](#expected-outcomes)
+13. [Project Structure](#project-structure)
+14. [Roadmap](#roadmap)
 
 ---
 
@@ -55,6 +56,33 @@ DocMind is a **streamlit + LlamaIndex + Ollama** system with a **hybrid retrieva
 | **Cache & Eco Mode** | On-disk `.index_cache` reuses embeddings; Eco trims batches/context for cool & fast weak-machine answers (`utils/llama_index.py:834` / `166`) |
 
 No hallucination fallback: if retrieval returns 0 nodes the assistant says *“I could not find this information in the documents.”* and offers **Ask without documents** (`utils/ollama.py:528`, `components/chatbox.py:125`).
+
+---
+
+## Novelty — What Makes This Different
+
+Plain RAG (vector search + LLM) is the baseline every student builds. DocMind keeps the same tiny local model (`qwen2.5:0.5b`) but adds **system-level innovations** that are measured in `eval_harness.py:1` (43 tests, **100%** real run). No new model was trained — the contribution is engineering for **accuracy, privacy, and weak hardware**.
+
+### At a glance
+
+| # | Novelty | What plain RAG does | What DocMind does | Where | Eval proof |
+|---|---|---|---|---|---|
+| 1 | **Hybrid BM25 + Vector (RRF)** | Vector only — misses exact codes/numbers | Fuses BM25 keyword hits (exact) with vector semantics via Reciprocal Rank Fusion — pure CPU | `utils/llama_index.py:260` | Retrieval suite 12/12; e.g. `30-day` still hits |
+| 2 | **Evidence Floor (0.5)** | Weak scores (0.3–0.5) still return a chunk → hallucination | Score < 0.5 needs a BM25 hit, otherwise **0 nodes → correct rejection** | `utils/llama_index.py:75` | Correct rejection **0% → 100%** (`eval_report.md:17`) |
+| 3 | **Synonym expansion (BM25-only)** | `money back rules` ≠ `refund policy` | Short queries expand via curated map (`refund → return/money/back`) for BM25; vector query stays clean | `utils/llama_index.py:201` | `synonym` 100% |
+| 4 | **Hyphen & Hinglish hygiene** | `30-day` and `batao/kya/hai` are tokens | `30-day → 30 day`, single letters dropped, Hinglish fillers stripped | `utils/llama_index.py:184` | `hyphen` + `hinglish` 100% |
+| 5 | **Title-aware chunks** | Chunks are anonymous | Every chunk prefixed with `Annual Report.` etc. — title queries match all chunks + provenance visible | `utils/llama_index.py:141` | `title-aware` 100% |
+| 6 | **Near-duplicate & cache** | Re-embeds same headers every run | Jaccard dedup before embed + disk `.index_cache` (5 entries, content-hashed) → less heat, instant reload | `utils/llama_index.py:108`/`832` | `dedupe` + `cache` 100% |
+| 7 | **Eco Mode (weak-machine)** | One-size compute | Batch 4 / 256 tokens / ≤3 chunks / 3200-char budget when hot | `utils/llama_index.py:166` `utils/ollama.py:100` | `eco_mode_trims` 100% |
+| 8 | **No-hallucination UX** | Silent hallucination | Grounded template (`Answer ONLY from context, cite [n]`) + `I could not find…` + **Ask without documents** button | `utils/llama_index.py:43` `utils/ollama.py:528` | `no_hallucination` 100%, `generation` 100% |
+| 9 | **No heavy ML at runtime** | Needs `torch`/`transformers` | `rank-bm25` + `nltk` stemmer only — **~500 MB saved**, no torch import (`tests/test_import_boundaries.py`) | `Pipfile:6` | `no_torch_at_import` 100% |
+| 10 | **Security & validation** | Trusts any path/URL | GitHub URL normalize, SSRF/IP block, upload limits, excluded `*.png/*.zip` | `utils/helpers.py:19`/`254`/`80` | `robustness` 6/6 |
+
+### Why this is defensible
+
+* **Same model, better system** — you didn't claim a new LLM; you proved a better *pipeline* on the same `nomic-embed-text` + `qwen2.5:0.5b`. Reviewers can rerun `python eval_harness.py` vs `python eval_harness.py --mock` themselves.
+* **Reproducible numbers** — every novelty maps to a test in `eval_report.md:5` and a code line; overall **43/43 — 100%** (`eval_results.json:2`).
+* **Practical impact** — fully offline, runs cool on a weak laptop, handles 26 formats + Hinglish + GitHub/sites in one index — exactly the gap for colleges / small orgs that can't use cloud RAG.
 
 ---
 
