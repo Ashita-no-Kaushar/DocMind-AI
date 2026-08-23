@@ -48,7 +48,7 @@ TEXT_QA_TEMPLATE = PromptTemplate(
     "When a fact comes from a numbered chunk, cite it like this: (from [n]).\n"
     "If the context does not contain the answer, reply exactly:\n"
     "\"I could not find this information in the documents.\"\n"
-    "Keep the answer concise and factual: 1-3 short sentences.\n\n"
+    "Follow any style guidance from the system message and stay factual and cited.\n\n"
     "---------------------\n"
     "{context_str}\n"
     "---------------------\n"
@@ -59,7 +59,10 @@ TEXT_QA_TEMPLATE = PromptTemplate(
 
 # Documents with less content than this are skipped during ingestion: too
 # short to embed usefully, they only add embedding work and retrieval noise.
-MIN_CHUNK_CHARS = 50
+# Kept low (15) so small but meaningful files (CSV rows, JSON snippets, short
+# notes) are still indexed — the user sees "rest types not working" if this
+# is too high.
+MIN_CHUNK_CHARS = 15
 
 # Rough token budget for the retrieved context sent to the LLM (chars/4).
 # Excess chunks are trimmed from the bottom of the ranking, keeping the
@@ -75,7 +78,7 @@ CONTEXT_CHAR_BUDGET = 4800
 VECTOR_EVIDENCE_FLOOR = 0.5
 
 # Bump when retrieval/ingestion logic changes so stale caches rebuild once.
-INDEX_CACHE_VERSION = 5
+INDEX_CACHE_VERSION = 6
 
 # Lazy Porter stemmer (pure Python, no model data): normalizes word endings
 # ("running" -> "run") so BM25 keyword matching understands inflected forms
@@ -700,6 +703,10 @@ def load_documents(data_dir: str, input_files: list = None):
     """
     Loads documents from a directory of files with binary and archive exclusions.
 
+    Resilient: a single unreadable file (missing deps like docx2txt) no longer
+    aborts the whole ingestion — the file is skipped with a warning and the
+    rest are loaded.
+
     Args:
         data_dir (str): The path to the directory containing the documents to be loaded.
         input_files (list, optional): An explicit list of files to load. When provided,
@@ -712,18 +719,52 @@ def load_documents(data_dir: str, input_files: list = None):
         Exception: If there is an error creating the data index.
     """
     try:
+        documents = []
         if input_files:
-            files = SimpleDirectoryReader(
-                input_files=input_files,
-                exclude=EXCLUDED_FILE_PATTERNS,
-            )
+            # Per-file loading so one bad file doesn't kill the batch
+            for path in input_files:
+                try:
+                    reader = SimpleDirectoryReader(
+                        input_files=[path],
+                        exclude=EXCLUDED_FILE_PATTERNS,
+                    )
+                    docs = reader.load_data()
+                    documents.extend(docs)
+                except Exception as per_file_err:
+                    logs.log.warning(f"Skipping unreadable file {path}: {per_file_err}")
+                    continue
+            if not documents and input_files:
+                # All files failed — surface the error instead of silent empty
+                raise Exception("No files could be loaded — check file types and logs")
         else:
-            files = SimpleDirectoryReader(
-                input_dir=data_dir,
-                recursive=True,
-                exclude=EXCLUDED_FILE_PATTERNS,
-            )
-        documents = files.load_data()
+            # Directory mode — try bulk load first (fast path), fall back to per-file
+            try:
+                files = SimpleDirectoryReader(
+                    input_dir=data_dir,
+                    recursive=True,
+                    exclude=EXCLUDED_FILE_PATTERNS,
+                )
+                documents = files.load_data()
+            except Exception as bulk_err:
+                logs.log.warning(f"Bulk load failed ({bulk_err}), retrying per-file")
+                documents = []
+                # Enumerate files manually and load one-by-one
+                for root, _, filenames in os.walk(data_dir):
+                    for fname in filenames:
+                        fpath = os.path.join(root, fname)
+                        # Respect exclude patterns quickly
+                        if any(Path(fname).match(pat.lstrip("*")) or fname.endswith(pat.lstrip("*")) for pat in EXCLUDED_FILE_PATTERNS if "*" in pat):
+                            continue
+                        try:
+                            reader = SimpleDirectoryReader(
+                                input_files=[fpath],
+                                exclude=EXCLUDED_FILE_PATTERNS,
+                            )
+                            docs = reader.load_data()
+                            documents.extend(docs)
+                        except Exception as per_file_err:
+                            logs.log.warning(f"Skipping {fpath}: {per_file_err}")
+                            continue
         logs.log.info(f"Loaded {len(documents):,} documents from files")
         return documents
     except Exception as err:

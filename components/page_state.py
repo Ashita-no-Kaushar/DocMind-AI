@@ -73,6 +73,7 @@ def perform_project_reset(state):
     state["temperature"] = 0.4
     state["eco_mode"] = False
     state["quick_answer_style"] = "Balanced (default)"
+    state["answer_style"] = "Balanced (default)"
     state["llm_backend"] = "Ollama"
     state["openai_base_url"] = "http://localhost:1234/v1"
     state["openai_model"] = ""
@@ -274,6 +275,9 @@ def set_initial_state():
 
     if "quick_answer_style" not in st.session_state:
         st.session_state["quick_answer_style"] = "Balanced (default)"
+
+    if "answer_style" not in st.session_state:
+        st.session_state["answer_style"] = st.session_state.get("quick_answer_style", "Balanced (default)")
 
     ##################
     # LLM Backends   #

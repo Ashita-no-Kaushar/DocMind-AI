@@ -32,10 +32,22 @@ def _style_to_prompt(style: str) -> str:
     return base + style_instructions.get(style, style_instructions["Balanced (default)"])
 
 
+def _sync_answer_style(source_key: str):
+    """Keep the two style selectors (chatbox + Settings) in sync."""
+    # Settings uses 'answer_style', chatbox uses 'quick_answer_style' — keep them identical
+    style = st.session_state.get(source_key, "Balanced (default)")
+    st.session_state["answer_style"] = style
+    st.session_state["quick_answer_style"] = style
+    st.session_state["system_prompt"] = _style_to_prompt(style)
+
+
 def _apply_quick_answer_style():
     """Rewrite the system prompt when the quick tone selector changes."""
-    style = st.session_state.get("quick_answer_style", "Balanced (default)")
-    st.session_state["system_prompt"] = _style_to_prompt(style)
+    _sync_answer_style("quick_answer_style")
+
+
+def _apply_answer_style_from_settings():
+    _sync_answer_style("answer_style")
 
 
 def _suggested_questions():
@@ -126,6 +138,13 @@ def _process_prompt(prompt):
 
 
 def chatbox():
+    # Sync tone between Settings (answer_style) and chatbox (quick_answer_style) — single source
+    if st.session_state.get("answer_style") is not None and st.session_state.get("quick_answer_style") != st.session_state.get("answer_style"):
+        st.session_state["quick_answer_style"] = st.session_state["answer_style"]
+        st.session_state["system_prompt"] = _style_to_prompt(st.session_state["answer_style"])
+    elif st.session_state.get("quick_answer_style") is not None and st.session_state.get("answer_style") is None:
+        st.session_state["answer_style"] = st.session_state["quick_answer_style"]
+
     if st.session_state.get("system_prompt") is None:
         _apply_quick_answer_style()
 

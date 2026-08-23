@@ -225,6 +225,8 @@ def settings():
             key="answer_style",
         )
         st.session_state["system_prompt"] = _style_to_prompt(style)
+        # Keep chatbox quick selector in sync
+        st.session_state["quick_answer_style"] = style
         with st.expander("Preview prompt", expanded=False):
             st.caption(_style_to_prompt(style))
 
