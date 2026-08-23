@@ -15,7 +15,8 @@
 2. [Solution & Approach](#solution--approach)
 3. [Novelty — What Makes This Different](#novelty--what-makes-this-different)
 4. [System Architecture & Workflow](#system-architecture--workflow)
-5. [Tech Stack](#tech-stack)
+5. [Behind the Scenes — What Happens When You Add Content](#behind-the-scenes--what-happens-when-you-add-content)
+6. [Tech Stack](#tech-stack)
 6. [Features — Everything the App Does](#features--everything-the-app-does)
 7. [Supported Documents & Sources](#supported-documents--sources)
 8. [Modes & Options](#modes--options)
@@ -116,6 +117,64 @@ Plain RAG (vector search + LLM) is the baseline every student builds. DocMind ke
 
 ---
 
+## Behind the Scenes — What Happens When You Add Content
+
+This is the “explain to a non-technical examiner” section — exactly what runs after you drag a file, paste a `owner/repo`, or add a website URL. The UI shows 4–5 stage chips; underneath this is what really happens.
+
+### 1) Local Files — `components/tabs/local_files.py` → `utils/helpers.py` → `utils/llama_index.py` → `utils/rag_pipeline.py`
+
+**You do:** sidebar → **Data Sources → Local Files → Upload** (up to 10 files, 25 MB each).
+
+**System does:**
+
+1. **Save safely** — each `uploaded_file` is checked by `safe_uploaded_filename()` (`helpers.py:174`): no `/` or `\`, matches `^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$`, extension in `ALLOWED_UPLOAD_EXTENSIONS` (26 types). Then `upload_destination()` resolves the path and asserts it stays inside `data/` (prevents `../../etc/passwd`). Total size checked (`MAX_TOTAL_UPLOAD_BYTES=100 MB`, `helpers.py:52`). File is written via `save_uploaded_file()` and the UI shows *files uploaded*.
+2. **Load** — `load_documents(data_dir)` uses LlamaIndex `SimpleDirectoryReader` with `EXCLUDED_FILE_PATTERNS` (`llama_index.py:689`): `*.png, *.zip, *.exe, *.mp4, node_modules, .git …` (34 patterns) are never read — even if a user zips a repo, the zip itself is skipped.
+3. **Validate** — `validate_ingested_documents()` (`rag_pipeline.py:22`) enforces **≤1000 docs and ≤10 MB text**. Too much → clear error “Too many documents” instead of OOM.
+4. **Chunk** — LlamaIndex splitter with `Settings.chunk_size=256` tokens (~1024 chars) and `chunk_overlap=32` (12 %). Small chunks = precise retrieval; overlap = no fact split across a boundary. Both are editable in Advanced and take effect on *next* ingestion.
+5. **Enrich** — for each chunk: `MIN_CHUNK_CHARS=50` drops empty fragments, `_dedupe_near_duplicate_nodes()` (`llama_index.py:108`) drops boilerplate repeats via stemmed Jaccard >0.95, `_prepend_document_title()` (`:141`) prefixes `Annual Report.\n\n…` so title queries match *every* chunk.
+6. **Embed (the hot part)** — `OllamaEmbedding.get_text_embedding_batch()` (`llama_index.py:530`) sends `embed_batch_size=16` (Eco: 4) chunks to `http://localhost:11434/api/embed` with a 300 s timeout. A `ProgressReportingEmbedding` wrapper calls the progress callback for the progress bar. If Ollama returns `CUDA out of memory`, the batch is halved (`16 → 8 → 4 → 2 → 1`) and retried — ingestion finishes instead of crashing.
+7. **Index + cache** — `VectorStoreIndex(nodes=…, embed_model=…)` builds the in-memory index. `index_cache_dir()` hashes `INDEX_CACHE_VERSION + model + chunk settings + sorted doc texts` into `.index_cache/<20-char-key>` and `persist_index_to_cache()` saves it. Next time you add *the same files with same settings* the index loads from disk in ~0.03 s (`eval_report.md:70`). Old caches pruned (keep 5).
+8. **Ready** — `create_query_engine()` creates a streaming `RetrieverQueryEngine` (`top_k` from slider) with `TEXT_QA_TEMPLATE` (grounded prompt) and a **hybrid retriever** (`build_hybrid_retriever()`). Temp files under `data/` are deleted.
+
+> **Seen as:** *files uploaded → documents loaded → embeddings generated → index ready* (kept in `st.session_state["file_ingestion_stages"]` so reruns don’t re-trigger).
+
+### 2) GitHub Repo — `components/tabs/github_repo.py` → `utils/helpers.py:254`
+
+**You do:** `Ashita-no-Kaushar/DocMind-AI` or `https://github.com/Ashita-no-Kaushar/DocMind-AI`.
+
+**System does:**
+
+1. **Normalize & validate** — `normalize_github_repo()` strips whitespace, parses URL, requires `https` + `github.com`, needs exactly `owner/repo` (2 path parts), strips trailing `.git`, then regex `^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`. `https://gitlab.com/…` or `…/extra/path` → error. This is the same check `eval_harness.py:698` tests.
+2. **Clone** — `clone_github_repo()` ensures `data/` exists, deletes a stale checkout (with `remove_dir_retry` for Windows locks, fallback to `data/clone_<ts>/owner__repo`), then `git clone --depth 1 -q https://github.com/owner/repo.git data/owner/repo` (120 s timeout). No `git` binary → graceful error.
+3. **Load** — the cloned folder is then processed exactly like Local Files (steps 2–8 above) — respecting `EXCLUDED_FILE_PATTERNS`, so `.git/` and `node_modules/` are never embedded.
+
+> **Seen as:** *repository validated → repository cloned → files loaded → embeddings generated → index ready*.
+
+### 3) Website — `components/tabs/website.py` → `utils/helpers.py:80`
+
+**You do:** paste `https://docs.python.org/3/library/os.html` (up to 5 at once) → **+** → **Process**.
+
+**System does:**
+
+1. **Validate** — `validate_website_urls()` → `_validate_public_http_url()` per URL: scheme must be `https`, no `user:pass@`, hostname not in `BLOCKED_HOSTNAMES` (`localhost`, `metadata.google.internal`), **DNS → IP** via `getaddrinfo` and reject if IP `is_private / is_loopback / is_link_local` (prevents SSRF to `169.254.169.254` or `127.0.0.1`). Exceed 5 URLs → error.
+2. **Fetch** — `load_website_documents()` opens a `requests.Session` with `User-Agent: docmind/website-ingestion`, follows at most `MAX_WEBSITE_REDIRECTS=3` (re-validating each redirect), checks `Content-Type` contains `text/html` or `text/plain`, streams in 64 KB chunks and aborts if `>5 MB` (`MAX_WEBSITE_RESPONSE_BYTES`). Timeout `(5, 20)` s.
+3. **Convert** — `html2text.html2text(html)` → clean markdown text → `Document(text=…, metadata={"source": url})`.
+4. **Index** — same chunk/title/dedup/embed pipeline as above.
+
+> **Seen as:** *websites fetched → content loaded → embeddings generated → index ready*.
+
+### After indexing — how a question is answered
+
+1. **Rewrite** — `_rewrite_query()` (`llama_index.py:248`): Porter-stem, split hyphens, drop filler words (`the/a/and`, plus Hinglish `batao/kya/hai`), produce `refunded purchases → refund purchas`.
+2. **Retrieve** — `HybridRetriever.retrieve()` (`:338`): vector search (rewritten query) → RRF rank + BM25 keyword search (expanded tokens `_bm25_expanded_tokens()` for short queries only) → fuse via `1/(60+rank)`.
+3. **Filter** — `_is_credible()`: drop `< similarity_cutoff` (default 0.3); then **evidence floor**: if `vector < 0.5` need a BM25 `score>0` hit or the chunk is discarded — this is why no-match queries correctly return **0 nodes**.
+4. **Budget** — keep top chunks within `CONTEXT_CHAR_BUDGET=4800` (Eco: 3200), dedup within selection, and for doc-level queries (“summarize…”) prepend intro chunks.
+5. **Generate** — `context_chat()` (`ollama.py:492`): numbers chunks `[1]…`, builds `TEXT_QA_TEMPLATE` (`:43`) with `{context_str}` + `{query_str}`, prepends recent chat history (multi-turn, `CHAT_HISTORY_TOKEN_BUDGET=1200` / Eco 500), `llm.stream_chat()` → UI `write_stream()` → source chips `[file (score%)]`.
+
+---
+
+
+
 ## Tech Stack
 
 | Layer | Choice | Reason |
@@ -157,13 +216,29 @@ No `torch`/`transformers` at runtime — removed for lightness (`Pipfile:6`).
 |---|---|
 | **Chat** | Provider (Ollama / OpenAI / LM Studio / TabbyAPI) → Chat Model dropdown + Refresh; Server URL & API key when non-Ollama |
 | **Document Search** | Embedding Model dropdown + Refresh |
-| **Answer Style** | 6 presets: Concise / Balanced / Detailed / Bulleted / Technical / Simple-ELI5 → prompt preview |
+| **Answer Style** | 6 presets: Concise / Balanced / Detailed / Bulleted / Technical / Simple-ELI5 → prompt preview (collapsed) |
 | **Preferences** | Eco Mode (batch 4, 256 tokens, ≤3 chunks, 3200-char budget) + Show advanced controls |
-| **Advanced** (when on) | Sources per answer (1–10), Relevance threshold (0–1), Creativity/temperature (0–1.5), Chunk Size/Overlap + live token count |
+| **Advanced** (when on) | Sources per answer, Relevance threshold, Creativity, Chunk Size/Overlap + live token count — **see drill-down below** |
 | **External RAG (R2R)** | Optional `utils/r2r.py` server (`http://localhost:7272`), health check, doc IDs |
 | **Export** | Download chat as `.docx` (`chat_history_docx`) |
 
 Sidebar extras: **mode badge** (Chat / RAG / R2R), **Clear Chat & Reset** expander, browser-settings persistence.
+
+#### Advanced Settings — In Detail (hidden until “Show advanced controls” is on)
+
+> All of these are **live** — change them and the *next* query uses the new value (chunk settings need a re-ingest). They are deliberately hidden by default so a new user sees only 3 cards.
+
+| Control | Key (`page_state.py`) | Default | Range | What it does — in plain words | When to tweak |
+|---|---|---:|---|---|---|
+| **Sources per answer** | `top_k` | `3` | 1–10 slider | How many document chunks are glued into the prompt. More = broader context but more noise/hallucination risk. Eco caps at 3. | Raise to 5–7 for long reports where facts are scattered; lower to 1–2 for invoices/Q&A where one chunk holds the answer. (`utils/llama_index.py:319`) |
+| **Relevance threshold** | `similarity_cutoff` | `0.30` | 0.00–1.00 (0.05 step) | Minimum vector score to keep a chunk. `0` = no filter. Higher = stricter. After that, the **evidence floor** (`0.5`) still requires a BM25 keyword hit for weak scores. | Raise to 0.4–0.5 if you see irrelevant sources; lower to 0.15 if good chunks are being dropped (but watch hallucinations). (`utils/llama_index.py:376`) |
+| **Creativity** | `temperature` | `0.4` | 0.0–1.5 (0.05) | Sampling randomness. 0 = deterministic/focused, 1.5 = very creative/unpredictable. | Keep 0.3–0.5 for factual RAG; raise to 0.8–1.0 for brainstorming/drafting. (`utils/ollama.py:343`) |
+| **Chunk Size** | `chunk_size` | `256` tokens | free text (int) | Tokens per piece before embedding (~4 chars/token). Smaller = more precise, more vectors & more GPU work. | Drop to 128–192 for highly structured tables; raise to 384–512 for long narrative docs. Needs **re-ingest**. (`utils/llama_index.py:669`) |
+| **Chunk Overlap** | `chunk_overlap_pct` → `chunk_overlap` | `12%` → `32` tokens | 0–50% slider | Overlap between neighbours to keep sentence continuity. Computed live: `overlap = chunk_size * pct // 100`. | Raise to 20% if facts are split across boundaries; lower to 0–5% to shrink index on clean docs. Needs re-ingest. |
+| **Eco Mode** | `eco_mode` | `off` | toggle | Shrinks `embed_batch 16→4`, `num_predict 512→256`, `top_k ≤3`, `context 4800→3200`. Cooler & faster, slightly less context. | Turn **on** when laptop is hot, fan loud, or answers lag >3 s. (`utils/llama_index.py:166` `utils/ollama.py:100`) |
+| **R2R Base URL / API Key** | `r2r_base_url` / `r2r_api_key` | `http://localhost:7272` / `` | inside collapsed *External RAG* expander | When on, uploads go to an external R2R server instead of local LlamaIndex — less local RAM/disk. | Only if you run the R2R stack separately. (`utils/r2r.py`) |
+
+All advanced values are persisted in `localStorage` (`utils/browser_settings.py`) and survive reloads. Reset via **Clear Chat & Reset → Reset Project** (`components/sidebar.py` / `page_state.py:34`).
 
 ### Performance & Safety
 
