@@ -1,10 +1,15 @@
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
+
 from components.page_state import (
     default_chat_model,
     ensure_valid_model_selections,
     set_initial_state,
 )
+
+
 class PageStateTests(unittest.TestCase):
     def test_default_chat_model_prefers_gemma4_latest(self):
         self.assertEqual(
@@ -45,7 +50,7 @@ class PageStateTests(unittest.TestCase):
             state.update(
                 {
                     "browser_settings_restored": True,
-                    "ollama_endpoint": "http://192.168.4.2:11434",
+                    "ollama_endpoint": "https://192.168.4.2:11434",
                     "selected_model": "gemma4:latest",
                     "ollama_embedding_model": "embeddinggemma",
                 }
@@ -62,15 +67,65 @@ class PageStateTests(unittest.TestCase):
             set_initial_state()
         get_models.assert_called_once()
         get_embedding_models.assert_called_once()
-        self.assertEqual(state["ollama_endpoint"], "http://192.168.4.2:11434")
-        self.assertEqual(state["ollama_models_endpoint"], "http://192.168.4.2:11434")
+        self.assertEqual(state["ollama_endpoint"], "https://192.168.4.2:11434")
+        self.assertEqual(state["ollama_models_endpoint"], "https://192.168.4.2:11434")
         self.assertEqual(
             state["ollama_embedding_models_endpoint"],
-            "http://192.168.4.2:11434",
+            "https://192.168.4.2:11434",
         )
         self.assertEqual(state["selected_model"], "gemma4:latest")
         self.assertEqual(state["ollama_embedding_model"], "embeddinggemma")
-    def test_initial_state_replaces_empty_live_endpoint_before_model_discovery(self):
+    def test_project_reset_removes_only_owned_work_and_reports_failure(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            owned = root / "owned"
+            failed = root / "failed"
+            shared = root / "data" / "shared.txt"
+            owned.mkdir()
+            failed.mkdir()
+            shared.parent.mkdir()
+            shared.write_text("keep", encoding="utf-8")
+            state = {
+                "active_source": {"kind": "local", "status": "ready"},
+                "query_engine": object(),
+                "retriever": object(),
+                "documents": [object()],
+                "file_list": [object()],
+                "messages": [],
+                "_session_work_dirs": [],
+            }
+            from components.page_state import _remove_dir_retry as real_remove
+
+            def remove_owned(path):
+                if Path(path) == failed:
+                    return False
+                return real_remove(path)
+
+            with patch(
+                "components.page_state._remove_dir_retry",
+                side_effect=remove_owned,
+            ):
+                result = __import__("components.page_state", fromlist=["perform_project_reset"]).perform_project_reset(
+                    state, owned_dirs=[owned, failed, root / "missing"]
+                )
+
+            self.assertFalse(owned.exists())
+            self.assertTrue(failed.exists())
+            self.assertTrue(shared.exists())
+            self.assertEqual(result["failed"], [str(failed)])
+            self.assertEqual(state["active_source"]["kind"], None)
+            self.assertIsNone(state["query_engine"])
+
+    def test_project_reset_does_not_call_removal_for_absent_owned_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state = {}
+            with patch("components.page_state._remove_dir_retry") as remove:
+                result = __import__("components.page_state", fromlist=["perform_project_reset"]).perform_project_reset(
+                    state, owned_dirs=[Path(tmpdir) / "missing"]
+                )
+        remove.assert_not_called()
+        self.assertEqual(result["failed"], [])
+
         state = {
             "browser_settings_restored": True,
             "ollama_endpoint": "",

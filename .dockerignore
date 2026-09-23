@@ -16,3 +16,13 @@ logo.*
 Dockerfile
 docker-compose.yml
 *.log
+.venv
+venv
+data
+.index_cache
+tests
+eval_harness.py
+eval_report.md
+eval_results.json
+__pycache__
+*.py[cod]

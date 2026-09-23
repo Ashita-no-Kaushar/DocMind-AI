@@ -29,13 +29,10 @@ def sources():
 
     with st.expander("💡 &nbsp; **Cooling & Speed Tips**", expanded=False):
         st.markdown(
-            "- **Prefer short documents:** 10-20 page PDFs (or `.txt`/`.md`) embed in seconds. "
-            "A 300-page book takes minutes and heats the laptop.\n"
-            "- **Don't re-upload the same files:** every upload re-embeds everything from scratch. "
-            "Reuse the existing index instead — just chat.\n"
-            "- **Split big documents** into chapters/sections and ingest only what you need.\n"
-            "- **Limit sources:** 1-2 websites or one small GitHub repo at a time.\n"
-            "- **Chat is cheap:** Q&A uses a tiny model on your GPU (~0.5s per answer). "
-            "Ingestion is the heavy part.\n"
-            "- **When idle** the GPU drops to ~40°C within a minute."
+            "- Ingestion time depends on document size, parser, embedding model, and hardware.\n"
+            "- Reuse the active index when the files and indexing settings are unchanged.\n"
+            "- Changing the embedding model or chunk settings requires a new ingestion to affect the index.\n"
+            "- Split large documents and process only the material you need.\n"
+            "- Eco Mode lowers configured embedding batch, output, and context limits; it does not guarantee a speed or temperature change.\n"
+            "- Website and GitHub ingestion require outbound network access."
         )

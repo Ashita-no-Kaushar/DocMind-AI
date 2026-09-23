@@ -145,16 +145,24 @@ class GetOpenAIModelsTests(unittest.TestCase):
 
 
 class CreateLLMDispatchTests(unittest.TestCase):
-    def test_dispatches_to_openai_for_openai_backend(self):
+    def test_dispatches_to_openai_for_official_backend(self):
         state = {"llm_backend": "OpenAI"}
         with patch(
             "utils.ollama.st", SimpleNamespace(session_state=state)
         ), patch("utils.ollama.create_openai_llm") as openai_llm, patch(
-            "utils.ollama.create_ollama_llm"
-        ) as ollama_llm:
-            create_llm("my-model", "http://x/v1", "key", None, 0.7)
+            "utils.ollama.create_openai_compatible_llm"
+        ) as compatible_llm, patch("utils.ollama.create_ollama_llm") as ollama_llm:
+            create_llm("my-model", "https://api.openai.com/v1", "key", None, 0.7)
 
-        openai_llm.assert_called_once_with("my-model", "http://x/v1", "key", 0.7, eco_mode=False)
+        openai_llm.assert_called_once_with(
+            "my-model",
+            "https://api.openai.com/v1",
+            "key",
+            0.7,
+            eco_mode=False,
+            backend="OpenAI",
+        )
+        compatible_llm.assert_not_called()
         ollama_llm.assert_not_called()
 
     def test_dispatches_to_ollama_by_default(self):
@@ -167,9 +175,33 @@ class CreateLLMDispatchTests(unittest.TestCase):
             create_llm("qwen2.5:0.5b", "http://localhost:11434", system_prompt="sys")
 
         ollama_llm.assert_called_once_with(
-            "qwen2.5:0.5b", "http://localhost:11434", "sys", temperature=None, eco_mode=False
+            "qwen2.5:0.5b", "http://localhost:11434", "sys", temperature=0.4, eco_mode=False
         )
         openai_llm.assert_not_called()
+
+    def test_dispatches_lm_studio_and_tabby_to_openai_like_path(self):
+        for backend in ("LM Studio (Local AI)", "TabbyAPI"):
+            with self.subTest(backend=backend):
+                state = {"llm_backend": backend, "temperature": 0.2}
+                with patch(
+                    "utils.ollama.st", SimpleNamespace(session_state=state)
+                ), patch(
+                    "utils.ollama.create_openai_compatible_llm"
+                ) as compatible_llm, patch(
+                    "utils.ollama.create_openai_llm"
+                ) as openai_llm, patch("utils.ollama.create_ollama_llm") as ollama_llm:
+                    create_llm("local-model", "http://localhost:1234/v1", "key")
+
+                compatible_llm.assert_called_once_with(
+                    "local-model",
+                    "http://localhost:1234/v1",
+                    "key",
+                    0.2,
+                    eco_mode=False,
+                    backend=backend,
+                )
+                openai_llm.assert_not_called()
+                ollama_llm.assert_not_called()
 
 
 class EcoModeTests(unittest.TestCase):

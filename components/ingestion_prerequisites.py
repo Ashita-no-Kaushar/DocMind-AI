@@ -1,42 +1,54 @@
 import streamlit as st
 
+from utils.provider_config import (
+    OLLAMA,
+    OPENAI_OFFICIAL,
+    get_chat_profile,
+    get_embedding_profile,
+)
 
-def missing_ingestion_settings():
-    """Return human-readable missing settings that block ingestion."""
+
+def missing_ingestion_settings(allow_r2r: bool = False):
+    """Return missing model settings for local or R2R ingestion."""
     missing = []
 
-    # R2R hosts its own LLM and embedding models: local settings are not
-    # required while the R2R backend is enabled.
-    if st.session_state.get("r2r_enabled"):
+    if allow_r2r and st.session_state.get("r2r_enabled"):
         return missing
 
     backend = st.session_state.get("llm_backend", "Ollama")
+    try:
+        chat = get_chat_profile(st.session_state, backend)
+    except ValueError as err:
+        return [str(err)]
+    if not chat.get("model"):
+        missing.append("a valid chat model")
+    if chat["provider_kind"] == OPENAI_OFFICIAL and not chat.get("api_key"):
+        missing.append("an explicit OpenAI API key")
+    if chat["provider_kind"] == OLLAMA:
+        chat_models = st.session_state.get("ollama_models", [])
+        if chat.get("model") not in chat_models:
+            missing.append("a valid Ollama chat model")
 
-    if backend == "OpenAI":
-        if not st.session_state.get("openai_base_url"):
-            missing.append("an OpenAI-compatible Base URL")
-        if not st.session_state.get("openai_model"):
-            missing.append("an OpenAI-compatible chat model")
-        if not st.session_state.get("openai_embedding_model"):
-            missing.append("an OpenAI-compatible embedding model")
+    try:
+        embedding = get_embedding_profile(st.session_state)
+    except ValueError as err:
+        missing.append(str(err))
         return missing
-
-    chat_model = st.session_state.get("selected_model")
-    chat_models = st.session_state.get("ollama_models", [])
-    if not chat_model or chat_model not in chat_models:
-        missing.append("a valid Ollama chat model")
-
-    embedding_model = st.session_state.get("ollama_embedding_model")
-    embedding_models = st.session_state.get("ollama_embedding_models", [])
-    if not embedding_model or embedding_model not in embedding_models:
-        missing.append("a valid Ollama embedding model")
+    if not embedding.get("model"):
+        missing.append("a valid embedding model")
+    if embedding["provider_kind"] == OPENAI_OFFICIAL and not embedding.get("api_key"):
+        missing.append("an explicit OpenAI embedding API key")
+    if embedding["provider_kind"] == OLLAMA:
+        embedding_models = st.session_state.get("ollama_embedding_models", [])
+        if embedding.get("model") not in embedding_models:
+            missing.append("a valid Ollama embedding model")
 
     return missing
 
 
-def ingestion_is_configured():
-    """Return whether the app has the model settings required for ingestion."""
-    return len(missing_ingestion_settings()) == 0
+def ingestion_is_configured(allow_r2r: bool = False):
+    """Return whether the required model settings are available."""
+    return len(missing_ingestion_settings(allow_r2r=allow_r2r)) == 0
 
 
 def render_ingestion_settings_warning():
@@ -47,9 +59,9 @@ def render_ingestion_settings_warning():
 
     missing_str = " and ".join(missing)
     st.warning(
-        f"⚠️ **Ingestion unavailable.** Missing: {missing_str}.\n\n"
-        "Go to **Settings → Chat** and click **Refresh Models** to load your Ollama models, "
-        "then select a Chat Model and an Embedding Model.",
+        f"Local document ingestion is unavailable. Missing: {missing_str}.\n\n"
+        "Open **Settings**, configure the active provider, and refresh model lists when needed. "
+        "R2R local uploads can still be used when R2R is enabled.",
         icon=None,
     )
 

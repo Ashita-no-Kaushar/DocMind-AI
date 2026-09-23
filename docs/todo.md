@@ -1,71 +1,56 @@
 # To Do
 
-Below is a rough outline of proposed features and outstanding issues that are being tracked.
+## Verified Implemented
 
-Although not final, items are generally sorted from highest to lowest priority.
+- [x] Streamlit chat interface
+- [x] Direct model chat
+- [x] Local LlamaIndex RAG pipeline
+- [x] Local file uploads
+- [x] Public GitHub repository ingestion
+- [x] Public HTTPS website ingestion
+- [x] Ollama chat and embedding model discovery
+- [x] OpenAI-compatible routing for OpenAI, LM Studio, and TabbyAPI provider values
+- [x] R2R client for local-file upload and chat
+- [x] Hybrid vector and BM25 retrieval
+- [x] Evidence filtering and no-match response
+- [x] Index persistence with source/model/endpoint-aware cache identity
+- [x] Browser settings persistence for a selected non-secret subset
+- [x] DOCX transcript export
+- [x] Unit tests and evaluation harness
+- [x] Windows and Docker launch configuration
 
-### Core
+## High-Priority Fixes
 
-- [x] Migrate Chat Stream to Llama-Index
-- [x] Implement Llama-Index Chat Engine with Memory
-- [x] Swap Chatbox UI to Llama-Index Chat Engine
-- [x] Function to Handle File Embeddings
-- [x] Allow Switching of Embedding Model & Settings
-- [x] Delete Files after Index Created/Failed
-- [x] Support Additional Import Options
-    - [x] GitHub Repos
-    - [x] Websites
-- [x] Export Data (Chat History, ...)
-- [x] Docker Support
-    - [x] Windows Support
-- [x] Extract Metadata and Load into Index
-- [x] Faster Document Embeddings (Cuda, Batch Size, ...)
-- [ ] Swap to OpenAI compatible endpoints
-- [ ] Allow Usage of Ollama hosted embeddings
-- [ ] Enable support for additional LLM backends
-    - [ ] Local AI
-    - [ ] TabbyAPI
-- [ ] Remove File Type Limitations for Uploads?
+- [ ] Add a tested `OpenAILike` adapter for arbitrary local model identifiers
+- [ ] Add live integration tests for LM Studio and TabbyAPI
+- [ ] Add a complete R2R lifecycle: status polling, remote deletion, rollback, and GitHub/website routing
+- [ ] Add a durable source registry so old completion labels cannot describe a replaced index
+- [ ] Isolate temporary files and cache keys per Streamlit session
+- [ ] Pin DNS during website requests or use a transport that verifies the connected peer
+- [ ] Bound GitHub clone size and file count before parsing
+- [ ] Add real Git clone and website-fetch integration tests
+- [ ] Add browser-level end-to-end tests
+- [ ] Commit a dependency lockfile
 
-### User Experience
+## Reliability
 
-- [x] Show Loaders in UI (File Uploads, Conversions, ...)
-- [x] View and Manage Imported Files
-- [x] About Tab in Sidebar w/ Resources
-- [x] Enable Caching
-- [ ] Allow Users to Set LLM Settings
-    - [x] System Prompt
-    - [x] Chat Mode
-    - [ ] Temperature
-    - [x] top_k
-    - [x] chunk_size
-    - [ ] chunk_overlap (needs to be proportional to chunk_size?)
-- [ ] Additional Error Handling
-    - [x] Starting a chat without an Ollama model set
-    - [x] Non-existent GitHub repos
-    - [ ] Non-existent Embedding models
-    - [x] Non-existent Websites
-    - [ ] System Level Errors (CUDA OOM, Hugging Face downtime, ...)
+- [ ] Add output verification for generated factual claims and citation entailment
+- [ ] Evaluate multiple chat models and larger document corpora
+- [ ] Repeat live-generation trials and publish confidence intervals
+- [ ] Make tokenizer-exact context and history budgeting
+- [ ] Clean temporary local data on failed ingestion
+- [ ] Make reset behavior fully explicit for retained settings and remote documents
 
-### Code Quality
+## Deployment
 
-- [x] Refactor main.py into submodules
-- [x] Refactor file processing logic
-- [x] Refactor README
-- [x] Implement Log Library
-- [x] Improve Logging
-- [x] Re-write Docstrings
-- [x] Tests
+- [ ] Build and health-check the Docker image on a supported host
+- [ ] Test read-only filesystem and named-volume permissions
+- [ ] Add authentication before exposing the service beyond localhost
+- [ ] Test concurrent sessions
+- [ ] Decide whether the ROCm Compose file is needed or should point to an Ollama ROCm deployment guide
 
-### Known Issues & Bugs
+## Documentation
 
-- [x] Upon sending a Chat message, the File Processing expander appears to re-run itself (seems something is not using state correctly)
-- [x] Settings are restored from browser localStorage after refresh
-- [x] Files can be uploaded before Ollama config is set, leading to embedding errors
-- [x] Assuming Ollama is hosted on localhost, Models are automatically loaded and selected, but the dropdown does not render the selected option
-
-### Other
-
-- [ ] Investigate [R2R](https://github.com/SciPhi-AI/R2R) backend support/migration
-- [ ] ROCm Support -- Wanted: AMD Testers! 🔍🔴
-- [ ] Improved Windows / Windows + Docker Support
+- [x] Replace unsupported format, limit, privacy, and performance claims
+- [x] Align setup, usage, pipeline, troubleshooting, and security docs with source behavior
+- [x] Generate evaluation reports with explicit pass/fail/skip accounting

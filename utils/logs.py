@@ -1,46 +1,43 @@
 import logging
+import os
 import sys
 
 from typing import Union
 
 
 def setup_logger(
-    log_file: str = "docmind.log", level: Union[int, str] = logging.INFO
-):
-    """
-    Sets up a logger for this module.
-
-    Args:
-        log_file (str, optional): The file to which the logs should be written. Defaults to "docmind.log".
-        level (str, optional): The logging level at which to log messages. Defaults to logging.INFO.
-
-    Returns:
-        logging.Logger: The set up logger.
-
-    Notes:
-        This function sets up a logger for this module using the `logging` library. It sets the logging level to the specified level, and adds handlers for both file and console output. The log file can be customized by passing a different name as the argument.
-    """
+    log_file: str | None = None, level: Union[int, str] = logging.INFO
+) -> logging.Logger:
+    """Configure console logging and optional file logging."""
     logger = logging.getLogger(__name__)
     logger.setLevel(level)
 
-    # Streamlit reloads modules frequently; prevent duplicate handlers.
     if logger.handlers:
         return logger
 
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setLevel(level)
-
     console_handler = logging.StreamHandler(stream=sys.stdout)
     console_handler.setLevel(level)
-
     log_format = logging.Formatter(
         "%(asctime)s - %(module)s - %(levelname)s - %(message)s"
     )
-    file_handler.setFormatter(log_format)
     console_handler.setFormatter(log_format)
-
-    logger.addHandler(file_handler)
     logger.addHandler(console_handler)
+
+    if log_file is None:
+        log_file = os.environ.get(
+            "DOCMIND_LOG_FILE", os.path.join(os.getcwd(), "docmind.log")
+        )
+
+    try:
+        parent = os.path.dirname(os.path.abspath(log_file))
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(level)
+        file_handler.setFormatter(log_format)
+        logger.addHandler(file_handler)
+    except OSError:
+        pass
 
     return logger
 

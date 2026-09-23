@@ -1,67 +1,111 @@
 # Troubleshooting
 
-In the event that an error occurs when using DocMind, checking out the current application state and logfile can provide insights into what is happening behind the scenes.
+## Application Does Not Start
 
-Note: To better understand what is happening under the hood and aid in troubleshooting, check out the [Pipeline documentation](pipeline.md) as well.
+Confirm Python dependencies are installed in the active environment:
+
+```bash
+pipenv run python -m pip check
+pipenv run python -m py_compile main.py
+```
+
+Then start the app:
+
+```bash
+pipenv run streamlit run main.py --server.headless=true --server.port=8520 --server.address=127.0.0.1
+```
+
+Check:
+
+```text
+http://127.0.0.1:8520/_stcore/health
+```
 
 ## Ingestion Is Disabled
 
-Data import controls are disabled until Settings contains a valid Ollama chat model and a valid Ollama embedding model.
+Local GitHub and website ingestion require valid local-provider chat and embedding settings. Local file uploads can use R2R without local models when R2R is enabled.
 
-To fix this:
+For Ollama:
 
-- Confirm Ollama is running.
-- Confirm the endpoint in Settings, usually `http://localhost:11434`.
-- Pull at least one chat-capable model, such as `qwen2.5:0.5b`.
-- Pull at least one embedding-capable model, such as `nomic-embed-text:latest`.
-- Use the Refresh Models buttons after changing the endpoint or pulling new models.
+1. Confirm Ollama is reachable.
+2. Confirm the endpoint, usually `http://localhost:11434`.
+3. Click **Refresh Models**.
+4. Select an installed chat-capable model.
+5. Select an installed embedding-capable model.
 
-## Settings Restore Problems
+For OpenAI-compatible providers, configure the base URL, chat model, and embedding model. LM Studio and TabbyAPI use this routing path, but the model identifier must be supported by the server and installed LlamaIndex adapter.
 
-Settings are restored from browser `localStorage`. If a stale browser setting points to the wrong Ollama endpoint or a model you no longer have installed, update it in Settings and refresh the model lists. Empty Ollama endpoint values are ignored and the default endpoint is restored.
+## Model Answers Are Vague or Miss the Context
+
+Small local models can produce variable answers even when retrieval succeeds. The current evaluation observed the expected refund fact in 2/3 repeated live generations.
+
+Try:
+
+- A larger chat model
+- A lower temperature
+- Balanced or Detailed answer style
+- Re-running the same query
+- Checking the retrieved source labels
+- Verifying the document actually contains the requested fact
+
+A citation marker does not prove that the generated claim is supported by the cited chunk.
+
+## No Usable Content
+
+The index builder rejects content that produces no usable chunks. Try a text-based TXT, Markdown, CSV, JSON, or DOCX export. Scanned PDFs require OCR, which is not included.
+
+The current minimum retained chunk length is 15 non-whitespace characters.
+
+## Local Upload Errors
+
+- More than 10 files
+- File larger than 25 MiB
+- Total batch larger than 100 MiB
+- Unsupported filename characters
+- Unsupported extension
+- A parser or optional dependency cannot extract the file
+
+Accepted extensions are listed in [Usage](usage.md#local-files). Acceptance does not guarantee reliable parsing for every format.
+
+## Website Import Errors
+
+Common causes:
+
+- URL is not HTTPS
+- URL contains credentials
+- DNS resolves to a blocked address
+- Redirect limit was exceeded
+- Content-Type is not HTML or plain text
+- Response exceeds 5 MiB
+
+DNS validation and the later request resolve independently, so changing DNS between checks can still create an edge case.
+
+## GitHub Import Errors
+
+- Use `owner/repo` or `https://github.com/owner/repo`
+- Do not include issue, pull-request, branch, or extra path segments
+- The repository must be public and reachable
+- `git` must be installed and available on PATH
+- Large repositories may take longer or exceed local parser resources
+
+## Settings Do Not Persist
+
+Only the settings listed in `PERSISTED_SETTING_TYPES` are saved to browser `localStorage`. API keys, chat history, indexes, R2R IDs, and answer-style state are not persisted.
+
+Use the DOCX export for the current transcript. Re-enter API keys after a process/session restart when required.
+
+## Reset Project Does Not Remove Everything
+
+Reset Project deletes local `data/` and `.index_cache/` directories and clears most local index state. It intentionally retains some settings and session-only API keys. It also does not delete documents already uploaded to an external R2R server.
+
+## Logs
+
+By default, DocMind writes `docmind.log` in the current working directory. Set `DOCMIND_LOG_FILE` to another writable path when needed.
+
+The logger always writes to stdout. If the configured file path is not writable, file logging is skipped rather than preventing application import.
+
+Do not share logs without reviewing them for document content, prompts, local paths, internal addresses, and credentials.
 
 ## Application State
 
-Each stage of the RAG pipeline stores its data in the application state. 
-
-In order for a successful RAG conversation to take place the following state values must NOT be null:
-- `documents` - if null, there was an error processing your documents
-- `llm` - if null, there was an error creating the Ollama LLM instance
-- `query_engine` - if null, errors occurred when creating embeddings for your your documents
-
-To view the current application state:
-- Navigate to the Settings panel
-- Toggle Advanced Settings
-- State is now visible at the bottom of Settings
-- Verify that the above state values are valid
-
-## Import Errors
-
-Common local file import errors:
-
-- Unsupported file extension. Supported extensions are listed in [Usage](usage.md#local-files).
-- Too many files, too large a single file, or too large a total upload.
-- Filename contains unsupported characters or path separators.
-
-Common GitHub import errors:
-
-- Repository input is not `owner/repo` or `https://github.com/owner/repo`.
-- URL is not on `github.com`.
-- URL points to an issue, pull request, branch, or another extra path instead of the repository root.
-- The repository cannot be validated or cloned.
-
-Common website import errors:
-
-- URL is not HTTPS.
-- URL resolves to a blocked local, private, metadata, or otherwise unsafe network address.
-- The response is not HTML or plain text.
-- The response is larger than the website ingestion limit.
-- The URL redirects too many times.
-
-## Log File
-
-By default, DocMind will create a `docmind.log` file in the root application folder.
-
-Each step of the RAG process is logged into this file whether the required step was successful or encountered an error. 
-
-Reviewing this log can give you insights into what took place when processing your documents.
+There is no Application State viewer in Settings. Relevant state is visible indirectly through the mode badge, ingestion stages, source labels, and error messages. Inspect `components/page_state.py` when debugging source code.

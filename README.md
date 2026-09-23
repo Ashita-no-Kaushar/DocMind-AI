@@ -1,324 +1,114 @@
-# 🧠 DocMind AI — Private Offline RAG Assistant
+# DocMind AI
 
-> **Import files, GitHub repos, or websites — then chat with grounded answers. Everything runs locally. No data ever leaves your device.**
+DocMind AI is a Streamlit document-chat application built with LlamaIndex and model providers such as Ollama. It can build a local retrieval-augmented generation (RAG) index from files, a public GitHub repository, or public HTTPS webpages, then answer questions using retrieved context.
 
-[![Quality](https://github.com/Ashita-no-Kaushar/DocMind-AI/actions/workflows/quality.yml/badge.svg)](https://github.com/Ashita-no-Kaushar/DocMind-AI/actions/workflows/quality.yml)
-[![Docker Build](https://github.com/Ashita-no-Kaushar/DocMind-AI/actions/workflows/main.yaml/badge.svg)](https://github.com/Ashita-no-Kaushar/DocMind-AI/actions/workflows/main.yaml)
-![Python](https://img.shields.io/badge/python-3.13-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+The primary verified path is a single-user installation using a local Ollama server. OpenAI-compatible providers and R2R are optional integrations with different privacy and maturity characteristics.
 
-> **Try it in 3 clicks:** `1` Upload files / paste GitHub or website → `2` Wait ~5 s (index built, cached) → `3` Ask anything — answers are cited from *your* docs. No account, no upload to cloud.
+## Current Verification Status
 
----
+Latest local verification for this snapshot was run on Windows on 2026-09-24 with Python 3.12.10, Streamlit 1.64.0, and LlamaIndex 0.14.25:
 
-## Table of Contents
+| Check | Result |
+|---|---:|
+| Streamlit health endpoint | Passed in the earlier 2026-09-23 run; current-snapshot rerun pending |
+| Ollama health and model discovery | Passed in the earlier 2026-09-23 run; current-snapshot rerun pending |
+| Unit tests | 235 passed, 1 skipped (236 total) |
+| Real evaluation harness | 43/43 in the earlier 2026-09-23 snapshot; current-snapshot rerun pending |
+| Mock evaluation harness | 42/42 scored checks passed, 1 real-LLM check skipped |
+| Python compile checks | Passed |
+| `pip check` | No broken installed requirements |
+| CI Ruff fatal checks | Passed |
+| Full Ruff ruleset | Not rerun for this snapshot |
+| Black check | Not rerun for this snapshot |
+| Docker build/runtime | Not tested; Docker CLI is unavailable in the verification environment |
 
-1. [Problem](#problem)
-2. [Solution & Approach](#solution--approach)
-3. [Novelty — What Makes This Different](#novelty--what-makes-this-different)
-4. [System Architecture & Workflow](#system-architecture--workflow)
-5. [Behind the Scenes — What Happens When You Add Content](#behind-the-scenes--what-happens-when-you-add-content)
-6. [Plain RAG vs DocMind — Feature Matrix](#plain-rag-vs-docmind--feature-matrix)
-7. [Tech Stack](#tech-stack)
-6. [Features — Everything the App Does](#features--everything-the-app-does)
-7. [Supported Documents & Sources](#supported-documents--sources)
-8. [Modes & Options](#modes--options)
-9. [Quick Start](#quick-start)
-10. [Configuration](#configuration)
-11. [Evaluation](#evaluation)
-12. [Expected Outcomes](#expected-outcomes)
-13. [Project Structure](#project-structure)
-14. [Troubleshooting & Security](#troubleshooting--security)
-15. [Roadmap](#roadmap)
+The earlier real evaluation used a five-document fixture. Its live LLM check ran the same refund question three times and required the expected fact in at least two answers. In that run, the expected `30 days` fact appeared in 2/3 answers. This is useful historical evidence, not a claim about the current snapshot or a guarantee for every model and question.
 
----
+The project does not commit a dependency lockfile. Package versions can therefore differ between installations.
 
-## Problem
+## Implemented Features
 
-Teams and students who work with sensitive documents face a dilemma:
+- Streamlit chat interface with direct chat, local RAG, and optional R2R routing
+- Local file uploads with validation and content-based duplicate detection
+- Public GitHub repository ingestion using a shallow clone
+- Public HTTPS webpage ingestion with network and response-size guardrails
+- LlamaIndex sentence/paragraph-aware chunking
+- CSV, TSV, and JSON table verbalization on a best-effort basis
+- Code-fence repair, minimum-content filtering, near-duplicate filtering, and file-title enrichment
+- Ollama embeddings with adaptive batch shrinking
+- Independent vector and BM25 candidate pools fused through Reciprocal Rank Fusion
+- Conversation-aware follow-up retrieval and a tokenizer-aware total RAG input budget
+- Configurable similarity cutoff, evidence floor, top-k, temperature, and Eco Mode
+- Grounded prompt with numbered context, per-turn evidence, and validated citation references
+- Fixed no-match response when local retrieval returns zero nodes
+- DOCX chat export
+- Browser `localStorage` persistence for a selected subset of non-secret settings
+- Optional synchronous R2R upload and chat client for local files
 
-* **Cloud RAG is risky** — uploading contracts, research papers, or internal reports to a third-party API leaks private data and violates compliance.
-* **Naïve local RAG is brittle** — plain vector search misses exact keywords (“30-day”), hallucinates when no evidence exists, breaks on Hinglish queries, and heats weak laptops during ingestion.
-* **Tool sprawl** — useful knowledge lives in PDFs, Word docs, scattered CSVs, GitHub repos, and documentation sites, but most chatbots only accept one file type at a time.
+## Data Sources
 
-**Goal:** one lightweight, fully offline assistant that ingests *any* of those sources, retrieves the *right* chunks reliably, and answers *only* from evidence.
+### Local Files
 
----
+The uploader accepts 25 filename extensions:
 
-## Solution & Approach
-
-DocMind is a **streamlit + LlamaIndex + Ollama** system with a **hybrid retrieval layer** designed for small, local LLMs (e.g. `qwen2.5:0.5b`). The core insight is *novelty in system design, not model size*:
-
-| Design Choice | Why it matters (`code` ref) |
-|---|---|
-| **Hybrid BM25 + vector with RRF** | BM25 catches exact terms/numbers that dense vectors miss; RRF fusion costs only CPU (`utils/llama_index.py:260`) |
-| **Evidence floor 0.5** | Weak vector scores (<0.5) need a BM25 keyword hit, otherwise the query is correctly *rejected* instead of hallucinated (`utils/llama_index.py:75`) |
-| **Curated synonym expansion** | Short queries like “money back rules” widen to `refund` synonyms for BM25 only — vector query stays clean (`utils/llama_index.py:201`) |
-| **Hyphen / Hinglish hygiene** | `30-day → 30 day`, single-letter tokens dropped, Hinglish fillers (`batao/kya/hai`) stripped (`utils/llama_index.py:184`) |
-| **Title-aware chunks** | Every chunk is prefixed with its document title so title queries match all chunks and the LLM knows provenance (`utils/llama_index.py:141`) |
-| **Near-duplicate filter** | Jaccard on stemmed tokens drops repeated headers/footers before embedding — less GPU work (`utils/llama_index.py:108`) |
-| **Grounded prompt + citations** | “Answer ONLY from context, quote numbers, cite `[n]`” + compact numbered context (`utils/llama_index.py:43`) |
-| **Cache & Eco Mode** | On-disk `.index_cache` reuses embeddings; Eco trims batches/context for cool & fast weak-machine answers (`utils/llama_index.py:834` / `166`) |
-| **Numeric word → digit** | `thirty days` ≠ `30 days` for BM25 | `thirty → 30` before stemming so `thirty days` matches `30 days` (`utils/llama_index.py:239`) |
-| **Exact-phrase boost** | `"refund policy"` is bag-of-words | Quoted phrase gets +0.5 RRF if found verbatim (`utils/llama_index.py:358`) |
-| **Tabular verbalization** | `id,info / 1,HR leave` is not a sentence | CSV/JSON rows → `Row 1: info is HR leave…` making tables retrievable (`utils/llama_index.py:175`) |
-| **Code fence aware** | `requests.get(` split across chunks | ` ``` ` odd-count chunks merged before embed (`utils/llama_index.py:808`) |
-
-No hallucination fallback: if retrieval returns 0 nodes the assistant says *“I could not find this information in the documents.”* and offers **Ask without documents** (`utils/ollama.py:528`, `components/chatbox.py:125`).
-
----
-
-## Novelty — What Makes This Different
-
-Plain RAG (vector search + LLM) is the baseline every student builds. DocMind keeps the same tiny local model (`qwen2.5:0.5b`) but adds **system-level innovations** that are measured in `eval_harness.py:1` (43 tests, **100%** real run). No new model was trained — the contribution is engineering for **accuracy, privacy, and weak hardware**.
-
-### At a glance
-
-| # | Novelty | What plain RAG does | What DocMind does | Where | Eval proof |
-|---|---|---|---|---|---|
-| 1 | **Hybrid BM25 + Vector (RRF)** | Vector only — misses exact codes/numbers | Fuses BM25 keyword hits (exact) with vector semantics via Reciprocal Rank Fusion — pure CPU | `utils/llama_index.py:260` | Retrieval suite 12/12; e.g. `30-day` still hits |
-| 2 | **Evidence Floor (0.5)** | Weak scores (0.3–0.5) still return a chunk → hallucination | Score < 0.5 needs a BM25 hit, otherwise **0 nodes → correct rejection** | `utils/llama_index.py:75` | Correct rejection **0% → 100%** (`eval_report.md:17`) |
-| 3 | **Synonym expansion (BM25-only)** | `money back rules` ≠ `refund policy` | Short queries expand via curated map (`refund → return/money/back`) for BM25; vector query stays clean | `utils/llama_index.py:201` | `synonym` 100% |
-| 4 | **Hyphen & Hinglish hygiene** | `30-day` and `batao/kya/hai` are tokens | `30-day → 30 day`, single letters dropped, Hinglish fillers stripped | `utils/llama_index.py:184` | `hyphen` + `hinglish` 100% |
-| 5 | **Title-aware chunks** | Chunks are anonymous | Every chunk prefixed with `Annual Report.` etc. — title queries match all chunks + provenance visible | `utils/llama_index.py:141` | `title-aware` 100% |
-| 6 | **Near-duplicate & cache** | Re-embeds same headers every run | Jaccard dedup before embed + disk `.index_cache` (5 entries, content-hashed) → less heat, instant reload | `utils/llama_index.py:108`/`832` | `dedupe` + `cache` 100% |
-| 7 | **Eco Mode (weak-machine)** | One-size compute | Batch 4 / 256 tokens / ≤3 chunks / 3200-char budget when hot | `utils/llama_index.py:166` `utils/ollama.py:100` | `eco_mode_trims` 100% |
-| 8 | **No-hallucination UX** | Silent hallucination | Grounded template (`Answer ONLY from context, cite [n]`) + `I could not find…` + **Ask without documents** button | `utils/llama_index.py:43` `utils/ollama.py:528` | `no_hallucination` 100%, `generation` 100% |
-| 9 | **No heavy ML at runtime** | Needs `torch`/`transformers` | `rank-bm25` + `nltk` stemmer only — **~500 MB saved**, no torch import (`tests/test_import_boundaries.py`) | `Pipfile:6` | `no_torch_at_import` 100% |
-| 10 | **Security & validation** | Trusts any path/URL | GitHub URL normalize, SSRF/IP block, upload limits, excluded `*.png/*.zip` | `utils/helpers.py:19`/`254`/`80` | `robustness` 6/6 |
-| 11 | **Numeric word → digit** | `thirty days` missed | `thirty → 30`, `twenty → 20` before stemming | `utils/llama_index.py:239` | `numeric` 100% |
-| 12 | **Exact-phrase boost** | Quoted search ignored | `"refund policy"` +0.5 RRF if verbatim in chunk | `utils/llama_index.py:358` | `phrase` 100% |
-| 13 | **Tabular verbalization** | CSV/JSON not sentence-like | `Row 1: info is HR leave…` making tables answerable | `utils/llama_index.py:175` | `ingestion` 7/7 |
-| 14 | **Code fence aware** | Code split mid-` ``` ` | Odd-fence chunks merged before embed | `utils/llama_index.py:808` | `ingestion` 7/7 |
-
-### Why this is defensible
-
-* **Same model, better system** — you didn't claim a new LLM; you proved a better *pipeline* on the same `nomic-embed-text` + `qwen2.5:0.5b`. Reviewers can rerun `python eval_harness.py` vs `python eval_harness.py --mock` themselves.
-* **Reproducible numbers** — every novelty maps to a test in `eval_report.md:5` and a code line; overall **43/43 — 100%** (`eval_results.json:2`).
-* **Practical impact** — fully offline, runs cool on a weak laptop, handles 26 formats + Hinglish + GitHub/sites in one index — exactly the gap for colleges / small orgs that can't use cloud RAG.
-
----
-
-## System Architecture & Workflow
-
-```
-┌─────────────┐     ┌──────────────┐     ┌──────────────────┐
-│  Sources    │     │  Ingestion   │     │    Retrieval     │
-│  Local Files│────▶│  Validate    │────▶│  Vector (Ollama) │
-│  GitHub Repo│     │  Load docs   │     │  + BM25 (rank-   │
-│  Website    │     │  Chunk 256/32│     │    bm25) → RRF   │
-│             │     │  Title+dedup │     │  Evidence floor  │
-│             │     │  Embed batch │     │  Context budget  │
-└─────────────┘     │  Index(cache)│     └────────┬─────────┘
-                    └──────────────┘              │
-                                                ▼
-┌─────────────┐     ┌──────────────┐     ┌──────────────────┐
-│    UI       │◀────│  Generation  │◀────│    Query         │
-│  Chat Box   │     │  Stream Chat │     │  Rewrite →       │
-│  Suggestions│     │  Grounded    │     │  Multi-turn      │
-│  Sources    │     │  Citations   │     │  History         │
-└─────────────┘     │  No-halluc.  │     └──────────────────┘
-                    └──────────────┘
+```text
+.csv .doc .docx .eml .epub .htm .html .ipynb .json .jsonl
+.markdown .mbox .md .mhtml .msg .odt .pdf .ppt .pptx .rtf
+.tsv .txt .xls .xlsx .xml
 ```
 
-**Ingestion flow** (`docs/pipeline.md`): validate model → load docs (LlamaIndex `SimpleDirectoryReader` + SSRF-guarded website fetch) → validate limits (≤1000 docs, ≤10 MB) → split → title/dedup → batched embed with progress & OOM shrink → `VectorStoreIndex` → streaming query engine + hybrid retriever → persist to `.index_cache`.
+Upload limits:
 
-**Query flow** (`components/chatbox.py:56`, `utils/ollama.py:492`): rewrite query → vector+BM25 retrieve → filter by cutoff & evidence → build numbered context → prepend recent chat history (multi-turn) → `stream_chat` → render tokens + source chips.
+- 10 files per batch
+- 25 MiB per file
+- 100 MiB total per batch
 
-**State:** `components/page_state.py:117` seeds session state; `sidebar.py:37` shows mode badges (RAG / R2R / Chat); `utils/browser_settings.py` persists preferences in `localStorage`.
+An accepted extension does not guarantee a dedicated parser. Text extraction quality depends on the installed LlamaIndex readers and optional parser dependencies. The committed evaluation directly exercises TXT, Markdown, CSV, and DOCX. Scanned PDFs and unsupported legacy/container formats may produce no usable text; OCR is not included.
 
----
+### GitHub
 
-## Behind the Scenes — What Happens When You Add Content
+Accepted inputs:
 
-This is the “explain to a non-technical examiner” section — exactly what runs after you drag a file, paste a `owner/repo`, or add a website URL. The UI shows 4–5 stage chips; underneath this is what really happens.
+```text
+owner/repo
+https://github.com/owner/repo
+```
 
-### 1) Local Files — `components/tabs/local_files.py` → `utils/helpers.py` → `utils/llama_index.py` → `utils/rag_pipeline.py`
+DocMind validates the two-segment GitHub repository identifier, checks repository availability, and runs a shallow clone with a 120-second timeout. Only public repositories are supported. Private-repository authentication is not implemented.
 
-**You do:** sidebar → **Data Sources → Local Files → Upload** (up to 10 files, 25 MB each).
+### Websites
 
-**System does:**
+DocMind accepts up to six public HTTPS webpages per batch. It rejects credentials in URLs, blocked hostnames, private/loopback/link-local/multicast/reserved addresses, unsupported content types, excessive redirects, and response bodies larger than 5 MiB. Website fetches and indexing share a bounded deadline, and failures are categorized for the UI.
 
-1. **Save safely** — each `uploaded_file` is checked by `safe_uploaded_filename()` (`helpers.py:174`): no `/` or `\`, matches `^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$`, extension in `ALLOWED_UPLOAD_EXTENSIONS` (26 types). Then `upload_destination()` resolves the path and asserts it stays inside `data/` (prevents `../../etc/passwd`). Total size checked (`MAX_TOTAL_UPLOAD_BYTES=100 MB`, `helpers.py:52`). File is written via `save_uploaded_file()` and the UI shows *files uploaded*.
-2. **Load** — `load_documents(data_dir)` uses LlamaIndex `SimpleDirectoryReader` with `EXCLUDED_FILE_PATTERNS` (`llama_index.py:689`): `*.png, *.zip, *.exe, *.mp4, node_modules, .git …` (34 patterns) are never read — even if a user zips a repo, the zip itself is skipped.
-3. **Validate** — `validate_ingested_documents()` (`rag_pipeline.py:22`) enforces **≤1000 docs and ≤10 MB text**. Too much → clear error “Too many documents” instead of OOM.
-4. **Chunk** — LlamaIndex splitter with `Settings.chunk_size=256` tokens (~1024 chars) and `chunk_overlap=32` (12 %). Small chunks = precise retrieval; overlap = no fact split across a boundary. Both are editable in Advanced and take effect on *next* ingestion.
-5. **Enrich** — for each chunk: `MIN_CHUNK_CHARS=50` drops empty fragments, `_dedupe_near_duplicate_nodes()` (`llama_index.py:108`) drops boilerplate repeats via stemmed Jaccard >0.95, `_prepend_document_title()` (`:141`) prefixes `Annual Report.\n\n…` so title queries match *every* chunk.
-6. **Embed (the hot part)** — `OllamaEmbedding.get_text_embedding_batch()` (`llama_index.py:530`) sends `embed_batch_size=16` (Eco: 4) chunks to `http://localhost:11434/api/embed` with a 300 s timeout. A `ProgressReportingEmbedding` wrapper calls the progress callback for the progress bar. If Ollama returns `CUDA out of memory`, the batch is halved (`16 → 8 → 4 → 2 → 1`) and retried — ingestion finishes instead of crashing.
-7. **Index + cache** — `VectorStoreIndex(nodes=…, embed_model=…)` builds the in-memory index. `index_cache_dir()` hashes `INDEX_CACHE_VERSION + model + chunk settings + sorted doc texts` into `.index_cache/<20-char-key>` and `persist_index_to_cache()` saves it. Next time you add *the same files with same settings* the index loads from disk in ~0.03 s (`eval_report.md:70`). Old caches pruned (keep 5).
-8. **Ready** — `create_query_engine()` creates a streaming `RetrieverQueryEngine` (`top_k` from slider) with `TEXT_QA_TEMPLATE` (grounded prompt) and a **hybrid retriever** (`build_hybrid_retriever()`). Temp files under `data/` are deleted.
+Every hostname is resolved and all returned A and AAAA addresses are checked before each request. HTTPS connections use the validated numeric address while retaining the original hostname for SNI and certificate verification, and every redirect is revalidated before it is followed.
 
-> **Seen as:** *files uploaded → documents loaded → embeddings generated → index ready* (kept in `st.session_state["file_ingestion_stages"]` so reruns don’t re-trigger).
+## Modes and Providers
 
-### 2) GitHub Repo — `components/tabs/github_repo.py` → `utils/helpers.py:254`
-
-**You do:** `Ashita-no-Kaushar/DocMind-AI` or `https://github.com/Ashita-no-Kaushar/DocMind-AI`.
-
-**System does:**
-
-1. **Normalize & validate** — `normalize_github_repo()` strips whitespace, parses URL, requires `https` + `github.com`, needs exactly `owner/repo` (2 path parts), strips trailing `.git`, then regex `^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`. `https://gitlab.com/…` or `…/extra/path` → error. This is the same check `eval_harness.py:698` tests.
-2. **Clone** — `clone_github_repo()` ensures `data/` exists, deletes a stale checkout (with `remove_dir_retry` for Windows locks, fallback to `data/clone_<ts>/owner__repo`), then `git clone --depth 1 -q https://github.com/owner/repo.git data/owner/repo` (120 s timeout). No `git` binary → graceful error.
-3. **Load** — the cloned folder is then processed exactly like Local Files (steps 2–8 above) — respecting `EXCLUDED_FILE_PATTERNS`, so `.git/` and `node_modules/` are never embedded.
-
-> **Seen as:** *repository validated → repository cloned → files loaded → embeddings generated → index ready*.
-
-### 3) Website — `components/tabs/website.py` → `utils/helpers.py:80`
-
-**You do:** paste `https://docs.python.org/3/library/os.html` (up to 5 at once) → **+** → **Process**.
-
-**System does:**
-
-1. **Validate** — `validate_website_urls()` → `_validate_public_http_url()` per URL: scheme must be `https`, no `user:pass@`, hostname not in `BLOCKED_HOSTNAMES` (`localhost`, `metadata.google.internal`), **DNS → IP** via `getaddrinfo` and reject if IP `is_private / is_loopback / is_link_local` (prevents SSRF to `169.254.169.254` or `127.0.0.1`). Exceed 5 URLs → error.
-2. **Fetch** — `load_website_documents()` opens a `requests.Session` with `User-Agent: docmind/website-ingestion`, follows at most `MAX_WEBSITE_REDIRECTS=3` (re-validating each redirect), checks `Content-Type` contains `text/html` or `text/plain`, streams in 64 KB chunks and aborts if `>5 MB` (`MAX_WEBSITE_RESPONSE_BYTES`). Timeout `(5, 20)` s.
-3. **Convert** — `html2text.html2text(html)` → clean markdown text → `Document(text=…, metadata={"source": url})`.
-4. **Index** — same chunk/title/dedup/embed pipeline as above.
-
-> **Seen as:** *websites fetched → content loaded → embeddings generated → index ready*.
-
-### After indexing — how a question is answered
-
-1. **Rewrite** — `_rewrite_query()` (`llama_index.py:248`): Porter-stem, split hyphens, drop filler words (`the/a/and`, plus Hinglish `batao/kya/hai`), produce `refunded purchases → refund purchas`.
-2. **Retrieve** — `HybridRetriever.retrieve()` (`:338`): vector search (rewritten query) → RRF rank + BM25 keyword search (expanded tokens `_bm25_expanded_tokens()` for short queries only) → fuse via `1/(60+rank)`.
-3. **Filter** — `_is_credible()`: drop `< similarity_cutoff` (default 0.3); then **evidence floor**: if `vector < 0.5` need a BM25 `score>0` hit or the chunk is discarded — this is why no-match queries correctly return **0 nodes**.
-4. **Budget** — keep top chunks within `CONTEXT_CHAR_BUDGET=4800` (Eco: 3200), dedup within selection, and for doc-level queries (“summarize…”) prepend intro chunks.
-5. **Generate** — `context_chat()` (`ollama.py:492`): numbers chunks `[1]…`, builds `TEXT_QA_TEMPLATE` (`:43`) with `{context_str}` + `{query_str}`, prepends recent chat history (multi-turn, `CHAT_HISTORY_TOKEN_BUDGET=1200` / Eco 500), `llm.stream_chat()` → UI `write_stream()` → source chips `[file (score%)]`.
-
----
-
-
-
-## Tech Stack
-
-| Layer | Choice | Reason |
+| Integration | Current status | Important limitations |
 |---|---|---|
-| **UI** | Streamlit 1.62 (dark theme `#0E1117`) | Fast Python UI, no JS build |
-| **RAG** | LlamaIndex 0.14 + `llama-index-readers-file/web` | Pluggable loaders, `VectorStoreIndex` |
-| **LLM / Embed** | Ollama (`qwen2.5:0.5b` / `nomic-embed-text:latest`) + OpenAI-compatible (LM Studio, TabbyAPI, vLLM) | Offline by default, swappable via `components/tabs/settings.py:40` |
-| **Retrieval** | `rank-bm25` + `nltk` Porter stemmer | Pure-Python, no torch, no extra model download |
-| **Docs** | `python-docx`, `ebooklib`, `html2text`, `fsspec`, `pypdf` | 26 file types |
-| **Infra** | Python 3.13, Pipenv, Docker (compose + ROCm variant), GitHub Actions (quality + Docker build) | Reproducible dev & deploy |
-| **Observability** | `utils/logs.py`, 112 unit tests, eval harness | Verified via CI |
+| Ollama | Primary verified path | Requires a reachable Ollama server with chat and embedding models |
+| OpenAI | Implemented adapter path | Not live-tested here; model identifiers must be accepted by both the installed LlamaIndex adapter and the remote server |
+| LM Studio (Local AI) | Routed through the OpenAI-compatible path | Same adapter/model compatibility limitation; no live LM Studio test was available |
+| TabbyAPI | Routed through the OpenAI-compatible path | Same adapter/model compatibility limitation; no live TabbyAPI test was available |
+| R2R | Partial, experimental integration | Local uploads only; non-streaming chat; no application history/style/source-chip handling; remote documents are not automatically deleted by Reset Project |
 
-No `torch`/`transformers` at runtime — removed for lightness (`Pipfile:6`).
+### Chat Routing
 
----
+Every prompt follows this order:
 
-## Plain RAG vs DocMind — Feature Matrix
+1. R2R, when R2R is enabled and document IDs exist
+2. Local RAG, when a local query engine exists
+3. Direct model chat, when no document index is active
 
-Beyond raw scores — what a plain student RAG (vector search + LLM) *lacks* vs what DocMind ships. Use this in viva when asked “what’s different?”
+Routing is based on session state, not on semantic classification. Once a local index exists, later prompts remain in local RAG mode unless the index is cleared or the user chooses the one-time **Ask without documents** fallback after a no-match result.
 
-| Feature | Plain RAG (baseline) | **DocMind** | Eval / Code |
-|---|:---:|:---:|---|
-| **Retrieval** | Vector only | **Hybrid BM25 + vector (RRF)** + evidence floor 0.5 | `llama_index.py:260`/`:75` — rejection 0% → **100%** |
-| **Synonyms** | `money back` ≠ `refund` | **Curated synonym expansion** (short queries, BM25-only) | `llama_index.py:201` — 100% |
-| **Hyphen** | `30-day` is one token | **`30-day → 30 day`** split | `llama_index.py:184` — 100% |
-| **Hinglish** | `batao/kya/hai` are keywords | **Filler filtered** (`batao/kya/hai` removed, `please/tell` too) | `llama_index.py:239` — 100% |
-| **Stemming** | `refunded ≠ refund` | **Porter stemmer** symmetric on docs + query | `llama_index.py:184` — 100% |
-| **Title-aware** | Chunks anonymous | **Every chunk prefixed with title** | `llama_index.py:141` — 100% |
-| **Dedup** | Embeds every duplicate | **Jaccard dedup** before embed | `llama_index.py:108` — 100% |
-| **Cache** | Re-embeds every run | **Disk ` .index_cache`** (5, content-hashed) | `llama_index.py:832` — instant reload |
-| **Eco / Heat** | One-size compute | **Eco Mode**: batch 4, 256 tokens, ≤3 chunks, 3200-char budget | `llama_index.py:166` — cooler |
-| **No-hallucination** | Hallucinates on no-match | **Grounded prompt + `I could not find…` + Ask without docs** | `llama_index.py:43` / `ollama.py:528` — 100% |
-| **Multi-turn** | Forgets history | **RAG history budget** (1200 / Eco 500) in prompt | `ollama.py:115` — 100% |
-| **Answer style** | Fixed tone | **6 presets** (Concise/Balanced/Detailed/Bulleted/Technical/ELI5) | `chatbox.py:6` |
-| **Privacy** | Cloud API | **100% offline** (Ollama); OpenAI-compatible optional | `Pipfile:6` — no torch |
-| **File types** | 1–2 (txt/pdf) | **26 types** + GitHub + 5 websites | `helpers.py:19` |
-| **Upload safety** | No checks | **Name/size/SSRF/IP/host validation**, 34 excluded patterns | `helpers.py:19`/`:80` |
-| **Export** | Copy-paste | **Download chat `.docx`** | `settings.py:287` |
-| **Numeric words** | `thirty` ≠ `30` | **`thirty → 30`** before stemming | `llama_index.py:239` — 100% |
-| **Exact phrase** | `"refund policy"` bag-of-words | **Quoted phrase +0.5 RRF** if verbatim | `llama_index.py:358` — 100% |
-| **Tabular** | CSV/JSON not sentence | **`Row 1: info is …`** verbalization | `llama_index.py:175` — 100% |
-| **Code blocks** | Split mid-` ``` ` | **Odd-fence merge** before embed | `llama_index.py:808` — 100% |
-| **Heavy deps** | Needs `torch` ~500 MB | **No torch at import** | `test_import_boundaries.py` — 0 torch |
-| **Tests** | Manual | **112 unit + 43 eval** tests, CI green | `tests/` + `eval_harness.py:1` |
+## Local Setup
 
-> Plain hallucinates on every no-match; DocMind is **measured** 100% correct rejection on the same `nomic-embed-text` model.
+The declared Python version is 3.13. The current local verification environment uses Python 3.12.10 successfully, but Python 3.13 remains the project contract used by `Pipfile`, Docker, and CI.
 
----
+### Ollama Models
 
-## Features — Everything the App Does
-
-### Ingestion Sources (sidebar **Data Sources**)
-
-* **Local Files** — drag & drop, 25 MB/file, CSV/TSV/JSON/JSONL/XML/XLS/XLSX/PDF/DOC/DOCX/PPT/PPTX/ODT/RTF/EPUB/EML/MBOX/MSG/TXT/MD/Markdown/HTML/HTM/MHTML/IPYNB (`utils/helpers.py:19`)
-* **GitHub Repo** — `owner/repo` or `https://github.com/owner/repo`, SHA-clone `--depth 1`, stale-checkout handling (`utils/helpers.py:254`)
-* **Website** — up to 5 URLs, HTTPS-only, redirect + size + SSRF guards, HTML→text via `html2text` (`utils/helpers.py:108`)
-* Exclusions: binaries/archives/images (`*.png, *.zip, *.exe, *.mp4, node_modules …`) (`utils/llama_index.py:689`)
-* Stages shown live: *validated → cloned/fetched → loaded → embedded → ready* (`components/tabs/sources.py:17`)
-
-### Retrieval & Chat
-
-* **Two modes auto-routed** — RAG (with `query_engine`) vs direct LLM (`components/chatbox.py:58`)
-* **Hybrid retriever** with top-k, similarity cutoff, context budget (`utils/llama_index.py:260`)
-* **Grounded answers** with citations `[n]` and source chips (file + score) under each answer
-* **No-hallucination gate** + “Ask without documents” fallback
-* **Multi-turn memory** — last RAG context includes recent history (`utils/ollama.py:115`)
-* **Streaming** token-by-token via `write_stream`
-
-### Settings (`Settings` tab — `components/tabs/settings.py:119`)
-
-| Group | Controls |
-|---|---|
-| **Chat** | Provider (Ollama / OpenAI / LM Studio / TabbyAPI) → Chat Model dropdown + Refresh; Server URL & API key when non-Ollama |
-| **Document Search** | Embedding Model dropdown + Refresh |
-| **Answer Style** | 6 presets: Concise / Balanced / Detailed / Bulleted / Technical / Simple-ELI5 → prompt preview (collapsed) |
-| **Preferences** | Eco Mode (batch 4, 256 tokens, ≤3 chunks, 3200-char budget) + Show advanced controls |
-| **Advanced** (when on) | Sources per answer, Relevance threshold, Creativity, Chunk Size/Overlap + live token count — **see drill-down below** |
-| **External RAG (R2R)** | Optional `utils/r2r.py` server (`http://localhost:7272`), health check, doc IDs |
-| **Export** | Download chat as `.docx` (`chat_history_docx`) |
-
-Sidebar extras: **mode badge** (Chat / RAG / R2R), **Clear Chat & Reset** expander, browser-settings persistence.
-
-#### Advanced Settings — In Detail (hidden until “Show advanced controls” is on)
-
-> All of these are **live** — change them and the *next* query uses the new value (chunk settings need a re-ingest). They are deliberately hidden by default so a new user sees only 3 cards.
-
-| Control | Key (`page_state.py`) | Default | Range | What it does — in plain words | When to tweak |
-|---|---|---:|---|---|---|
-| **Sources per answer** | `top_k` | `3` | 1–10 slider | How many document chunks are glued into the prompt. More = broader context but more noise/hallucination risk. Eco caps at 3. | Raise to 5–7 for long reports where facts are scattered; lower to 1–2 for invoices/Q&A where one chunk holds the answer. (`utils/llama_index.py:319`) |
-| **Relevance threshold** | `similarity_cutoff` | `0.30` | 0.00–1.00 (0.05 step) | Minimum vector score to keep a chunk. `0` = no filter. Higher = stricter. After that, the **evidence floor** (`0.5`) still requires a BM25 keyword hit for weak scores. | Raise to 0.4–0.5 if you see irrelevant sources; lower to 0.15 if good chunks are being dropped (but watch hallucinations). (`utils/llama_index.py:376`) |
-| **Creativity** | `temperature` | `0.4` | 0.0–1.5 (0.05) | Sampling randomness. 0 = deterministic/focused, 1.5 = very creative/unpredictable. | Keep 0.3–0.5 for factual RAG; raise to 0.8–1.0 for brainstorming/drafting. (`utils/ollama.py:343`) |
-| **Chunk Size** | `chunk_size` | `256` tokens | free text (int) | Tokens per piece before embedding (~4 chars/token). Smaller = more precise, more vectors & more GPU work. | Drop to 128–192 for highly structured tables; raise to 384–512 for long narrative docs. Needs **re-ingest**. (`utils/llama_index.py:669`) |
-| **Chunk Overlap** | `chunk_overlap_pct` → `chunk_overlap` | `12%` → `32` tokens | 0–50% slider | Overlap between neighbours to keep sentence continuity. Computed live: `overlap = chunk_size * pct // 100`. | Raise to 20% if facts are split across boundaries; lower to 0–5% to shrink index on clean docs. Needs re-ingest. |
-| **Eco Mode** | `eco_mode` | `off` | toggle | Shrinks `embed_batch 16→4`, `num_predict 512→256`, `top_k ≤3`, `context 4800→3200`. Cooler & faster, slightly less context. | Turn **on** when laptop is hot, fan loud, or answers lag >3 s. (`utils/llama_index.py:166` `utils/ollama.py:100`) |
-| **R2R Base URL / API Key** | `r2r_base_url` / `r2r_api_key` | `http://localhost:7272` / `` | inside collapsed *External RAG* expander | When on, uploads go to an external R2R server instead of local LlamaIndex — less local RAM/disk. | Only if you run the R2R stack separately. (`utils/r2r.py`) |
-
-All advanced values are persisted in `localStorage` (`utils/browser_settings.py`) and survive reloads. Reset via **Clear Chat & Reset → Reset Project** (`components/sidebar.py` / `page_state.py:34`).
-
-### Performance & Safety
-
-* **Eco Mode** for hot/weak machines (`components/tabs/settings.py:218`)
-* **Index cache** (`.index_cache`, keep 5, keyed by docs+settings) — repeat uploads instant (`utils/llama_index.py:832`)
-* **OOM-safe batching** — halves batch on CUDA OOM and retries (`utils/llama_index.py:540`)
-* **Security** — GitHub URL normalize & reject non-github, website SSRF/IP block, upload name/size limits, `SAFE_UPLOAD_NAME_PATTERN` (`utils/helpers.py`)
-
----
-
-## Supported Documents & Sources
-
-**26 extensions:** `.csv .doc .docx .eml .epub .htm .html .ipynb .json .jsonl .markdown .mbox .md .mhtml .msg .odt .pdf .ppt .pptx .rtf .tsv .txt .xls .xlsx .xml`
-
-Plus: any GitHub repo (public, shallow clone) and up to 5 HTTPS websites at once.
-
-Upload limits: 10 files, 25 MB/file, 100 MB total; ingestion limits: 1000 docs, 10 MB text — enforced with clear errors.
-
----
-
-## Modes & Options
-
-| Mode | When | What happens |
-|---|---|---|
-| **Chat** | No index | Direct LLM (`utils/ollama.py:426`) with system prompt + chat history |
-| **RAG** | After ingesting files/repo/sites | Hybrid retrieval → grounded prompt → cited answer |
-| **R2R** | `Enable R2R` on | Files go to external R2R server (`utils/r2r.py`) — less local RAM/heat |
-
-Other toggles: **Answer tone** quick selector in chat (`components/chatbox.py:58`) mirrors Settings; **Directly import** caption reminds users how grounding works.
-
----
-
-## Quick Start
-
-**Prereqs:** Ollama running, Python 3.13, at least one chat + embedding model:
+Example models used by the current verification environment:
 
 ```bash
 ollama pull qwen2.5:0.5b
@@ -326,154 +116,210 @@ ollama pull nomic-embed-text:latest
 ollama list
 ```
 
-**Local (Pipenv):**
+The application prefers `gemma4:latest`, then `llama3:8b`, then `llama2:7b`, then the first discovered chat-capable model. `qwen2.5:0.5b` is an example model, not a hardcoded universal default.
+
+### Pipenv
 
 ```bash
-pip install pipenv
+python -m pip install pipenv
 pipenv install
 pipenv run streamlit run main.py
-# open http://localhost:8501
 ```
 
-**Docker:**
+Open `http://127.0.0.1:8501`.
+
+No `Pipfile.lock` is currently committed, so `pipenv install` may resolve newer package versions than those used in the recorded verification.
+
+### Existing Virtual Environment
+
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run main.py `
+  --server.port=8501 `
+  --server.address=127.0.0.1
+```
+
+### Windows Launcher
+
+```powershell
+.\run.ps1
+```
+
+`run.ps1` clears Python bytecode caches, attempts to start Ollama, stops a matching stale Streamlit process on port 8501, and launches the app. Its Ollama tuning environment variables affect an Ollama process started by the script; they do not reconfigure an Ollama service that is already running.
+
+## Docker
+
+The Compose files build the local source image, expose port 8501, mount writable data and index-cache volumes, and store the application log under the data volume. The container runs without a GPU reservation because model execution is delegated to a separate Ollama service.
 
 ```bash
-docker compose up -d
-# app at http://localhost:8501
-# point Ollama endpoint to host.docker.internal:11434 if Ollama is on host
+docker compose up --build
 ```
 
-Change Ollama endpoint in **Settings → Chat** if needed. First ingestion builds the index (~5 s for 5 small docs); repeat is instant from cache.
+If Ollama runs on the host, configure the Ollama endpoint as `http://host.docker.internal:11434` in the application settings.
 
----
+The `docker-compose.yml-rocm` file configures the Streamlit container, not an Ollama ROCm runtime. AMD acceleration must be configured in the separately installed Ollama service.
+
+Docker configuration was statically reviewed but could not be built or run because Docker is not installed in the current verification environment.
 
 ## Configuration
 
-* **Ollama endpoint** default `http://localhost:11434`, editable in Settings and persisted in `localStorage`.
-* **Chunking** 256 / 32 (12 %) — tweak in Advanced; next ingestion uses new values.
-* **Top K / cutoff / temperature** — live, next query uses new values (no re-ingest).
-* **Theme** dark (`#0E1117` / `#161B26` / violet `#8B5CF6`) in `.streamlit/config.toml:7`.
+| Setting | Default | Behavior |
+|---|---:|---|
+| Ollama endpoint | `http://localhost:11434` | Used by Ollama mode |
+| Top K | 3 | Applied to the next local retrieval query |
+| Similarity cutoff | 0.30 | Applied to the next local retrieval query; zero also disables the evidence-floor branch |
+| Temperature | 0.4 | Included in the LLM cache key after resolution |
+| Chunk size | 256 tokens | Used on the next ingestion |
+| Initial chunk overlap | 32 tokens | Opening Advanced Settings recalculates overlap from the percentage slider; 12% of 256 becomes 30 |
+| Context budget | 4,800 characters | 3,200 in Eco Mode |
+| RAG history estimate | 500 tokens | 300 in Eco Mode; this is a character-based estimate, not tokenizer-exact accounting |
+| Direct-chat history estimate | 1,200 tokens | Character-based estimate |
+| Normal embedding batch | 16 | 4 in Eco Mode |
+| Normal output cap | 512 tokens | 256 in Eco Mode |
 
----
+Changing provider, embedding model, chunk size, or overlap changes the local upload processing signature and causes the same still-selected upload batch to be ingested again.
 
-## Evaluation
+## Retrieval and Grounding
 
-All claims are measured, not asserted.
+For a local RAG query, DocMind:
 
-**Harness:** `eval_harness.py:1` — 6 suites, 43 tests, mock-friendly:
+1. Normalizes basic query tokens and selected filler words.
+2. Retrieves vector candidates.
+3. Calculates a BM25 ranking.
+4. Fuses rankings with `1 / (60 + rank)`.
+5. Applies the similarity cutoff.
+6. Requires positive BM25 evidence for vector scores below 0.5 when the cutoff is positive.
+7. Applies an exact-phrase boost for quoted queries.
+8. Removes duplicate selected chunks and applies the context-character budget.
+9. Adds up to two introduction chunks for some document-level questions.
+10. Sends numbered context to the model.
+
+The evidence rule is a retrieval filter, not a hallucination guarantee. If one weak but accepted chunk is sent to the model, the generated answer is not automatically checked for factual entailment. Citation formatting is also not proof that a claim is supported by the cited text.
+
+## Index Cache
+
+DocMind can persist up to five LlamaIndex index directories under `.index_cache/`.
+
+The cache key includes:
+
+- Cache version
+- Embedding adapter class
+- Embedding model name
+- Embedding endpoint
+- Chunk size and overlap
+- Extracted document text
+- Source identity metadata such as filename or URL
+
+The cache avoids rebuilding embeddings for matching inputs. It does not cache model answers, and its contents are not encrypted.
+
+## Privacy and Storage
+
+With Ollama running on the same machine:
+
+- Model inference can remain local.
+- Extracted index/cache data and logs remain on the local filesystem unless the user configures another storage location.
+- GitHub and website ingestion still require outbound network access.
+
+OpenAI-compatible mode sends requests to the configured server. R2R mode uploads local files to the configured R2R server. API keys and chat history are not stored in browser `localStorage`, but non-secret settings, local index caches, and logs remain local files.
+
+## Testing
+
+### Unit Tests
 
 ```bash
-python eval_harness.py              # real Ollama + LLM
-python eval_harness.py --mock       # deterministic hash embeddings, no server (CI)
-python eval_harness.py --suite retrieval  # single suite
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-**Outputs:** `eval_results.json` (machine-readable) + `eval_report.md` (paste-ready for thesis/README).
+The suite covers model helpers, settings, browser persistence, format extraction, source/index transactions, provider profiles, website SSRF controls, upload signatures, R2R HTTP behavior, conversational retrieval, evidence and citation rules, cache identity, and import boundaries.
 
-**Latest real run (2026-08-23, `nomic-embed-text:latest`): 43/43 — 100%**
+### Compile Checks
 
-| Suite | Score | Covers |
-|---|---:|---|
-| ingestion | 100% | File types, chunking, dedup, title-aware, cache, exclusions |
-| retrieval | 100% | Hybrid vs plain, synonyms, hyphen/Hinglish, evidence floor |
-| generation | 100% | No-hallucination fallback, citations, tone presets, multi-turn, e2e |
-| performance | 100% | Ingest speed, retrieval latency, eco-mode, cache hit, OOM resilience |
-| robustness | 100% | Empty/binary, GitHub/URL validation, special chars |
-| architecture | 100% | Backend presets, export, settings persistence, import boundaries |
-| **Overall** | **100%** | |
+```bash
+.\.venv\Scripts\python.exe -m py_compile `
+  main.py `
+  components/page_state.py `
+  components/tabs/settings.py `
+  utils/browser_settings.py `
+  utils/ollama.py
+```
 
-**Headline Retrieval result (most viva-relevant):**
+### Evaluation Harness
 
-| Metric | Plain RAG | **DocMind Hybrid** |
-|---|---:|---:|
-| Factual hit rate (n=8) | 100% | **100%** |
-| Correct rejection (n=2) | 0% | **100%** |
-| Avg latency | 23 ms | 24 ms |
+```bash
+# Requires Ollama embeddings; the live LLM check is skipped if no chat model is found
+.\.venv\Scripts\python.exe eval_harness.py
 
-Plain RAG *always* hallucinates on no-match queries (pulls `python_guide.txt` at 0.38); DocMind returns **0 nodes** and the UI shows the fallback — zero hallucination. Per-query table and code refs are in `eval_report.md:17`.
+# Uses stable hash embeddings and skips the live LLM check
+.\.venv\Scripts\python.exe eval_harness.py --mock
 
-Full unit suite: `pipenv run python -m unittest discover -s tests` — **112 tests, OK** on Windows & Linux CI.
+# Writes results to a separate directory
+.\.venv\Scripts\python.exe eval_harness.py --out .\eval-output
+```
 
----
+The harness now:
 
-## Expected Outcomes
+- Uses a stable hash function for mock embeddings
+- Distinguishes passed, failed, and skipped checks
+- Excludes skipped checks from the raw score denominator
+- Returns a nonzero process status when a scored check fails
+- Refuses to silently replace unavailable real embeddings with hash embeddings
+- Runs three real LLM trials for its one generation check
 
-* **Privacy:** zero egress — all embeddings, chat, and storage are local (or to your chosen compatible server).
-* **Reliability:** no invented answers when evidence is absent; citations tie every fact to its chunk.
-* **Usability:** non-technical flow — add docs → chat; 3 steps in the welcome card (`components/page_state.py:18`).
-* **Efficiency:** repeat queries are instantaneous (cache); Eco Mode keeps a hot laptop cool (batch 4, trimmed context).
-* **Breadth:** 26 formats + repos + sites in one index — no tool switching.
+The harness is a small-fixture evaluation, not a browser automation suite, load test, security audit, or proof of factual correctness for arbitrary documents.
 
-For a final-year project the *novelty is system design* (hybrid + evidence gating on a tiny 0.5B model), not model size — an honest, defensible story.
+## Known Limitations
 
----
+- OpenAI-compatible model identifiers must be supported by the installed LlamaIndex adapter; arbitrary local-server model names may require an `OpenAILike`-style adapter.
+- R2R support is limited to local-file upload/chat and is not a complete replacement for local RAG.
+- Only one local index is active at a time. A new local ingestion replaces the previous active index.
+- Source-specific completion labels are session state and are not a durable source registry.
+- Conversation history is not persisted across sessions.
+- API keys are session-only in the Streamlit process.
+- The application has no authentication and is designed for local/single-user use.
+- `data/`, `.index_cache/`, LlamaIndex global settings, and logging are process/filesystem-wide rather than isolated per browser session.
+- Operating-system DNS resolution and provider callbacks cannot be forcibly interrupted once entered; website deadlines are checked around those operations and request timeouts bound normal waits.
+- GitHub clone size, file count, and parser resource use are not bounded before parsing.
+- Temperature zero reduces sampling randomness but does not guarantee byte-identical output.
+- Docker remains unverified in the current environment.
+- Dependency versions are not locked.
 
 ## Project Structure
 
-```
+```text
 .
-├── main.py                     # bootstrap: header → messages → sidebar → chatbox
+├── main.py
 ├── components/
-│   ├── header.py               # branded title + tagline
-│   ├── page_config.py          # dark theme, centered layout, chrome hiding
-│   ├── page_state.py           # WELCOME_MESSAGE, session-state seeding
-│   ├── sidebar.py              # Data Sources / Settings tabs + mode badge + Clear & Reset
-│   ├── chatbox.py              # streaming, citations, tone pills, suggestions
+│   ├── chatbox.py
+│   ├── header.py
+│   ├── page_config.py
+│   ├── page_state.py
+│   ├── sidebar.py
+│   ├── ingestion_prerequisites.py
 │   └── tabs/
-│       ├── sources.py / local_files.py / github_repo.py / website.py
-│       └── settings.py         # providers, models, style, eco, advanced, R2R, export
+│       ├── local_files.py
+│       ├── github_repo.py
+│       ├── website.py
+│       ├── settings.py
+│       └── sources.py
 ├── utils/
-│   ├── llama_index.py          # index, hybrid retriever, embeddings, cache, dedup
-│   ├── ollama.py               # LLM factories, chat/context_chat, history trimming
-│   ├── helpers.py              # upload/URL/GitHub validation, file handling
-│   ├── rag_pipeline.py         # ingestion pipeline orchestration
-│   ├── browser_settings.py     # localStorage persistence
-│   └── r2r.py                  # optional RAG-to-Riches backend
-├── tests/                      # 112 tests (ingestion, security, settings, etc.)
-├── docs/                       # pipeline / setup / usage / contributing / troubleshooting
-├── eval_harness.py             # comprehensive 6-suite eval (43 tests)
-├── eval_report.md              # generated report (this section)
-├── eval_results.json           # generated JSON
-├── Pipfile / Pipfile.lock      # deps (no torch)
-├── .streamlit/config.toml      # dark theme + upload limit
-├── Dockerfile + docker-compose.yml
-└── .github/workflows/quality.yml + main.yaml  # tests + Docker build
+│   ├── browser_settings.py
+│   ├── helpers.py
+│   ├── llama_index.py
+│   ├── logs.py
+│   ├── ollama.py
+│   ├── r2r.py
+│   └── rag_pipeline.py
+├── tests/
+├── docs/
+├── eval_harness.py
+├── eval_report.md
+├── eval_results.json
+├── Pipfile
+├── Dockerfile
+├── docker-compose.yml
+├── docker-compose.yml-rocm
+└── run.ps1
 ```
-
----
-
-## Troubleshooting & Security
-
-**Common issues → docs:**
-
-* **Ollama not running / model not found** → `docs/troubleshooting.md` — check `http://localhost:11434`, `ollama list`, `ollama pull qwen2.5:0.5b` / `nomic-embed-text:latest`, and Settings → Connection.
-* **No usable content / empty index** → file may be scanned PDF or binary — try `.txt`/`.md` export; check `MIN_CHUNK_CHARS=50` (`utils/llama_index.py:62`).
-* **CUDA OOM during embed** → Eco Mode on, or lower `Chunk Size`; batch auto-halves (`utils/llama_index.py:540`).
-* **Website fails / SSRF block** → only `https`, no `localhost/metadata`, ≤5 URLs, ≤5 MB, HTML/plain only (`utils/helpers.py:80`). Use a public URL.
-* **GitHub clone fails** → use `owner/repo` or `https://github.com/owner/repo`, check `git` is installed, ensure repo is public (`utils/helpers.py:254`).
-* **Slow answers / hot laptop** → turn on **Eco Mode** (`Settings → Preferences`), split 300-page PDFs into chapters.
-
-**Security model → `SECURITY.md`:**
-
-* Uploads validated by `SAFE_UPLOAD_NAME_PATTERN` + extension allow-list + size caps (10 files / 25 MB / 100 MB total).
-* Websites: SSRF-guarded via DNS→IP check (`_is_blocked_ip`), blocked hosts, redirect & size limits.
-* GitHub: strict `owner/repo` regex, only `github.com` over `https`.
-* No torch at runtime, no egress unless you point to an OpenAI-compatible server.
-
----
-
-## Roadmap
-
-* [ ] Rerank cross-encoder (optional, still no torch by default)
-* [ ] More export formats (markdown, PDF)
-* [ ] Collaborative sharing of cached indexes
-* [ ] Optional OCR for scanned PDFs (pluggable, off by default)
-
----
 
 ## License
 
-MIT — see `LICENSE` (if present) or the repository header.
-
-> Built with Streamlit · LlamaIndex · Ollama · rank-bm25 · NLTK · python-docx.
-
+GPL-3.0. See [LICENSE](LICENSE).

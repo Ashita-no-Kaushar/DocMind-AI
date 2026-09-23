@@ -1,47 +1,99 @@
 # RAG Pipeline
 
-DocMind builds an in-memory LlamaIndex query engine from one source at a time: local file uploads, a GitHub repository clone, or fetched website documents.
+DocMind maintains one active local index at a time. A successful new local ingestion replaces the previous active local query engine.
 
-## Ingestion Flow
+## Local Ingestion Order
 
-1. Validate the current Ollama chat model and embedding settings.
-2. Initialize the selected Ollama chat model.
-3. Configure the embedding backend:
-   - Ollama embeddings through the configured Ollama endpoint
-4. Load documents:
-   - Local files and GitHub repositories are loaded with LlamaIndex `SimpleDirectoryReader`.
-   - Websites are fetched with request size, redirect, content type, and network guardrails, then converted to text.
-5. Validate ingestion limits:
-   - At most 1,000 loaded documents
-   - At most 10 MB of loaded source text
-6. Split documents into chunks using the configured chunk size and chunk overlap.
-7. Generate embeddings and display exact progress while indexing.
-8. Create a streaming LlamaIndex query engine with the configured `top_k` and response mode.
-9. Remove transient on-disk ingestion files from `data/`.
+1. Read the active provider and chat-model settings.
+2. Create and validate the selected LLM.
+3. Validate chunk size and overlap.
+4. Configure and validate the embedding model.
+5. Load source documents.
+6. Enforce post-load limits:
+   - 300 loaded document objects
+   - 4 MiB of extracted Python characters
+7. Attempt to load a compatible persisted index.
+8. If no compatible cache exists, transform, deduplicate, embed, and build an in-memory `VectorStoreIndex`.
+9. Persist the index cache when the filesystem is writable.
+10. Create the query engine and hybrid retriever.
+11. Remove transient files under `data/` after successful indexing.
 
-## Source-Specific Stages
+Failed local ingestion may leave transient files because several failure paths stop the Streamlit run before success-only cleanup.
 
-The UI stores completed ingestion stages in Streamlit session state so reruns can show the current status without reprocessing unchanged inputs.
+## Source Loading
 
-- Local files: files uploaded, documents loaded, embeddings generated, index ready
-- GitHub repositories: repository validated, repository cloned, repository files loaded, embeddings generated, index ready
-- Websites: websites fetched, website content loaded, embeddings generated, index ready
+- Local files are saved under `data/` and loaded from an explicit safe file list.
+- GitHub repositories are shallow-cloned and loaded from the checkout directory.
+- Websites are fetched first and passed to the pipeline as LlamaIndex `Document` objects.
 
-## Key Parameters
+The loader rejects paths outside the selected source root, file symlinks, hidden paths, and configured excluded patterns. It retries unreadable files individually so one parser failure does not necessarily stop the complete batch.
 
-Users can adjust these advanced settings:
+The ingestion limits run after loading. They do not bound clone size, parser CPU/memory use, decompression, or PDF page count before parsing.
 
-1. **`top_k`**: Number of similar chunks retrieved for each query. Higher values provide more context but may add noise. Applies to the next query immediately.
-2. **`similarity_cutoff`**: Minimum vector similarity score for a chunk to be used. Higher = only strong matches (less hallucination), lower = more recall. `0` disables the filter. Applies to the next query immediately.
-3. **`chunk_size`**: Maximum size of each text chunk before embedding. Smaller chunks can improve precision but increase embedding work. Applies to the next ingestion.
-4. **`chunk_overlap`**: Overlap between consecutive chunks. This must be greater than or equal to `0` and less than `chunk_size`. Applies to the next ingestion.
+## Text Processing
 
-## Runtime State
+Local files and GitHub content pass through:
 
-A successful RAG conversation requires:
+1. Basic table verbalization for selected CSV, TSV, and JSON documents
+2. LlamaIndex sentence/paragraph-aware chunking
+3. Simple odd-fence code-block repair
+4. Removal of chunks with fewer than 15 non-whitespace characters
+5. Stemmed-token overlap deduplication
+6. Title enrichment for file-backed chunks
+7. Embedding and vector-index construction
 
-- `llm`: the initialized Ollama LLM
-- `documents`: loaded source documents
-- `query_engine`: the LlamaIndex query engine
+JSONL is normally parsed as one JSON document; ordinary multi-line JSONL often bypasses table verbalization. Website documents do not pass through the local table verbalizer because they enter the pipeline as already-created `Document` objects.
 
-If any of these are missing, ingestion did not complete and chat is blocked until data is imported successfully.
+## Embedding
+
+Ollama embedding batches begin at:
+
+- 16 chunks normally
+- 4 chunks in Eco Mode
+
+On any batch exception, the current Ollama wrapper halves the batch down to one. This helps with out-of-memory failures but also retries non-batch errors such as timeouts.
+
+OpenAI-compatible embeddings use the installed LlamaIndex OpenAI adapter and do not use the same project-level batch-shrinking loop.
+
+## Index Cache
+
+The cache retains up to five index directories. Cache identity includes:
+
+- Cache version
+- Embedding adapter class
+- Embedding model name
+- Embedding endpoint
+- Chunk size and overlap
+- Extracted text
+- Source identity metadata such as filename or URL
+
+The cache is unencrypted local storage. It avoids re-embedding matching inputs but does not cache generated answers.
+
+## Query Flow
+
+1. Normalize basic number words, hyphens, ASCII tokens, and selected filler words.
+2. Retrieve vector candidates.
+3. Build a BM25 ranking over the current index corpus.
+4. Fuse vector and BM25 ranks with Reciprocal Rank Fusion.
+5. Apply the similarity cutoff.
+6. For a positive cutoff, require positive BM25 evidence when vector score is below 0.5.
+7. Add a quoted-phrase boost when applicable.
+8. Remove duplicate selected chunks.
+9. Apply the 4,800-character context budget, or 3,200 in Eco Mode.
+10. Add up to two introduction chunks for recognized document-level questions.
+11. Number the selected context blocks.
+12. Stream the model response.
+
+BM25 searches the full corpus, but under a positive cutoff a keyword-only node absent from the vector candidate list has vector score zero and is rejected. BM25 therefore reinforces eligible vector candidates rather than acting as a completely independent retrieval path at the default cutoff.
+
+## Generation
+
+Local RAG adds the system-style message and approximately 500 tokens of recent RAG history, or 300 in Eco Mode. Token counts use `len(text) // 4` and are estimates.
+
+The final user message contains the grounded template, numbered context, and current question. The model response is streamed. If the expected citation substring is missing, `(from [1])` is appended as a formatting fallback; citation numbers and factual support are not automatically verified.
+
+## R2R Path
+
+R2R currently bypasses the local pipeline only for local-file uploads. It calls the configured R2R server, stores returned document IDs in session state, and sends future R2R chat requests to that server.
+
+GitHub and website ingestion continue to use the local pipeline. R2R chat is synchronous, does not receive the application's answer-style/history settings, and does not populate the local source-chip state.

@@ -3,7 +3,8 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
-Pipfile.lock
+.ruff_cache/
+.pytest_cache/
 
 # App data & caches
 data/

@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Project Overview
 
-DocMind is a Streamlit application for offline retrieval augmented generation with Ollama, LlamaIndex, local files, GitHub repositories, and websites.
+DocMind is a Streamlit retrieval-augmented generation application with local Ollama support, optional external LLM providers, local files, GitHub repositories, websites, and a partial R2R integration. External provider and R2R modes transmit data to the server configured by the user.
 
 Primary entry points:
 
@@ -23,7 +23,7 @@ pipenv install
 pipenv run streamlit run main.py
 ```
 
-The app expects Python 3.12-3.13 and an Ollama instance. The default Ollama endpoint is `http://localhost:11434`.
+The declared environment is Python 3.13. The default Ollama endpoint is `http://localhost:11434`; other modes use the endpoints configured by the user.
 
 ## Verification
 

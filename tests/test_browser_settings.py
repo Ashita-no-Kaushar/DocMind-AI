@@ -10,8 +10,8 @@ from utils.browser_settings import (
     option_index,
     persist_settings_to_browser_storage,
     restore_settings_from_browser_storage,
-    should_refresh_models_for_endpoint,
     serialize_persisted_settings,
+    should_refresh_models_for_endpoint,
 )
 
 
@@ -21,7 +21,7 @@ class BrowserSettingsTests(unittest.TestCase):
         apply_persisted_settings(
             state,
             {
-                "ollama_endpoint": "http://192.168.4.2:11434",
+                "ollama_endpoint": "https://192.168.4.2:11434",
                 "ollama_embedding_model": "embeddinggemma",
                 "top_k": "5",
                 "chunk_size": "2048",
@@ -30,7 +30,7 @@ class BrowserSettingsTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(state["ollama_endpoint"], "http://192.168.4.2:11434")
+        self.assertEqual(state["ollama_endpoint"], "https://192.168.4.2:11434")
         self.assertEqual(state["top_k"], 5)
         self.assertEqual(state["chunk_size"], 2048)
         self.assertEqual(state["chunk_overlap"], 256)
@@ -52,7 +52,7 @@ class BrowserSettingsTests(unittest.TestCase):
     def test_serialize_persisted_settings_only_includes_supported_keys(self):
         payload = serialize_persisted_settings(
             {
-                "ollama_endpoint": "http://192.168.4.2:11434",
+                "ollama_endpoint": "https://192.168.4.2:11434",
                 "top_k": 4,
                 "messages": ["do not persist"],
             }
@@ -61,7 +61,7 @@ class BrowserSettingsTests(unittest.TestCase):
         self.assertEqual(
             payload,
             {
-                "ollama_endpoint": "http://192.168.4.2:11434",
+                "ollama_endpoint": "https://192.168.4.2:11434",
                 "top_k": 4,
             },
         )
@@ -91,7 +91,7 @@ class BrowserSettingsTests(unittest.TestCase):
         state = {}
         stored_settings = browser_storage_payload(
             {
-                "ollama_endpoint": "http://192.168.4.2:11434",
+                "ollama_endpoint": "https://192.168.4.2:11434",
                 "selected_model": "gemma4:latest",
                 "ollama_embedding_model": "embeddinggemma",
             }
@@ -104,14 +104,14 @@ class BrowserSettingsTests(unittest.TestCase):
             restore_settings_from_browser_storage()
 
         self.assertTrue(state["browser_settings_restored"])
-        self.assertEqual(state["ollama_endpoint"], "http://192.168.4.2:11434")
+        self.assertEqual(state["ollama_endpoint"], "https://192.168.4.2:11434")
         self.assertEqual(state["selected_model"], "gemma4:latest")
         self.assertEqual(state["ollama_embedding_model"], "embeddinggemma")
 
     def test_persist_writes_ollama_endpoint_and_model_settings_after_restore(self):
         state = {
             "browser_settings_restored": True,
-            "ollama_endpoint": "http://192.168.4.2:11434",
+            "ollama_endpoint": "https://192.168.4.2:11434",
             "selected_model": "gemma4:latest",
             "ollama_embedding_model": "embeddinggemma",
             "messages": ["do not persist"],
@@ -129,7 +129,7 @@ class BrowserSettingsTests(unittest.TestCase):
         self.assertEqual(
             persisted_settings,
             {
-                "ollama_endpoint": "http://192.168.4.2:11434",
+                "ollama_endpoint": "https://192.168.4.2:11434",
                 "ollama_embedding_model": "embeddinggemma",
                 "selected_model": "gemma4:latest",
             },
@@ -138,7 +138,7 @@ class BrowserSettingsTests(unittest.TestCase):
     def test_persist_skips_redundant_component_write_for_same_settings(self):
         state = {
             "browser_settings_restored": True,
-            "ollama_endpoint": "http://192.168.4.2:11434",
+            "ollama_endpoint": "https://192.168.4.2:11434",
             "selected_model": "gemma4:latest",
         }
         storage_component = Mock()
@@ -201,13 +201,13 @@ class BrowserSettingsTests(unittest.TestCase):
         self.assertIsNone(option_index([], "missing"))
 
     def test_should_refresh_models_for_endpoint_when_lists_missing(self):
-        state = {"ollama_endpoint": "http://192.168.4.2:11434"}
+        state = {"ollama_endpoint": "https://192.168.4.2:11434"}
 
         self.assertTrue(should_refresh_models_for_endpoint(state, "ollama_models"))
 
     def test_should_refresh_models_for_endpoint_when_endpoint_changed(self):
         state = {
-            "ollama_endpoint": "http://192.168.4.2:11434",
+            "ollama_endpoint": "https://192.168.4.2:11434",
             "ollama_models": [],
             "ollama_models_endpoint": "http://localhost:11434",
         }
@@ -216,9 +216,9 @@ class BrowserSettingsTests(unittest.TestCase):
 
     def test_should_not_refresh_models_for_matching_endpoint(self):
         state = {
-            "ollama_endpoint": "http://192.168.4.2:11434",
+            "ollama_endpoint": "https://192.168.4.2:11434",
             "ollama_models": ["llama3"],
-            "ollama_models_endpoint": "http://192.168.4.2:11434",
+            "ollama_models_endpoint": "https://192.168.4.2:11434",
         }
 
         self.assertFalse(should_refresh_models_for_endpoint(state, "ollama_models"))

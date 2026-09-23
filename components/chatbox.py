@@ -1,7 +1,16 @@
+import copy
+
 import streamlit as st
 
 import utils.r2r as r2r
-from utils.ollama import chat, context_chat, get_models, get_embedding_models
+from utils.ollama import (
+    chat,
+    context_chat,
+    get_embedding_models,
+    get_models,
+    is_openai_compatible_backend,
+)
+from utils.source_state import active_index_matches_settings, ensure_active_source
 
 ANSWER_STYLE_OPTIONS = [
     "Concise",
@@ -50,9 +59,21 @@ def _apply_answer_style_from_settings():
     _sync_answer_style("answer_style")
 
 
+def _local_index_ready():
+    source = ensure_active_source(st.session_state)
+    if source.get("kind") is None:
+        return bool(st.session_state.get("query_engine"))
+    return bool(
+        st.session_state.get("query_engine")
+        and source.get("kind") in {"local", "github", "website"}
+        and source.get("status") == "ready"
+        and active_index_matches_settings(st.session_state)
+    )
+
+
 def _suggested_questions():
     """Starter questions shown while the conversation is still empty."""
-    if st.session_state.get("query_engine") or r2r.r2r_is_ready(st.session_state):
+    if _local_index_ready() or r2r.r2r_is_ready(st.session_state):
         return [
             "Summarize my documents",
             "What are the key points?",
@@ -65,9 +86,45 @@ def _suggested_questions():
     ]
 
 
+def _clear_turn_state():
+    st.session_state["last_doc_sources"] = []
+    st.session_state["last_rag_evidence"] = []
+    st.session_state["last_rag_no_result"] = False
+    st.session_state["last_rag_question"] = None
+
+
+def _render_sources(sources):
+    best = {}
+    for item in sources or []:
+        if isinstance(item, dict):
+            name = str(item.get("source", "document"))
+            score = item.get("score", 0.0)
+        else:
+            try:
+                name, score = item
+            except (TypeError, ValueError):
+                continue
+            name = str(name)
+        try:
+            score = float(score)
+        except (TypeError, ValueError):
+            score = 0.0
+        if name not in best or score > best[name]:
+            best[name] = score
+    labels = []
+    for name, score in best.items():
+        if score >= 0.15:
+            labels.append(f"`{name}` ({score:.0%})")
+        else:
+            labels.append(f"`{name}` (keyword match)")
+    if labels:
+        st.caption("📄 **Sources:** " + ", ".join(labels))
+
+
 def _process_prompt(prompt):
-    """Handle one user turn end-to-end: render, stream the answer, and store it."""
-    if st.session_state.get("llm_backend", "Ollama") == "OpenAI":
+    _clear_turn_state()
+    use_r2r = r2r.r2r_is_ready(st.session_state)
+    if not use_r2r and is_openai_compatible_backend():
         if not st.session_state.get("openai_model"):
             st.warning(
                 "⚠️ No chat model configured. Please go to **Settings → Chat** "
@@ -75,7 +132,7 @@ def _process_prompt(prompt):
                 icon=None,
             )
             return
-    elif not st.session_state.get("selected_model"):
+    elif not use_r2r and not st.session_state.get("selected_model"):
         try:
             models = get_models()
             if models:
@@ -93,40 +150,46 @@ def _process_prompt(prompt):
             )
             return
 
+    st.session_state.pop("last_r2r_metadata", None)
     st.session_state["messages"].append({"role": "user", "content": prompt})
-    st.session_state["last_rag_no_result"] = False
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    turn_evidence = []
     with st.chat_message("assistant"):
+        if use_r2r:
+            st.caption("R2R response (complete, non-streaming)")
         with st.spinner("Thinking..."):
-            if r2r.r2r_is_ready(st.session_state):
-                st.session_state["last_doc_sources"] = []
+            if use_r2r:
                 stream = r2r.r2r_chat(prompt=prompt)
-            elif st.session_state.get("query_engine"):
+            elif _local_index_ready():
                 stream = context_chat(
                     prompt=prompt,
                     query_engine=st.session_state["query_engine"],
+                    evidence_sink=turn_evidence,
                 )
             else:
-                st.session_state["last_doc_sources"] = []
                 stream = chat(prompt=prompt)
 
             response = st.write_stream(stream)
 
-        sources = st.session_state.get("last_doc_sources") or []
-        if sources:
-            best = {}
-            for name, score in sources:
-                if name not in best or score > best[name]:
-                    best[name] = score
-            labels = []
-            for name, score in best.items():
-                if score >= 0.15:
-                    labels.append(f"`{name}` ({score:.0%})")
-                else:
-                    labels.append(f"`{name}` (keyword match)")
-            st.caption("📄 **Sources:** " + ", ".join(labels))
+        if use_r2r:
+            turn_sources = st.session_state.get("last_doc_sources") or []
+        else:
+            turn_evidence = [
+                dict(item)
+                for item in (
+                    turn_evidence
+                    or st.session_state.get("last_rag_evidence")
+                    or []
+                )
+                if isinstance(item, dict)
+            ]
+            turn_sources = [
+                (item.get("source", "document"), item.get("score", 0.0))
+                for item in turn_evidence
+            ]
+        _render_sources(turn_sources)
 
     if st.session_state.get("last_rag_no_result"):
         if st.button("💬 Ask without documents", key="ask_without_docs_btn"):
@@ -134,7 +197,13 @@ def _process_prompt(prompt):
             st.rerun()
 
     if response:
-        st.session_state["messages"].append({"role": "assistant", "content": response})
+        message = {"role": "assistant", "content": response}
+        r2r_metadata = st.session_state.get("last_r2r_metadata")
+        if use_r2r and r2r_metadata:
+            message["r2r"] = copy.deepcopy(r2r_metadata)
+        elif not use_r2r:
+            message["evidence"] = copy.deepcopy(turn_evidence)
+        st.session_state["messages"].append(message)
 
 
 def chatbox():
@@ -150,6 +219,8 @@ def chatbox():
 
     if st.session_state.pop("ask_without_docs", False):
         prompt = st.session_state.get("last_rag_question")
+        st.session_state["last_doc_sources"] = []
+        st.session_state["last_rag_evidence"] = []
         st.session_state["last_rag_no_result"] = False
         st.session_state["last_rag_question"] = None
         if prompt:
@@ -158,7 +229,7 @@ def chatbox():
                     response = st.write_stream(chat(prompt=prompt))
             if response:
                 st.session_state["messages"].append(
-                    {"role": "assistant", "content": response}
+                    {"role": "assistant", "content": response, "evidence": []}
                 )
 
     messages = st.session_state.get("messages", [])

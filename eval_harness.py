@@ -1,29 +1,27 @@
-"""
-DocMind AI — Comprehensive Evaluation Harness
-Covers the WHOLE project: ingestion, retrieval, generation, performance,
-robustness, and architecture. Compares plain vector RAG vs DocMind hybrid.
+"""Evaluation harness for DocMind's implemented subsystems.
 
 Run:
-  python eval_harness.py              # real embeddings + real LLM if Ollama running
-  python eval_harness.py --mock       # no Ollama required (deterministic hash embeddings, mocked LLM)
-  python eval_harness.py --suite retrieval  # run single suite
-  python eval_harness.py --quick      # alias for --mock (fast smoke test)
+  python eval_harness.py              # require Ollama embeddings; run real LLM check when available
+  python eval_harness.py --mock       # use stable hash embeddings and skip the real LLM check
+  python eval_harness.py --suite retrieval
+  python eval_harness.py --quick      # alias for --mock
 
 Suites:
-  ingestion   — file-type coverage, chunking, dedup, title-aware, cache, exclusions
-  retrieval   — hit rate, synonyms, hyphen, Hinglish, title-aware, evidence floor, BM25
-  generation  — no-hallucination fallback, citations, tone presets, multi-turn, e2e
-  performance — ingestion speed, retrieval latency, eco-mode, cache hit
-  robustness  — empty/binary handling, security validation, malformed inputs
-  architecture— backend presets, settings persistence, export, R2R/embedding helpers
+  ingestion   — loader exclusions, chunking, dedup, titles, cache, helper validation
+  retrieval   — fixture retrieval, query cleanup, evidence filtering, hybrid ranking
+  generation  — prompt guards, no-match fallback, tone prompts, history, three real LLM trials
+  performance — fixture timings, cache round-trip, Eco settings, batch shrinking
+  robustness  — empty/binary handling, URL/GitHub validation, token cleanup
+  architecture— provider definitions, export, persistence contract, R2R health mock
 
 Outputs:
-  eval_results.json — machine-readable (per-suite)
-  eval_report.md    — human report ready for README / thesis appendix
+  eval_results.json — machine-readable per-suite results
+  eval_report.md    — generated report with fixture scope and limitations
 """
 
 import argparse
 import csv
+import hashlib
 import json
 import os
 import shutil
@@ -83,13 +81,6 @@ QUERIES = [
     {"query": "tell me about the annual report", "expected": "annual_report.txt", "feature": "filler-filter"},
 ]
 
-# Generation E2E expectations (keyword must appear in answer, if LLM available)
-GEN_EXPECTATIONS = [
-    {"query": "What is the refund policy?", "must_contain": ["30 days", "refund"], "feature": "factual"},
-    {"query": "How many leave days?", "must_contain": ["20 days", "leave"], "feature": "factual"},
-    {"query": "What is the capital of France?", "must_contain": ["could not find"], "feature": "no-hallucination"},
-]
-
 ALL_SUITES = ["ingestion", "retrieval", "generation", "performance", "robustness", "architecture"]
 
 
@@ -102,6 +93,9 @@ def _setup_streamlit_state():
         import streamlit as st
         defaults = {
             "top_k": 3,
+            "candidate_depth": 10,
+            "vector_candidate_depth": 10,
+            "bm25_candidate_depth": 10,
             "similarity_cutoff": 0.3,
             "eco_mode": False,
             "chunk_size": 256,
@@ -118,6 +112,7 @@ def _setup_streamlit_state():
             "retriever": None,
             "query_engine": None,
             "last_doc_sources": [],
+            "last_rag_evidence": [],
             "last_rag_no_result": False,
         }
         for k, v in defaults.items():
@@ -153,7 +148,8 @@ def _setup_hash_embeddings():
         def _get_text_embedding(self, text: str):
             vec = [0.0] * 64
             for tok in _bm25_tokens(text):
-                h = hash(tok) % 64
+                digest = hashlib.sha256(tok.encode("utf-8")).digest()
+                h = int.from_bytes(digest[:8], "big") % 64
                 vec[h] += 1.0
             norm = sum(x * x for x in vec) ** 0.5 or 1.0
             return [x / norm for x in vec]
@@ -166,7 +162,7 @@ def _setup_hash_embeddings():
     from llama_index.core import Settings as _S
     _S.chunk_size = 256
     _S.chunk_overlap = 32
-    print("  Using deterministic hash embeddings (no Ollama).")
+    print("  Using stable hash embeddings (no Ollama).")
 
 
 def _create_index_from_docs(tmpdir: str):
@@ -286,7 +282,7 @@ def suite_ingestion(mock: bool):
                 doc.add_paragraph(DOCS["python_guide.txt"])
                 doc.save(os.path.join(d, "d.docx"))
                 docx_ok = True
-            except Exception as e:
+            except Exception:
                 docx_ok = False
                 Path(d, "d.txt").write_text(DOCS["python_guide.txt"], encoding="utf-8")
             try:
@@ -349,7 +345,7 @@ def suite_ingestion(mock: bool):
             Path(d, "ok.txt").write_text("This is a sufficiently long document content for chunking tests. " * 5, encoding="utf-8")
             docs = load_documents(d)
             try:
-                idx = create_index(docs)
+                create_index(docs)
                 # tiny doc should be filtered, but ok doc remains -> index succeeds
                 return True, f"MIN_CHARS={MIN_CHUNK_CHARS} docs_in={len(docs)}"
             except Exception as e:
@@ -384,10 +380,10 @@ def suite_retrieval(mock: bool, endpoint="http://localhost:11434", model="nomic-
     _setup_streamlit_state()
     if mock:
         _setup_hash_embeddings()
-    else:
-        if not _try_real_embeddings(endpoint, model):
-            _setup_hash_embeddings()
-            mock = True
+    elif not _try_real_embeddings(endpoint, model):
+        raise RuntimeError(
+            f"Real embeddings were required but unavailable for {model} at {endpoint}"
+        )
 
     tmpdir = tempfile.mkdtemp(prefix="docmind_eval_")
     try:
@@ -435,13 +431,14 @@ def suite_retrieval(mock: bool, endpoint="http://localhost:11434", model="nomic-
             summary[f"hybrid_{feat}_rate"] = round(hr(rows, "hybrid_hit"), 3)
 
         print(f"  Summary: hit plain {summary['plain_hit_rate']:.0%} hybrid {summary['hybrid_hit_rate']:.0%} | reject plain {summary['plain_rejection']:.0%} hybrid {summary['hybrid_rejection']:.0%} | latency plain {summary['plain_avg_ms']}ms hybrid {summary['hybrid_avg_ms']}ms")
-        score = round((summary["hybrid_hit_rate"] + summary["hybrid_rejection"]) / 2, 3)
-        return {"suite": "retrieval", "results": results, "summary": summary, "passed": sum(1 for r in results if r["hybrid_hit"]), "total": len(results), "score": score}
+        passed = sum(1 for r in results if r["hybrid_hit"])
+        score = round(passed / len(results), 3) if results else 0
+        return {"suite": "retrieval", "results": results, "summary": summary, "passed": passed, "total": len(results), "score": score}
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-def suite_generation(mock: bool, endpoint="http://localhost:11434"):
+def suite_generation(mock: bool, endpoint="http://localhost:11434", model="nomic-embed-text:latest"):
     print("\n[Suite] Generation (RAG answer quality)")
     results = []
 
@@ -450,7 +447,8 @@ def suite_generation(mock: bool, endpoint="http://localhost:11434"):
             t0 = time.perf_counter()
             ok, detail = fn()
             dt = int((time.perf_counter() - t0) * 1000)
-            print(f"  {'PASS' if ok else 'FAIL'}  {name:32s}  {detail} ({dt}ms)")
+            status = "SKIP" if ok is None else ("PASS" if ok else "FAIL")
+            print(f"  {status}  {name:32s}  {detail} ({dt}ms)")
             results.append({"test": name, "pass": ok, "detail": detail, "ms": dt})
         except Exception as e:
             print(f"  FAIL  {name:32s}  exception: {e}")
@@ -473,8 +471,8 @@ def suite_generation(mock: bool, endpoint="http://localhost:11434"):
         return (ok1 and ok2 and ok3), f"hyphen={ok1} hinglish={ok2} synonym={ok3}"
     check("query_helpers", t_query_helpers)
 
-    # 3 — context_chat no-hallucination fallback (mock retriever returns [])
-    def t_no_hallucination():
+    # 3 — context_chat no-match fallback (mock retriever returns [])
+    def t_no_match():
         from unittest.mock import patch, MagicMock
         from utils import ollama as oll_mod
         import streamlit as st
@@ -487,13 +485,13 @@ def suite_generation(mock: bool, endpoint="http://localhost:11434"):
         st.session_state["retriever"] = fake_qe._retriever
         st.session_state["query_engine"] = fake_qe
         # mock LLM to ensure not called
-        with patch.object(oll_mod, "create_llm") as mock_llm:
+        with patch.object(oll_mod, "create_llm"):
             from utils.ollama import context_chat
             chunks = list(context_chat("quantum physics", query_engine=fake_qe))
             text = "".join(chunks)
             ok = "could not find" in text.lower()
             return ok, f"fallback={'hit' if ok else 'miss'}"
-    check("no_hallucination_fallback", t_no_hallucination)
+    check("no_match_fallback", t_no_match)
 
     # 4 — tone presets produce distinct prompts
     def t_tone():
@@ -541,7 +539,7 @@ def suite_generation(mock: bool, endpoint="http://localhost:11434"):
     # 6 — e2e with real LLM if available (best effort)
     def t_e2e_real():
         if mock:
-            return True, "skipped (mock mode)"
+            return None, "skipped (mock mode)"
         try:
             import streamlit as st
             from utils.llama_index import create_index, load_documents, build_hybrid_retriever
@@ -554,7 +552,9 @@ def suite_generation(mock: bool, endpoint="http://localhost:11434"):
             models = [m.get("model") or m.get("name") for m in client.list().get("models", [])]
             has_llm = any("qwen" in m or "llama" in m for m in (models or []))
             if not has_llm:
-                return True, "skipped (no chat model)"
+                return None, "skipped (no chat model)"
+            if not _try_real_embeddings(endpoint, model):
+                return False, f"real embeddings unavailable for {model}"
             # build tiny index and query it end-to-end
             _setup_streamlit_state()
             d = tempfile.mkdtemp()
@@ -571,18 +571,27 @@ def suite_generation(mock: bool, endpoint="http://localhost:11434"):
                 st.session_state["retriever"] = build_hybrid_retriever(vr, idx, top_k=3, similarity_cutoff=0.3)
                 st.session_state["query_engine"] = qe
                 st.session_state["messages"] = []
-                chunks = list(context_chat("What is the refund policy?", query_engine=qe))
-                answer = "".join(chunks)
-                ok = "30" in answer and ("day" in answer.lower() or "refund" in answer.lower())
-                return ok, f"answer_len={len(answer)} has_30days={ok} preview={answer[:80]!r}"
+                answers = []
+                for _ in range(3):
+                    answers.append("".join(context_chat("What is the refund policy?", query_engine=qe)))
+                successful = sum(
+                    "30" in answer and ("day" in answer.lower() or "refund" in answer.lower())
+                    for answer in answers
+                )
+                ok = successful >= 2
+                preview = answers[0][:80]
+                return ok, f"successful={successful}/3 lengths={[len(answer) for answer in answers]} preview={preview!r}"
             finally:
                 shutil.rmtree(d, ignore_errors=True)
         except Exception as e:
             return False, f"e2e failed: {e}"
     check("e2e_real_llm", t_e2e_real)
 
-    passed = sum(1 for r in results if r["pass"])
-    return {"suite": "generation", "results": results, "passed": passed, "total": len(results), "score": round(passed / len(results), 3) if results else 0}
+    passed = sum(1 for r in results if r["pass"] is True)
+    skipped = sum(1 for r in results if r["pass"] is None)
+    scored = len(results) - skipped
+    score = round(passed / scored, 3) if scored else 0
+    return {"suite": "generation", "results": results, "passed": passed, "skipped": skipped, "scored": scored, "total": len(results), "score": score}
 
 
 def suite_performance(mock: bool, endpoint="http://localhost:11434", model="nomic-embed-text:latest"):
@@ -593,7 +602,8 @@ def suite_performance(mock: bool, endpoint="http://localhost:11434", model="nomi
             t0 = time.perf_counter()
             ok, detail = fn()
             dt = int((time.perf_counter() - t0) * 1000)
-            print(f"  {'PASS' if ok else 'FAIL'}  {name:32s}  {detail} ({dt}ms)")
+            status = "SKIP" if ok is None else ("PASS" if ok else "FAIL")
+            print(f"  {status}  {name:32s}  {detail} ({dt}ms)")
             results.append({"test": name, "pass": ok, "detail": detail, "ms": dt})
         except Exception as e:
             print(f"  FAIL  {name:32s}  {e}")
@@ -604,9 +614,10 @@ def suite_performance(mock: bool, endpoint="http://localhost:11434", model="nomi
         _setup_streamlit_state()
         if mock:
             _setup_hash_embeddings()
-        else:
-            if not _try_real_embeddings(endpoint, model):
-                _setup_hash_embeddings()
+        elif not _try_real_embeddings(endpoint, model):
+            raise RuntimeError(
+                f"Real embeddings were required but unavailable for {model} at {endpoint}"
+            )
         d = tempfile.mkdtemp()
         try:
             for n, c in DOCS.items():
@@ -622,7 +633,7 @@ def suite_performance(mock: bool, endpoint="http://localhost:11434", model="nomi
             shutil.rmtree(d, ignore_errors=True)
     check("ingest_5_docs", t_ingest_speed)
 
-    # 2 — cache hit is faster than cold build
+    # 2 — persisted index cache round-trip
     def t_cache_speed():
         from utils.llama_index import load_documents, create_index, index_cache_dir, load_index_from_cache, persist_index_to_cache
         _setup_streamlit_state()
@@ -635,12 +646,12 @@ def suite_performance(mock: bool, endpoint="http://localhost:11434", model="nomi
             if cdir:
                 persist_index_to_cache(idx, cdir)
                 t0 = time.perf_counter(); loaded = load_index_from_cache(cdir); hit = time.perf_counter() - t0
-                ok = loaded is not None  # cache hit itself is the win; tiny docs make timing noisy
-                return ok, f"cold {cold:.1f}s vs cache {hit:.2f}s"
-            return True, f"cold {cold:.1f}s (no cache dir)"
+                ok = loaded is not None
+                return ok, f"cold {cold:.1f}s vs cache load {hit:.2f}s"
+            return None, f"cold {cold:.1f}s (cache unavailable)"
         finally:
             shutil.rmtree(d, ignore_errors=True)
-    check("cache_hit_faster", t_cache_speed)
+    check("cache_round_trip", t_cache_speed)
 
     # 3 — retrieval latency hybrid vs plain (from retrieval suite) — lightweight check
     def t_retrieval_latency():
@@ -695,8 +706,11 @@ def suite_performance(mock: bool, endpoint="http://localhost:11434", model="nomi
         return ok, f"shrunk to {emb.embed_batch_size} after OOM"
     check("batch_oom_resilience", t_batch_oom)
 
-    passed = sum(1 for r in results if r["pass"])
-    return {"suite": "performance", "results": results, "passed": passed, "total": len(results), "score": round(passed / len(results), 3) if results else 0}
+    passed = sum(1 for r in results if r["pass"] is True)
+    skipped = sum(1 for r in results if r["pass"] is None)
+    scored = len(results) - skipped
+    score = round(passed / scored, 3) if scored else 0
+    return {"suite": "performance", "results": results, "passed": passed, "skipped": skipped, "scored": scored, "total": len(results), "score": score}
 
 
 def suite_robustness(mock: bool):
@@ -812,9 +826,16 @@ def suite_architecture(mock: bool):
 
     def t_presets():
         from components.tabs.settings import BACKEND_PRESETS
-        ok = "Ollama" in BACKEND_PRESETS and "OpenAI" in BACKEND_PRESETS and "LM Studio (Local AI)" in BACKEND_PRESETS
-        return ok, f"presets={list(BACKEND_PRESETS.keys())}"
-    check("backend_presets", t_presets)
+        expected = {
+            "Ollama",
+            "OpenAI",
+            "LM Studio (Local AI)",
+            "TabbyAPI",
+            "OpenAI-compatible",
+        }
+        ok = set(BACKEND_PRESETS) == expected
+        return ok, f"definitions={list(BACKEND_PRESETS.keys())}"
+    check("backend_preset_definitions", t_presets)
 
     def t_export():
         from components.tabs.settings import chat_history_docx
@@ -824,10 +845,15 @@ def suite_architecture(mock: bool):
     check("export_docx", t_export)
 
     def t_browser_settings():
-        from utils.browser_settings import PERSISTED_SETTINGS_HASH_STATE_KEY
-        ok = isinstance(PERSISTED_SETTINGS_HASH_STATE_KEY, str) and len(PERSISTED_SETTINGS_HASH_STATE_KEY) > 5
-        return ok, f"key={PERSISTED_SETTINGS_HASH_STATE_KEY}"
-    check("browser_settings_keys", t_browser_settings)
+        from utils.browser_settings import PERSISTED_SETTING_TYPES, PERSISTED_SETTINGS_HASH_STATE_KEY
+        secrets_excluded = not {"openai_api_key", "r2r_api_key"} & set(PERSISTED_SETTING_TYPES)
+        ok = (
+            isinstance(PERSISTED_SETTINGS_HASH_STATE_KEY, str)
+            and len(PERSISTED_SETTINGS_HASH_STATE_KEY) > 5
+            and secrets_excluded
+        )
+        return ok, f"settings={len(PERSISTED_SETTING_TYPES)} secrets_excluded={secrets_excluded}"
+    check("browser_settings_contract", t_browser_settings)
 
     def t_ollama_helpers():
         from utils.ollama import _estimate_tokens, _trim_history
@@ -909,7 +935,7 @@ def run_full_eval(endpoint="http://localhost:11434", model="nomic-embed-text:lat
     suite_fns = {
         "ingestion": lambda: suite_ingestion(use_mock),
         "retrieval": lambda: suite_retrieval(use_mock, endpoint, model),
-        "generation": lambda: suite_generation(use_mock, endpoint),
+        "generation": lambda: suite_generation(use_mock, endpoint, model),
         "performance": lambda: suite_performance(use_mock, endpoint, model),
         "robustness": lambda: suite_robustness(use_mock),
         "architecture": lambda: suite_architecture(use_mock),
@@ -924,24 +950,56 @@ def run_full_eval(endpoint="http://localhost:11434", model="nomic-embed-text:lat
                 import traceback; traceback.print_exc()
                 all_results[name] = {"suite": name, "passed": 0, "total": 0, "score": 0, "error": str(e), "results": []}
 
-    # Overall score (mean of suite scores)
-    scores = [v["score"] for v in all_results.values() if "score" in v]
-    overall = round(sum(scores) / len(scores), 3) if scores else 0
+    for result in all_results.values():
+        rows = result.get("results", [])
+        if result.get("suite") == "retrieval":
+            skipped = 0
+            total = len(rows)
+            scored = total
+            passed = sum(1 for row in rows if row.get("hybrid_hit") is True)
+        else:
+            skipped = sum(1 for row in rows if row.get("pass") is None)
+            total = result.get("total", len(rows))
+            scored = max(total - skipped, 0)
+            passed = sum(1 for row in rows if row.get("pass") is True)
+        result["skipped"] = skipped
+        result["scored"] = scored
+        result["passed"] = passed
+        result["total"] = total
+        result["score"] = round(passed / scored, 3) if scored else 0
+
     total_pass = sum(v.get("passed", 0) for v in all_results.values())
+    total_scored = sum(v.get("scored", 0) for v in all_results.values())
+    total_skipped = sum(v.get("skipped", 0) for v in all_results.values())
     total_tests = sum(v.get("total", 0) for v in all_results.values())
+    overall = round(total_pass / total_scored, 3) if total_scored else 0
 
     print("\n" + "=" * 60)
-    print(f" Overall: {total_pass}/{total_tests} passed  —  score {overall:.0%}")
+    print(
+        f" Overall: {total_pass}/{total_scored} scored checks passed"
+        f"  —  {total_skipped} skipped  —  score {overall:.1%}"
+    )
     for name in target:
         r = all_results.get(name, {})
-        print(f"   {name:14s} {r.get('passed',0)}/{r.get('total',0)}  {r.get('score',0):.0%}")
+        print(
+            f"   {name:14s} {r.get('passed',0)}/{r.get('scored',0)}"
+            f"  skipped={r.get('skipped',0)}  {r.get('score',0):.1%}"
+        )
     print("=" * 60)
 
-    return all_results, {"overall_score": overall, "passed": total_pass, "total": total_tests, "suites": list(target)}
+    return all_results, {
+        "overall_score": overall,
+        "passed": total_pass,
+        "scored": total_scored,
+        "skipped": total_skipped,
+        "total": total_tests,
+        "suites": list(target),
+    }
 
 
 def _write_outputs(all_results, overall, out_dir="."):
     out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
     # JSON
     payload = {
         "meta": {"generated": time.strftime("%Y-%m-%d %H:%M"), "overall": overall},
@@ -958,25 +1016,31 @@ def _write_outputs(all_results, overall, out_dir="."):
     md = []
     md.append("# DocMind AI — Full Project Evaluation Report")
     md.append("")
-    md.append(f"_Generated {time.strftime('%Y-%m-%d %H:%M')} — overall score **{overall['overall_score']:.0%}** ({overall['passed']}/{overall['total']} tests)_")
+    md.append(
+        f"_Generated {time.strftime('%Y-%m-%d %H:%M')} — "
+        f"{overall['passed']}/{overall['scored']} scored checks passed, "
+        f"{overall['skipped']} skipped, raw score **{overall['overall_score']:.1%}**_"
+    )
     md.append("")
-    md.append("## Summary (suite scores)")
+    md.append("This harness uses small local fixtures. It is not a browser test, a production load test, or proof that generated answers are always factually grounded.")
     md.append("")
-    md.append("| Suite | Passed | Score | What it covers |")
-    md.append("|---|---:|---:|---|")
+    md.append("## Summary")
+    md.append("")
+    md.append("| Suite | Passed | Skipped | Score | Scope |")
+    md.append("|---|---:|---:|---:|---|")
     descs = {
-        "ingestion": "File types, chunking, dedup, title-aware, cache, exclusions",
-        "retrieval": "Hybrid BM25+vector vs plain, synonyms, Hyphen/Hinglish, evidence floor",
-        "generation": "No-hallucination fallback, citations, tone presets, multi-turn, e2e",
-        "performance": "Ingest speed, retrieval latency, eco-mode, cache hit, OOM resilience",
-        "robustness": "Empty/binary handling, security (GitHub/URL validation), special chars",
-        "architecture": "Backend presets, export, settings persistence, import boundaries",
+        "ingestion": "Loader exclusions, selected formats, chunking, dedup, titles, cache, helper validation",
+        "retrieval": "Fixture retrieval, query cleanup, hybrid ranking, and no-match rejection",
+        "generation": "Prompt guards, mocked no-match path, tone prompts, history, three real LLM trials",
+        "performance": "Small-fixture timings, cache round-trip, Eco settings, batch shrinking",
+        "robustness": "Empty/binary handling, URL/GitHub validation, token cleanup",
+        "architecture": "Provider definitions, export, persistence contract, mocked R2R health",
     }
     for name in ALL_SUITES:
         if name not in all_results: continue
         r = all_results[name]
-        md.append(f"| {name} | {r.get('passed',0)}/{r.get('total',0)} | **{r.get('score',0):.0%}** | {descs.get(name,'')} |")
-    md.append(f"| **Overall** | **{overall['passed']}/{overall['total']}** | **{overall['overall_score']:.0%}** | |")
+        md.append(f"| {name} | {r.get('passed',0)}/{r.get('scored',0)} | {r.get('skipped',0)} | **{r.get('score',0):.1%}** | {descs.get(name,'')} |")
+    md.append(f"| **Overall** | **{overall['passed']}/{overall['scored']}** | **{overall['skipped']}** | **{overall['overall_score']:.1%}** | Raw scored-check rate |")
     md.append("")
 
     # Retrieval deep-dive table (most important for README)
@@ -1009,41 +1073,44 @@ def _write_outputs(all_results, overall, out_dir="."):
     for name in ALL_SUITES:
         if name not in all_results or name == "retrieval": continue
         r = all_results[name]
-        md.append(f"## Suite: {name} ({r.get('passed',0)}/{r.get('total',0)} — {r.get('score',0):.0%})")
+        md.append(f"## Suite: {name} ({r.get('passed',0)}/{r.get('scored',0)} scored, {r.get('skipped',0)} skipped — {r.get('score',0):.1%})")
         md.append("")
         md.append("| Test | Pass | Detail |")
         md.append("|---|:---:|---|")
         for t in r.get("results", []):
-            p = "✓" if t.get("pass") else "✗"
+            status = "SKIP" if t.get("pass") is None else ("PASS" if t.get("pass") else "FAIL")
             d = (t.get("detail") or "")[:120].replace("|", "/")
             ms = f" {t.get('ms','')}ms" if "ms" in t else ""
-            md.append(f"| {t.get('test','')} | {p} | {d}{ms} |")
+            md.append(f"| {t.get('test','')} | {status} | {d}{ms} |")
         md.append("")
 
-    md.append("## What DocMind adds vs plain vector RAG")
+    md.append("## Implemented Retrieval Features")
     md.append("")
-    md.append("- **Hybrid BM25 + vector (RRF)** — keyword hits rescue low vector scores; `utils/llama_index.py:260`")
-    md.append("- **Evidence floor (0.5)** — weak scores need BM25 evidence or the query is correctly rejected; `utils/llama_index.py:75`")
-    md.append("- **Synonym expansion** — short queries expand (refund→return/money back) for BM25 only; `utils/llama_index.py:201`")
-    md.append("- **Hyphen & Hinglish** — `30-day`→`30 day`, filler words `batao/kya/hai` removed; `utils/llama_index.py:184`")
-    md.append("- **Title-aware chunks** — every chunk prefixed with its document title; `utils/llama_index.py:141`")
-    md.append("- **Dedup & cache** — near-duplicate filtering + on-disk index cache; `utils/llama_index.py:108`, `834`")
-    md.append("- **Eco Mode** — trims batches/context for cool & fast answers; `utils/llama_index.py:166`, `utils/ollama.py:100`")
-    md.append("- **No-hallucination fallback** — `I could not find this information…` and `Ask without documents`; `utils/ollama.py:528`")
+    md.append("- Vector candidates are fused with a CPU BM25 ranking through Reciprocal Rank Fusion.")
+    md.append("- With a positive similarity cutoff, weak vector candidates require positive BM25 evidence.")
+    md.append("- Short queries can receive curated BM25 synonym tokens; the vector query remains separate.")
+    md.append("- Hyphens are split, basic number words are normalized, and selected filler words are removed.")
+    md.append("- File-backed chunks receive a title prefix; website documents use source URLs without file titles.")
+    md.append("- A stemmed-token overlap filter removes near-duplicate chunks before embedding.")
+    md.append("- Up to five persisted index directories are retained when cache writes are available.")
+    md.append("- Eco Mode lowers configured embedding batch, output, and context limits; actual speed and heat depend on hardware and model.")
+    md.append("- Empty local retrieval returns a fixed no-match message. This does not verify factual support for non-empty answers.")
     md.append("")
 
-    md.append("## Reproducibility")
+    md.append("## Running the Harness")
     md.append("")
     md.append("```bash")
-    md.append("# real embeddings + LLM (needs Ollama running)")
+    md.append("# Requires the configured Ollama embedding model; the real LLM check is skipped when unavailable")
     md.append("python eval_harness.py")
     md.append("")
-    md.append("# deterministic, no server (CI-friendly)")
+    md.append("# Uses stable hash embeddings and skips the real LLM check")
     md.append("python eval_harness.py --mock")
     md.append("")
-    md.append("# single suite")
-    md.append("python eval_harness.py --suite retrieval")
+    md.append("# Run one suite and write results to a chosen directory")
+    md.append("python eval_harness.py --suite retrieval --out ./eval-output")
     md.append("```")
+    md.append("")
+    md.append("The mock suite still exercises validation paths that perform DNS resolution. The project does not currently commit a dependency lockfile, so package versions can vary between environments.")
 
     (out_dir / "eval_report.md").write_text("\n".join(md), encoding="utf-8")
     print(f"\nWrote {out_dir/'eval_results.json'} and {out_dir/'eval_report.md'}")
@@ -1065,3 +1132,4 @@ if __name__ == "__main__":
 
     all_results, overall = run_full_eval(endpoint=args.endpoint, model=args.model, use_mock=use_mock, suites=suites)
     _write_outputs(all_results, overall, out_dir=args.out)
+    raise SystemExit(1 if overall["passed"] != overall["scored"] else 0)

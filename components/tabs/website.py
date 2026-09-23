@@ -1,12 +1,16 @@
+from urllib.parse import urlparse
+
 import streamlit as st
 
-import utils.rag_pipeline as rag
-import utils.helpers as func
-from components.ingestion_prerequisites import (
-    ingestion_is_configured,
+from components.ingestion_prerequisites import ingestion_is_configured
+from utils import helpers as func
+from utils import rag_pipeline as rag
+from utils.source_state import (
+    effective_indexing_settings,
+    ensure_active_source,
+    mark_active_index_stale_if_needed,
+    source_identity,
 )
-
-from urllib.parse import urlparse
 
 
 def ensure_https(url):
@@ -23,8 +27,12 @@ def add_website_from_input():
     if new_website == "":
         return
 
+    candidate = ensure_https(new_website)
+    existing = list(st.session_state.get("websites", []))
     try:
-        validated_website = func.validate_website_urls([ensure_https(new_website)])[0]
+        if len(existing) >= func.MAX_WEBSITE_URLS and candidate not in existing:
+            func.validate_website_url_limit([*existing, candidate])
+        validated_website = func.validate_website_urls([candidate])[0]
     except ValueError as err:
         st.session_state["website_input_error"] = str(err)
         return
@@ -35,7 +43,19 @@ def add_website_from_input():
     st.session_state["website_input_error"] = None
 
 
+def clear_websites():
+    st.session_state["websites"] = []
+    st.session_state["new_website"] = ""
+    st.session_state["website_input_error"] = None
+
+
 def website():
+    try:
+        effective_indexing_settings(st.session_state)
+        mark_active_index_stale_if_needed(st.session_state)
+    except ValueError as err:
+        st.error(str(err))
+        return
     if not ingestion_is_configured():
         st.text_input(
             "Enter a Website",
@@ -57,37 +77,40 @@ def website():
             on_change=add_website_from_input,
         )
     with col2:
-        add_button = st.button("➕", help="Add URL to list")
-
-    if add_button:
-        add_website_from_input()
+        st.button("➕", help="Add URL to list", on_click=add_website_from_input)
 
     if st.session_state.get("website_input_error"):
         st.error(st.session_state["website_input_error"])
 
     if len(st.session_state.get("websites", [])) > 0:
-        st.markdown(f"<p>Website(s)</p>", unsafe_allow_html=True)
+        st.markdown("<p>Website(s)</p>", unsafe_allow_html=True)
         for site in st.session_state["websites"]:
             st.caption(f"- {site}")
         st.write("")
 
     col_proc, col_clr = st.columns([1, 1])
     with col_proc:
-        process_button = st.button("Process", key="process_website")
+        process_button = st.button(
+            "Process", key="process_website", on_click=add_website_from_input
+        )
     with col_clr:
         if len(st.session_state.get("websites", [])) > 0:
-            if st.button("Clear List", key="clear_websites"):
-                st.session_state["websites"] = []
-                st.session_state["new_website"] = ""
-                st.session_state["website_input_error"] = None
-                st.rerun()
+            st.button(
+                "Clear List", key="clear_websites", on_click=clear_websites
+            )
 
     if process_button:
-        if st.session_state.get("new_website", "").strip():
-            add_website_from_input()
-
         if len(st.session_state.get("websites", [])) == 0:
             st.warning("Please enter a website URL (e.g. https://docs.python.org/3/) before processing.")
+            return
+
+        try:
+            urls = func.validate_website_url_limit(
+                st.session_state.get("websites", [])
+            )
+            deadline = func.website_ingestion_deadline()
+        except ValueError as err:
+            st.error(func.website_error_message(err))
             return
 
         status_container = st.empty()
@@ -95,28 +118,53 @@ def website():
 
         with st.spinner("Processing..."):
             try:
+                st.session_state["last_ingestion_error"] = None
                 rag.render_pipeline_status(
                     status_container, completed_stages, "Fetching Websites"
                 )
-                documents = func.load_website_documents(st.session_state["websites"])
+                documents, website_report = func.load_website_documents(
+                    urls,
+                    deadline=deadline,
+                    return_report=True,
+                )
                 completed_stages.append("Websites Fetched")
                 rag.render_pipeline_status(status_container, completed_stages)
             except Exception as err:
-                st.error(f"Failed to fetch website content: {err}")
+                st.session_state["last_ingestion_error"] = func.website_error_message(err)
+                st.error(f"Failed to fetch website content: {func.website_error_message(err)}")
                 st.stop()
+                return
 
             if len(documents) > 0:
-                # Initiate the RAG pipeline, providing documents to be saved on disk if necessary
+                urls = sorted(
+                    entry["filename"] for entry in website_report
+                )
+                content_signature = source_identity("website", urls)
                 error = rag.rag_pipeline(
                     documents=documents,
                     status_container=status_container,
                     initial_stages=completed_stages,
                     status_state_key="website_ingestion_stages",
                     documents_loaded_stage="Website Content Loaded",
+                    source_kind="website",
+                    source_id=content_signature,
+                    display_name=", ".join(urls),
+                    source_uri=urls[0] if len(urls) == 1 else None,
+                    content_signature=content_signature,
+                    deadline=deadline,
+                    ingestion_report=website_report,
                 )
 
-                # Display errors (if any) or proceed
                 if error is not None:
-                    st.exception(error)
+                    if getattr(error, "category", None):
+                        st.error(func.website_error_message(error))
+                    else:
+                        st.exception(error)
                 else:
+                    st.session_state["processed_website_urls"] = urls
+                    active_source = ensure_active_source(st.session_state)
+                    rag.render_extraction_report(
+                        source_id=active_source.get("id"),
+                        index_generation=active_source.get("index_generation"),
+                    )
                     st.write("Site processing completed. Let's chat! 😎")

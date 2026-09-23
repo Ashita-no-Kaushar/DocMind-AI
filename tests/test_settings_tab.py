@@ -1,6 +1,11 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
+
+from components.ingestion_prerequisites import missing_ingestion_settings
 from components.tabs import settings as settings_tab
+
+
 class _Container:
     def __enter__(self):
         return self
@@ -74,7 +79,16 @@ class SettingsTabTests(unittest.TestCase):
             if "key" in kwargs
         }
         self.assertNotIn("index", keyed_selectboxes["selected_model"])
-        self.assertNotIn("index", keyed_selectboxes["ollama_embedding_model"])
+        self.assertNotIn("index", keyed_selectboxes["embedding_model"])
+
+    def test_r2r_bypasses_local_settings_only_for_local_uploads(self):
+        state = {"r2r_enabled": True, "llm_backend": "Ollama"}
+        with patch(
+            "components.ingestion_prerequisites.st",
+            SimpleNamespace(session_state=state),
+        ):
+            self.assertEqual(missing_ingestion_settings(allow_r2r=True), [])
+            self.assertTrue(missing_ingestion_settings())
 
     def test_advanced_settings_apply_temperature_and_proportional_overlap(self):
         state = {

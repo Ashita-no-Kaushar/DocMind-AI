@@ -1,8 +1,11 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from components.tabs.local_files import (
     upload_limit_help_text,
     should_process_uploads,
+    upload_processing_signature,
     uploaded_files_signature,
 )
 
@@ -30,6 +33,60 @@ class UploadedFilesSignatureTests(unittest.TestCase):
         second = [FakeUpload('resume.pdf', b'abd')]
 
         self.assertNotEqual(uploaded_files_signature(first), uploaded_files_signature(second))
+
+
+    def test_processing_signature_does_not_change_with_chat_only_settings(self):
+        upload = [FakeUpload('resume.pdf', b'abc')]
+        first_state = {
+            "llm_backend": "Ollama",
+            "ollama_endpoint": "http://localhost:11434",
+            "ollama_embedding_model": "embedding-a",
+            "selected_model": "chat-a",
+            "answer_style": "Concise",
+            "chunk_size": 256,
+            "chunk_overlap_pct": 12,
+        }
+        second_state = {
+            **first_state,
+            "selected_model": "chat-b",
+            "answer_style": "Detailed",
+        }
+        with patch(
+            "components.tabs.local_files.st",
+            SimpleNamespace(session_state=first_state),
+        ):
+            first = upload_processing_signature(upload)
+        with patch(
+            "components.tabs.local_files.st",
+            SimpleNamespace(session_state=second_state),
+        ):
+            second = upload_processing_signature(upload)
+        self.assertEqual(first, second)
+
+    def test_processing_signature_changes_with_index_settings(self):
+        upload = [FakeUpload('resume.pdf', b'abc')]
+        first_state = {
+            "llm_backend": "Ollama",
+            "ollama_endpoint": "http://localhost:11434",
+            "selected_model": "model-a",
+            "ollama_embedding_model": "embedding-a",
+            "chunk_size": 256,
+            "chunk_overlap": 32,
+        }
+        second_state = {**first_state, "ollama_embedding_model": "embedding-b"}
+
+        with patch(
+            "components.tabs.local_files.st",
+            SimpleNamespace(session_state=first_state),
+        ):
+            first = upload_processing_signature(upload)
+        with patch(
+            "components.tabs.local_files.st",
+            SimpleNamespace(session_state=second_state),
+        ):
+            second = upload_processing_signature(upload)
+
+        self.assertNotEqual(first, second)
 
 
 class ShouldProcessUploadsTests(unittest.TestCase):

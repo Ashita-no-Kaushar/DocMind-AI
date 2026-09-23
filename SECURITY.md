@@ -2,39 +2,73 @@
 
 ## Reporting a Vulnerability
 
-Please report suspected vulnerabilities through GitHub's private vulnerability reporting for this repository:
+If GitHub private vulnerability reporting is available for this repository, use it. Otherwise open a public issue without exploit details, credentials, private documents, or sensitive local paths and request a private contact method.
 
-https://github.com/Ashita-no-Kaushar/DocMind-AI/security/advisories/new
+Security-sensitive areas include:
 
-If private reporting is unavailable, open a [GitHub issue](https://github.com/Ashita-no-Kaushar/DocMind-AI/issues) and avoid including exploit details, private data, credentials, or sensitive local files in the public report.
+- Upload validation and path containment
+- Website URL validation, redirects, and SSRF resistance
+- GitHub cloning and repository file handling
+- External LLM, embedding, and R2R endpoints
+- API-key handling
+- Local index/cache contents and logs
+- Docker filesystem and network exposure
 
-## Response Expectations
+## Deployment Assumptions
 
-Security reports are reviewed as soon as practical, with an initial response target of 14 days or less. Confirmed medium, high, or critical vulnerabilities are prioritized for a fix and release.
+DocMind currently has no application authentication and uses process-wide temporary/cache paths. It is designed for local, single-user use. Do not expose it directly to an untrusted network without an authentication and isolation layer.
 
-## Supported Versions
+## Implemented Guardrails
 
-The project currently supports the latest released version. Users should upgrade to the newest GitHub release when security fixes are published:
+### Local Files
 
-https://github.com/Ashita-no-Kaushar/DocMind-AI/releases
+- 25-extension allowlist
+- 10-file, 25 MiB/file, and 100 MiB total limits
+- Restricted filename characters
+- Resolved destination containment
+- No executable/archive extensions in the upload allowlist
+- Explicit current-upload loading rather than scanning arbitrary stale files
 
-## Scope
+### Directory and GitHub Content
 
-Reports are most useful when they include:
+- Hidden paths and configured binary/archive/environment patterns excluded
+- File symlinks rejected
+- Resolved files required to remain under the selected source root
+- GitHub input restricted to exactly `owner/repo` on `github.com`
+- Dot-segment repository names rejected
+- Git invoked without a shell and with a 120-second timeout
 
-- The affected DocMind version or commit.
-- The operating system and deployment method.
-- Clear reproduction steps.
-- The expected and actual security impact.
+### Websites
 
-Do not include sensitive documents, private repository contents, model prompts containing secrets, or local credentials in reports.
+- HTTPS only
+- Embedded credentials rejected
+- Blocked hostnames
+- DNS resolution checks every returned A and AAAA address against private, loopback, link-local, multicast, reserved, unspecified, and other non-global ranges
+- Known cloud metadata hostnames and addresses rejected
+- HTTPS connections pinned to a validated numeric address while preserving hostname certificate verification
+- Redirect targets revalidated, up to three redirects
+- Per-request timeouts, a 180-second total ingestion deadline, and categorized failures
+- HTML/plain-text content types only
+- 5 MiB streamed response cap
+- Responses and connection pools closed on success and failure
 
-## Security Features
+### Provider and Secret Handling
 
-DocMind includes guardrails for common ingestion risks:
+- Browser persistence excludes OpenAI and R2R API keys
+- R2R documents are uploaded only when the user enables R2R and uses that path
+- The default Ollama endpoint is local, but users can configure remote endpoints
+- Logging falls back to console if the configured log file is not writable
 
-- Upload size and type validation (see `utils/helpers.py`).
-- URL validation and private/loopback IP blocking for website ingestion.
-- GitHub repository validation with subprocess isolation and timeouts.
-- Ollama endpoint handling with no secrets persisted beyond browser-local storage.
-- Hardened Docker deployment: read-only filesystem, dropped capabilities, no new privileges, resource limits.
+## Important Risks
+
+- External OpenAI-compatible and R2R servers receive data from the configured workflow.
+- Local index caches and logs can contain extracted document text.
+- GitHub content is cloned with the permissions of the application user; `subprocess.run` is not a sandbox.
+- Clone and parser resource limits are applied after or incompletely relative to ingestion.
+- The app has no user authentication or per-session filesystem isolation.
+- Docker has a read-only root filesystem and dropped capabilities, but runtime verification is still required.
+- A citation marker does not verify factual support.
+
+## Dependency and Deployment Status
+
+The project currently uses wildcard dependency versions and does not commit a lockfile. Docker configuration was statically reviewed but not built in the latest local environment.

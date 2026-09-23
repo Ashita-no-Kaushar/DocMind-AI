@@ -17,6 +17,7 @@ from utils.llama_index import (
     _prepend_document_title,
     _rewrite_query,
     _text_overlap_ratio,
+    index_cache_key,
     setup_embedding_model,
     verify_embedding_model,
 )
@@ -55,6 +56,67 @@ class _FakeOllamaClient:
         if model_name == "nomic-embed-text:latest":
             return {"capabilities": ["embedding"]}
         return {"capabilities": ["completion"]}
+
+
+class QueryEngineCandidateTests(unittest.TestCase):
+    def test_candidate_bundle_does_not_mutate_session_state(self):
+        import utils.llama_index as llama_index
+
+        class FakeQueryEngine:
+            def update_prompts(self, prompts):
+                self.prompts = prompts
+
+        class FakeIndex:
+            def as_query_engine(self, **kwargs):
+                return FakeQueryEngine()
+
+            def as_retriever(self, **kwargs):
+                return object()
+
+        state = {"query_engine": object(), "retriever": object(), "top_k": 3}
+        original_engine = state["query_engine"]
+        original_retriever = state["retriever"]
+        with patch.object(llama_index, "st", SimpleNamespace(session_state=state)), patch.object(
+            llama_index, "index_cache_dir", return_value=None
+        ), patch.object(llama_index, "create_index", return_value=FakeIndex()):
+            bundle = llama_index.create_query_engine(
+                [Document(text="a document with enough content")],
+                settings={"chunk_size": 256, "chunk_overlap": 30},
+                source_identity="local-content",
+            )
+
+        self.assertEqual(
+            set(bundle), {"query_engine", "retriever", "index", "cache_key"}
+        )
+        self.assertIs(state["query_engine"], original_engine)
+        self.assertIs(state["retriever"], original_retriever)
+
+
+class IndexCacheKeyTests(unittest.TestCase):
+    def test_cache_key_includes_source_metadata_and_endpoint(self):
+        original = getattr(Settings, "_embed_model", None)
+        original_chunk_size = Settings.chunk_size
+        original_chunk_overlap = Settings.chunk_overlap
+        try:
+            Settings.chunk_size = 256
+            Settings.chunk_overlap = 32
+            Settings.embed_model = OllamaEmbedding(
+                model_name="embedding-model", base_url="http://one"
+            )
+            first = [Document(text="same text", metadata={"file_name": "a.txt"})]
+            renamed = [Document(text="same text", metadata={"file_name": "b.txt"})]
+
+            self.assertNotEqual(index_cache_key(first), index_cache_key(renamed))
+            first_key = index_cache_key(first)
+
+            Settings.embed_model = OllamaEmbedding(
+                model_name="embedding-model", base_url="http://two"
+            )
+            self.assertNotEqual(first_key, index_cache_key(first))
+        finally:
+            Settings.embed_model = original
+            Settings.chunk_size = original_chunk_size
+            Settings.chunk_overlap = original_chunk_overlap
 
 
 class EmbeddingModelValidationTests(unittest.TestCase):
@@ -104,13 +166,13 @@ class EmbeddingModelValidationTests(unittest.TestCase):
                 chunk_size=128,
                 chunk_overlap=16,
                 backend="OpenAI",
-                ollama_endpoint="http://localhost:1234/v1",
+                ollama_endpoint="https://api.openai.com/v1",
                 api_key="secret",
             )
         embedding = Settings.embed_model
         self.assertEqual(embedding.kwargs["model_name"], "text-embedding-3-small")
         self.assertEqual(embedding.kwargs["api_key"], "secret")
-        self.assertEqual(embedding.kwargs["api_base"], "http://localhost:1234/v1")
+        self.assertEqual(embedding.kwargs["api_base"], "https://api.openai.com/v1")
         self.assertEqual(embedding.kwargs["embed_batch_size"], 16)
 
 

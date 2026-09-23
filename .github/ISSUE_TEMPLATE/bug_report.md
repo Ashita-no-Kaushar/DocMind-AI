@@ -8,39 +8,46 @@ assignees: ''
 ---
 
 **Describe the Bug**
+
 A clear and concise description of what the bug is.
 
 **Troubleshooting**
-I have read the DocMind [troubleshooting guide](../../docs/troubleshooting.md), reviewed my application state and log file:
+
+I have read the DocMind [troubleshooting guide](../../docs/troubleshooting.md) and reviewed the local log without including sensitive content:
+
 - [ ] Yes
 - [ ] No
 
 **How To Reproduce**
+
 Steps to reproduce the behavior:
+
 1. Go to '...'
 2. Click on '....'
-3. Scroll down to '....'
-4. See error
+3. Select the active source and settings
+4. See the error
 
 **Expected Behavior**
+
 A clear and concise description of what you expected to happen.
 
 **Screenshots**
-If applicable, attach screenshots to help explain your problem. **A screenshot of your Settings > Advanced > Application State section can greatly aid in troubleshooting.**
+
+If applicable, attach screenshots with credentials, API keys, private documents, and internal network addresses redacted.
 
 **Logs**
-If applicable, attach log files to help explain your problem. **Reproducing your issue and sharing a copy of your `docmind.log` can greatly aid in troubleshooting.**
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. Chrome, Safari]
- - Version [e.g. 22]
+If applicable, attach relevant excerpts from `docmind.log`. Remove credentials, document contents, prompts, and private paths before sharing.
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone 15]
- - OS: [e.g. iOS 17.x]
- - Browser [e.g. Stock Browser, Safari]
- - Version [e.g. 22]
+**Environment**
+
+- Operating system:
+- Python version:
+- Browser:
+- DocMind version or commit:
+- Ollama endpoint type: local or remote
+- Active provider: Ollama, OpenAI, LM Studio, TabbyAPI, or R2R
 
 **Additional Context**
-Add any other context about the problem here.
+
+Add any other non-sensitive context about the problem here.
