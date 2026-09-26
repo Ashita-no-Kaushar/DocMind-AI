@@ -77,60 +77,72 @@ class WebsiteAddressValidationTests(unittest.TestCase):
         )
         for address in addresses:
             with self.subTest(address=address):
-                with patch.object(
-                    helpers.socket,
-                    "getaddrinfo",
-                    return_value=dns_result(address),
+                with (
+                    patch.object(
+                        helpers.socket,
+                        "getaddrinfo",
+                        return_value=dns_result(address),
+                    ),
+                    self.assertRaises(helpers.WebsiteIngestionError) as context,
                 ):
-                    with self.assertRaises(helpers.WebsiteIngestionError) as context:
-                        helpers.validate_website_urls(["https://example.com"])
+                    helpers.validate_website_urls(["https://example.com"])
                 self.assertEqual(context.exception.category, "blocked_destination")
 
     def test_rejects_known_metadata_ip_even_when_it_is_global(self):
-        with patch.object(
-            helpers.socket,
-            "getaddrinfo",
-            return_value=dns_result("168.63.129.16"),
+        with (
+            patch.object(
+                helpers.socket,
+                "getaddrinfo",
+                return_value=dns_result("168.63.129.16"),
+            ),
+            self.assertRaises(helpers.WebsiteIngestionError) as context,
         ):
-            with self.assertRaises(helpers.WebsiteIngestionError) as context:
-                helpers.validate_website_urls(["https://metadata.example"])
+            helpers.validate_website_urls(["https://metadata.example"])
         self.assertEqual(context.exception.category, "blocked_destination")
 
     def test_rejects_known_metadata_hostname_before_dns(self):
-        with patch.object(helpers.socket, "getaddrinfo") as resolver:
-            with self.assertRaises(helpers.WebsiteIngestionError) as context:
-                helpers.validate_website_urls(["https://metadata.google.internal"])
+        with (
+            patch.object(helpers.socket, "getaddrinfo") as resolver,
+            self.assertRaises(helpers.WebsiteIngestionError) as context,
+        ):
+            helpers.validate_website_urls(["https://metadata.google.internal"])
         resolver.assert_not_called()
         self.assertEqual(context.exception.category, "blocked_destination")
 
     def test_accepts_global_ipv4_and_ipv6_results(self):
         for address in ("93.184.216.34", "2001:4860:4860::8888"):
-            with self.subTest(address=address):
-                with patch.object(
+            with (
+                self.subTest(address=address),
+                patch.object(
                     helpers.socket,
                     "getaddrinfo",
                     return_value=dns_result(address),
-                ):
-                    self.assertEqual(
-                        helpers.validate_website_urls(["https://example.com"]),
-                        ["https://example.com"],
-                    )
+                ),
+            ):
+                self.assertEqual(
+                    helpers.validate_website_urls(["https://example.com"]),
+                    ["https://example.com"],
+                )
 
     def test_rejects_a_hostname_with_any_blocked_address(self):
-        with patch.object(
-            helpers.socket,
-            "getaddrinfo",
-            return_value=dns_result("93.184.216.34") + dns_result("192.168.1.1"),
+        with (
+            patch.object(
+                helpers.socket,
+                "getaddrinfo",
+                return_value=dns_result("93.184.216.34") + dns_result("192.168.1.1"),
+            ),
+            self.assertRaises(helpers.WebsiteIngestionError) as context,
         ):
-            with self.assertRaises(helpers.WebsiteIngestionError) as context:
-                helpers.validate_website_urls(["https://example.com"])
+            helpers.validate_website_urls(["https://example.com"])
         self.assertEqual(context.exception.category, "blocked_destination")
 
     def test_url_limit_is_checked_before_dns(self):
         urls = [f"https://example-{index}.com" for index in range(7)]
-        with patch.object(helpers.socket, "getaddrinfo") as resolver:
-            with self.assertRaises(helpers.WebsiteIngestionError) as context:
-                helpers.validate_website_urls(urls)
+        with (
+            patch.object(helpers.socket, "getaddrinfo") as resolver,
+            self.assertRaises(helpers.WebsiteIngestionError) as context,
+        ):
+            helpers.validate_website_urls(urls)
         resolver.assert_not_called()
         self.assertEqual(context.exception.category, "url_limit")
         self.assertEqual(context.exception.diagnostic()["category"], "url_limit")
@@ -139,21 +151,25 @@ class WebsiteAddressValidationTests(unittest.TestCase):
         with self.assertRaises(helpers.WebsiteIngestionError) as invalid:
             helpers.validate_website_urls(["not-a-url"])
         self.assertEqual(invalid.exception.category, "invalid_url")
-        with patch.object(
-            helpers.socket,
-            "getaddrinfo",
-            side_effect=socket.gaierror("not found"),
+        with (
+            patch.object(
+                helpers.socket,
+                "getaddrinfo",
+                side_effect=socket.gaierror("not found"),
+            ),
+            self.assertRaises(helpers.WebsiteIngestionError) as dns,
         ):
-            with self.assertRaises(helpers.WebsiteIngestionError) as dns:
-                helpers.validate_website_urls(["https://example.com"])
+            helpers.validate_website_urls(["https://example.com"])
         self.assertEqual(dns.exception.category, "dns_failure")
-        with patch.object(
-            helpers.socket,
-            "getaddrinfo",
-            side_effect=TimeoutError("resolver timed out"),
+        with (
+            patch.object(
+                helpers.socket,
+                "getaddrinfo",
+                side_effect=TimeoutError("resolver timed out"),
+            ),
+            self.assertRaises(helpers.WebsiteIngestionError) as timeout,
         ):
-            with self.assertRaises(helpers.WebsiteIngestionError) as timeout:
-                helpers.validate_website_urls(["https://example.com"])
+            helpers.validate_website_urls(["https://example.com"])
         self.assertEqual(timeout.exception.category, "timeout")
 
 
@@ -164,11 +180,14 @@ class PinnedTransportTests(unittest.TestCase):
 
     def test_validated_address_is_used_for_the_tls_connection(self):
         FakePool.responses = [FakeResponse(chunks=(b"<p>Readable page content</p>",))]
-        with patch.object(
-            helpers.socket,
-            "getaddrinfo",
-            return_value=dns_result("93.184.216.34"),
-        ), patch.object(helpers.urllib3, "HTTPSConnectionPool", FakePool):
+        with (
+            patch.object(
+                helpers.socket,
+                "getaddrinfo",
+                return_value=dns_result("93.184.216.34"),
+            ),
+            patch.object(helpers.urllib3, "HTTPSConnectionPool", FakePool),
+        ):
             documents = helpers.load_website_documents(
                 ["https://example.com/page"],
                 deadline=time.monotonic() + 30,
@@ -185,19 +204,22 @@ class PinnedTransportTests(unittest.TestCase):
         self.assertTrue(FakePool.responses == [])
 
     def test_dns_rebinding_cannot_redirect_the_connection_to_private_address(self):
-        with patch.object(
-            helpers.socket,
-            "getaddrinfo",
-            side_effect=[
-                dns_result("93.184.216.34"),
-                dns_result("192.168.1.10"),
-            ],
-        ), patch.object(helpers.urllib3, "HTTPSConnectionPool", FakePool):
-            with self.assertRaises(helpers.WebsiteIngestionError) as context:
-                helpers.load_website_documents(
-                    ["https://example.com"],
-                    deadline=time.monotonic() + 30,
-                )
+        with (
+            patch.object(
+                helpers.socket,
+                "getaddrinfo",
+                side_effect=[
+                    dns_result("93.184.216.34"),
+                    dns_result("192.168.1.10"),
+                ],
+            ),
+            patch.object(helpers.urllib3, "HTTPSConnectionPool", FakePool),
+            self.assertRaises(helpers.WebsiteIngestionError) as context,
+        ):
+            helpers.load_website_documents(
+                ["https://example.com"],
+                deadline=time.monotonic() + 30,
+            )
         self.assertEqual(context.exception.category, "blocked_destination")
         self.assertEqual(FakePool.instances, [])
 
@@ -207,20 +229,23 @@ class PinnedTransportTests(unittest.TestCase):
             headers={"Location": "https://127.0.0.1/admin"},
         )
         FakePool.responses = [redirect]
-        with patch.object(
-            helpers.socket,
-            "getaddrinfo",
-            side_effect=[
-                dns_result("93.184.216.34"),
-                dns_result("93.184.216.34"),
-                dns_result("192.168.1.10"),
-            ],
-        ), patch.object(helpers.urllib3, "HTTPSConnectionPool", FakePool):
-            with self.assertRaises(helpers.WebsiteIngestionError) as context:
-                helpers.load_website_documents(
-                    ["https://example.com"],
-                    deadline=time.monotonic() + 30,
-                )
+        with (
+            patch.object(
+                helpers.socket,
+                "getaddrinfo",
+                side_effect=[
+                    dns_result("93.184.216.34"),
+                    dns_result("93.184.216.34"),
+                    dns_result("192.168.1.10"),
+                ],
+            ),
+            patch.object(helpers.urllib3, "HTTPSConnectionPool", FakePool),
+            self.assertRaises(helpers.WebsiteIngestionError) as context,
+        ):
+            helpers.load_website_documents(
+                ["https://example.com"],
+                deadline=time.monotonic() + 30,
+            )
         self.assertEqual(context.exception.category, "blocked_destination")
         self.assertTrue(redirect.closed)
         self.assertTrue(redirect.released)
@@ -233,15 +258,18 @@ class PinnedTransportTests(unittest.TestCase):
         )
         final = FakeResponse(chunks=(b"<p>Final page content</p>",))
         FakePool.responses = [redirect, final]
-        with patch.object(
-            helpers.socket,
-            "getaddrinfo",
-            side_effect=[
-                dns_result("93.184.216.34"),
-                dns_result("93.184.216.34"),
-                dns_result("93.184.216.34"),
-            ],
-        ), patch.object(helpers.urllib3, "HTTPSConnectionPool", FakePool):
+        with (
+            patch.object(
+                helpers.socket,
+                "getaddrinfo",
+                side_effect=[
+                    dns_result("93.184.216.34"),
+                    dns_result("93.184.216.34"),
+                    dns_result("93.184.216.34"),
+                ],
+            ),
+            patch.object(helpers.urllib3, "HTTPSConnectionPool", FakePool),
+        ):
             documents = helpers.load_website_documents(
                 ["https://example.com"],
                 deadline=time.monotonic() + 30,
@@ -263,11 +291,14 @@ class WebsiteResponseTests(unittest.TestCase):
 
     def _load_with_report(self, response, address="93.184.216.34"):
         FakePool.responses = [response]
-        with patch.object(
-            helpers.socket,
-            "getaddrinfo",
-            return_value=dns_result(address),
-        ), patch.object(helpers.urllib3, "HTTPSConnectionPool", FakePool):
+        with (
+            patch.object(
+                helpers.socket,
+                "getaddrinfo",
+                return_value=dns_result(address),
+            ),
+            patch.object(helpers.urllib3, "HTTPSConnectionPool", FakePool),
+        ):
             return helpers.load_website_documents(
                 ["https://example.com"],
                 deadline=time.monotonic() + 30,
@@ -319,12 +350,14 @@ class WebsiteDeadlineTests(unittest.TestCase):
         FakePool.responses = []
 
     def test_expired_deadline_stops_before_dns(self):
-        with patch.object(helpers.socket, "getaddrinfo") as resolver:
-            with self.assertRaises(helpers.WebsiteIngestionError) as context:
-                helpers.load_website_documents(
-                    ["https://example.com"],
-                    deadline=time.monotonic() - 1,
-                )
+        with (
+            patch.object(helpers.socket, "getaddrinfo") as resolver,
+            self.assertRaises(helpers.WebsiteIngestionError) as context,
+        ):
+            helpers.load_website_documents(
+                ["https://example.com"],
+                deadline=time.monotonic() - 1,
+            )
         resolver.assert_not_called()
         self.assertEqual(context.exception.category, "timeout")
 
@@ -339,16 +372,20 @@ class WebsiteDeadlineTests(unittest.TestCase):
 
         response.stream = stream
         FakePool.responses = [response]
-        with patch.object(helpers.time, "monotonic", side_effect=lambda: clock[0]), patch.object(
-            helpers.socket,
-            "getaddrinfo",
-            return_value=dns_result("93.184.216.34"),
-        ), patch.object(helpers.urllib3, "HTTPSConnectionPool", FakePool):
-            with self.assertRaises(helpers.WebsiteIngestionError) as context:
-                helpers.load_website_documents(
-                    ["https://example.com"],
-                    deadline=101.0,
-                )
+        with (
+            patch.object(helpers.time, "monotonic", side_effect=lambda: clock[0]),
+            patch.object(
+                helpers.socket,
+                "getaddrinfo",
+                return_value=dns_result("93.184.216.34"),
+            ),
+            patch.object(helpers.urllib3, "HTTPSConnectionPool", FakePool),
+            self.assertRaises(helpers.WebsiteIngestionError) as context,
+        ):
+            helpers.load_website_documents(
+                ["https://example.com"],
+                deadline=101.0,
+            )
         self.assertEqual(context.exception.category, "timeout")
         self.assertTrue(response.closed)
         self.assertTrue(response.released)
@@ -356,12 +393,14 @@ class WebsiteDeadlineTests(unittest.TestCase):
 
 class IndexDeadlineTests(unittest.TestCase):
     def test_expired_index_deadline_stops_before_transformations(self):
-        with patch.object(llama_index, "run_transformations") as transformations:
-            with self.assertRaises(TimeoutError):
-                llama_index.create_index(
-                    [Document(text="content that would otherwise be transformed")],
-                    deadline=time.monotonic() - 1,
-                )
+        with (
+            patch.object(llama_index, "run_transformations") as transformations,
+            self.assertRaises(TimeoutError),
+        ):
+            llama_index.create_index(
+                [Document(text="content that would otherwise be transformed")],
+                deadline=time.monotonic() - 1,
+            )
         transformations.assert_not_called()
 
 

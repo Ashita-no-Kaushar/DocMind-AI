@@ -13,9 +13,9 @@ import threading
 import time
 import uuid
 from collections.abc import Callable, Mapping
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote, urlsplit, urlunsplit
 
@@ -24,6 +24,7 @@ import streamlit as st
 
 import utils.helpers as func
 from utils import logs
+from utils.ingestion_lock import lifecycle_lock
 from utils.source_state import (
     active_index_matches_settings,
     ensure_active_source,
@@ -224,7 +225,7 @@ class R2RRemoteResetResult:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _fingerprint(value: str) -> str:
@@ -381,9 +382,7 @@ class R2RClient:
             category = (
                 "rate_limit"
                 if status_code == 429
-                else "server_error"
-                if status_code >= 500
-                else "http_error"
+                else "server_error" if status_code >= 500 else "http_error"
             )
             raise R2RHTTPError(status_code, category)
 
@@ -527,17 +526,17 @@ class R2RClient:
                     raise R2RPollTimeout() from None
                 if cancel_event is not None:
                     if cancel_event.wait(delay):
-                        raise R2RIngestionCancelled()
+                        raise R2RIngestionCancelled() from err
                 else:
                     sleep(delay)
                 delay = min(maximum_delay, max(0.1, delay * 2))
                 continue
-            except R2RConnectionError:
+            except R2RConnectionError as err:
                 if clock() >= deadline:
                     raise R2RPollTimeout() from None
                 if cancel_event is not None:
                     if cancel_event.wait(delay):
-                        raise R2RIngestionCancelled()
+                        raise R2RIngestionCancelled() from err
                 else:
                     sleep(delay)
                 delay = min(maximum_delay, max(0.1, delay * 2))
@@ -855,19 +854,15 @@ class R2RDocumentRegistry:
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
-            try:
+            with suppress(OSError):
                 os.chmod(temporary_name, 0o600)
-            except OSError:
-                pass
             os.replace(temporary_name, self.path)
         except OSError as err:
             raise R2RRegistryError("R2R registry could not be written.") from err
         finally:
             if os.path.exists(temporary_name):
-                try:
+                with suppress(OSError):
                     os.unlink(temporary_name)
-                except OSError:
-                    pass
 
     def _mutate(self, callback: Callable[[dict], None]) -> dict:
         with self._thread_lock, _locked_registry_file(self.path):
@@ -1231,21 +1226,21 @@ def _rollback_documents(
             outcome = client.delete_document(document_id)
         except R2RConnectionError as err:
             failed.append(document_id)
-            try:
+            with suppress(R2RRegistryError):
                 registry.update_document(
                     document_id,
                     status="rollback_failed",
                     last_error=f"{reason}:{_safe_error_code(err)}",
                 )
-            except R2RRegistryError:
-                pass
             continue
         try:
             registry.update_document(
                 document_id,
-                status="rolled_back"
-                if outcome in {"deleted", "missing"}
-                else "rollback_failed",
+                status=(
+                    "rolled_back"
+                    if outcome in {"deleted", "missing"}
+                    else "rollback_failed"
+                ),
                 last_error=reason,
             )
         except R2RRegistryError:
@@ -1381,14 +1376,12 @@ def ingest_paths_transaction(
                 outcome = client.delete_document(document_id)
             except R2RConnectionError as err:
                 old_failures.append(document_id)
-                try:
+                with suppress(R2RRegistryError):
                     registry.update_document(
                         document_id,
                         status="delete_failed",
                         last_error=_safe_error_code(err),
                     )
-                except R2RRegistryError:
-                    pass
                 continue
             registry.update_document(
                 document_id,
@@ -1493,6 +1486,7 @@ def _render_completed(status_container, completed_stages):
         st.empty()
 
 
+@lifecycle_lock()
 def r2r_ingest_files(
     uploaded_files: list,
     status_container=None,
@@ -1605,6 +1599,7 @@ def r2r_ingest_files(
                 logs.log.warning("Unable to delete the owned R2R work directory.")
 
 
+@lifecycle_lock()
 def delete_owned_remote_documents(
     state,
     client: R2RClient | None = None,
@@ -1625,14 +1620,12 @@ def delete_owned_remote_documents(
             outcome = client.delete_document(document_id)
         except R2RConnectionError as err:
             failed.append((document_id, _safe_error_code(err)))
-            try:
+            with suppress(R2RRegistryError):
                 registry.update_document(
                     document_id,
                     status="delete_failed",
                     last_error=_safe_error_code(err),
                 )
-            except R2RRegistryError:
-                pass
             continue
         if outcome == "deleted":
             deleted.append(document_id)

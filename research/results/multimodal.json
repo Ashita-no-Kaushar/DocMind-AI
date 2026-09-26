@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-09-25T18:21:00Z",
+  "missing": [
+    "no_pdf_supplied",
+    "no_pdf_rasterizer",
+    "no_vision_encoder"
+  ],
+  "note": "No image-resolution measurement was taken. The retrieval study in research/REPORT.md measures structural section granularity only.",
+  "pdf": null,
+  "planned_dpi_ladder": [
+    72,
+    150,
+    300
+  ],
+  "rasterizer": null,
+  "requested_dpi": 150,
+  "status": "skipped",
+  "vision_model": null
+}

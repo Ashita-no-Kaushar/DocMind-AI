@@ -64,4 +64,3 @@ def render_ingestion_settings_warning():
         "R2R local uploads can still be used when R2R is enabled.",
         icon=None,
     )
-

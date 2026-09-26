@@ -1,0 +1,373 @@
+variant,query_id,question,query_kind,target_document,hard_negative,hit,rank,precision,recall,result_count,evidence_tokens,global_tokens,map_index_tokens,token_delta,token_delta_pct,selected_sections,planned_sections,considered_sections,route_steps,routed,reflection,planner_mode,nodes_scored,latency_ms
+naive_vector_rag,q01,Within how many days may a customer request a full refund?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,248,249,0,-1,-0.4,0,0,0,0,False,False,,48,1.53
+naive_vector_rag,q02,What is the refund window for electronics?,answerable,refund_policy.txt,False,True,2,0.125,1.0,8,241,249,0,-8,-3.21,0,0,0,0,False,False,,48,1.293
+naive_vector_rag,q03,How many business days does refund settlement take?,answerable,refund_policy.txt,False,True,2,0.125,1.0,8,250,250,0,0,0.0,0,0,0,0,False,False,,48,1.406
+naive_vector_rag,q04,How long does domestic ground shipping take?,answerable,shipping_times.txt,False,True,1,0.125,1.0,8,235,118,0,117,99.15,0,0,0,0,False,False,,48,1.357
+naive_vector_rag,q05,When is expedited delivery available?,answerable,shipping_times.txt,False,True,1,0.125,1.0,8,242,253,0,-11,-4.35,0,0,0,0,False,False,,48,1.262
+naive_vector_rag,q06,How long does international customs clearance take?,answerable,shipping_times.txt,False,True,1,0.125,1.0,8,237,59,0,178,301.69,0,0,0,0,False,False,,48,1.346
+naive_vector_rag,q07,How long is the manufacturer warranty?,answerable,warranty_terms.txt,False,True,1,0.1429,1.0,7,210,210,0,0,0.0,0,0,0,0,False,False,,48,1.259
+naive_vector_rag,q08,What do I need to submit a warranty claim?,answerable,warranty_terms.txt,False,True,1,0.125,1.0,8,238,207,0,31,14.98,0,0,0,0,False,False,,48,1.324
+naive_vector_rag,q09,Is water damage covered by warranty?,answerable,warranty_terms.txt,False,True,1,0.125,1.0,8,244,179,0,65,36.31,0,0,0,0,False,False,,48,1.305
+naive_vector_rag,q10,What defines a severity 1 incident?,answerable,incident_runbook.txt,False,True,1,0.125,1.0,8,256,165,0,91,55.15,0,0,0,0,False,False,,48,1.654
+naive_vector_rag,q11,Who owns the incident response?,answerable,incident_runbook.txt,False,True,1,0.125,1.0,8,253,195,0,58,29.74,0,0,0,0,False,False,,48,1.323
+naive_vector_rag,q12,What is the public status update cadence for an outage?,answerable,incident_runbook.txt,False,True,1,0.1429,1.0,7,211,73,0,138,189.04,0,0,0,0,False,False,,48,1.392
+naive_vector_rag,q13,What blocks a release?,answerable,release_checklist.txt,False,True,4,0.1429,1.0,7,198,109,0,89,81.65,0,0,0,0,False,False,,48,1.294
+naive_vector_rag,q14,How long is the staging soak time?,answerable,release_checklist.txt,False,True,1,0.125,1.0,8,230,208,0,22,10.58,0,0,0,0,False,False,,48,1.31
+naive_vector_rag,q15,What is the staged rollout plan for production?,answerable,release_checklist.txt,False,True,1,0.125,1.0,8,239,141,0,98,69.5,0,0,0,0,False,False,,48,1.305
+naive_vector_rag,q16,On which working day of the month does the payroll run?,answerable,payroll_policy.txt,False,True,1,0.125,1.0,8,250,181,0,69,38.12,0,0,0,0,False,False,,48,1.377
+naive_vector_rag,q17,When are timesheets due?,answerable,payroll_policy.txt,False,True,1,0.3333,1.0,3,86,86,0,0,0.0,0,0,0,0,False,False,,48,1.213
+naive_vector_rag,q18,How is overtime paid?,answerable,payroll_policy.txt,False,True,1,0.1667,1.0,6,189,30,0,159,530.0,0,0,0,0,False,False,,48,1.2
+naive_vector_rag,q19,What is the default API rate limit quota?,answerable,api_rate_limits.txt,False,True,1,0.125,1.0,8,250,245,0,5,2.04,0,0,0,0,False,False,,48,1.349
+naive_vector_rag,q20,What happens when I exceed the burst allowance?,answerable,api_rate_limits.txt,False,True,1,0.125,1.0,8,241,62,0,179,288.71,0,0,0,0,False,False,,48,1.426
+naive_vector_rag,q21,How should clients handle throttling responses?,answerable,api_rate_limits.txt,False,True,2,0.125,1.0,8,235,88,0,147,167.05,0,0,0,0,False,False,,48,1.516
+naive_vector_rag,q22,Which principle governs access grants?,answerable,access_control.txt,False,True,1,0.125,1.0,8,233,152,0,81,53.29,0,0,0,0,False,False,,48,1.327
+naive_vector_rag,q23,Is multi factor authentication mandatory?,answerable,access_control.txt,False,True,1,0.1667,1.0,6,181,26,0,155,596.15,0,0,0,0,False,False,,48,1.306
+naive_vector_rag,q24,How are break glass accounts reviewed?,answerable,access_control.txt,False,True,1,0.25,1.0,4,121,152,0,-31,-20.39,0,0,0,0,False,False,,48,1.302
+naive_vector_rag,q25,What is the quarterly access review cadence?,answerable,access_control.txt,False,True,1,0.125,1.0,8,231,240,0,-9,-3.75,0,0,0,0,False,False,,48,1.316
+naive_vector_rag,n01,What is the office wifi password?,no_match,,False,False,0,0.0,0.0,3,96,0,0,96,0.0,0,0,0,0,False,False,,48,1.267
+naive_vector_rag,n02,Who won the 2022 world cup final?,no_match,,True,False,0,0.0,0.0,8,229,33,0,196,593.94,0,0,0,0,False,False,,48,1.348
+naive_vector_rag,n03,What is the capital city of Portugal?,no_match,,False,False,0,0.0,0.0,2,59,0,0,59,0.0,0,0,0,0,False,False,,48,1.246
+naive_vector_rag,n04,Can you book me a flight to Tokyo?,no_match,,True,False,0,0.0,0.0,7,220,32,0,188,587.5,0,0,0,0,False,False,,48,1.285
+naive_vector_rag,n05,What is the recommended daily calorie intake for adults?,no_match,,False,False,0,0.0,0.0,8,234,0,0,234,0.0,0,0,0,0,False,False,,48,1.379
+naive_vector_rag,n06,Explain quantum chromodynamics lattice gauge theory.,no_match,,False,False,0,0.0,0.0,8,254,0,0,254,0.0,0,0,0,0,False,False,,48,1.389
+global_topk,q01,Within how many days may a customer request a full refund?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,249,249,0,0,0.0,0,0,0,0,False,False,,48,0.204
+global_topk,q02,What is the refund window for electronics?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,249,249,0,0,0.0,0,0,0,0,False,False,,48,0.199
+global_topk,q03,How many business days does refund settlement take?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,250,250,0,0,0.0,0,0,0,0,False,False,,48,0.318
+global_topk,q04,How long does domestic ground shipping take?,answerable,shipping_times.txt,False,True,1,0.25,1.0,4,118,118,0,0,0.0,0,0,0,0,False,False,,48,0.165
+global_topk,q05,When is expedited delivery available?,answerable,shipping_times.txt,False,True,1,0.125,1.0,8,253,253,0,0,0.0,0,0,0,0,False,False,,48,0.176
+global_topk,q06,How long does international customs clearance take?,answerable,shipping_times.txt,False,True,1,0.5,1.0,2,59,59,0,0,0.0,0,0,0,0,False,False,,48,0.152
+global_topk,q07,How long is the manufacturer warranty?,answerable,warranty_terms.txt,False,True,1,0.1429,1.0,7,210,210,0,0,0.0,0,0,0,0,False,False,,48,0.142
+global_topk,q08,What do I need to submit a warranty claim?,answerable,warranty_terms.txt,False,True,1,0.1429,1.0,7,207,207,0,0,0.0,0,0,0,0,False,False,,48,0.168
+global_topk,q09,Is water damage covered by warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,179,0,0,0.0,0,0,0,0,False,False,,48,0.143
+global_topk,q10,What defines a severity 1 incident?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,165,0,0,0.0,0,0,0,0,False,False,,48,0.137
+global_topk,q11,Who owns the incident response?,answerable,incident_runbook.txt,False,True,1,0.1667,1.0,6,195,195,0,0,0.0,0,0,0,0,False,False,,48,0.138
+global_topk,q12,What is the public status update cadence for an outage?,answerable,incident_runbook.txt,False,True,1,0.5,1.0,2,73,73,0,0,0.0,0,0,0,0,False,False,,48,0.168
+global_topk,q13,What blocks a release?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,109,109,0,0,0.0,0,0,0,0,False,False,,48,0.119
+global_topk,q14,How long is the staging soak time?,answerable,release_checklist.txt,False,True,1,0.1429,1.0,7,208,208,0,0,0.0,0,0,0,0,False,False,,48,0.15
+global_topk,q15,What is the staged rollout plan for production?,answerable,release_checklist.txt,False,True,1,0.2,1.0,5,141,141,0,0,0.0,0,0,0,0,False,False,,48,0.155
+global_topk,q16,On which working day of the month does the payroll run?,answerable,payroll_policy.txt,False,True,1,0.1667,1.0,6,181,181,0,0,0.0,0,0,0,0,False,False,,48,0.181
+global_topk,q17,When are timesheets due?,answerable,payroll_policy.txt,False,True,1,0.3333,1.0,3,86,86,0,0,0.0,0,0,0,0,False,False,,48,0.12
+global_topk,q18,How is overtime paid?,answerable,payroll_policy.txt,False,True,1,1.0,1.0,1,30,30,0,0,0.0,0,0,0,0,False,False,,48,0.117
+global_topk,q19,What is the default API rate limit quota?,answerable,api_rate_limits.txt,False,True,1,0.125,1.0,8,245,245,0,0,0.0,0,0,0,0,False,False,,48,0.16
+global_topk,q20,What happens when I exceed the burst allowance?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,62,62,0,0,0.0,0,0,0,0,False,False,,48,0.15
+global_topk,q21,How should clients handle throttling responses?,answerable,api_rate_limits.txt,False,True,1,0.3333,1.0,3,88,88,0,0,0.0,0,0,0,0,False,False,,48,0.141
+global_topk,q22,Which principle governs access grants?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,152,0,0,0.0,0,0,0,0,False,False,,48,0.134
+global_topk,q23,Is multi factor authentication mandatory?,answerable,access_control.txt,False,True,1,1.0,1.0,1,26,26,0,0,0.0,0,0,0,0,False,False,,48,0.13
+global_topk,q24,How are break glass accounts reviewed?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,152,0,0,0.0,0,0,0,0,False,False,,48,0.147
+global_topk,q25,What is the quarterly access review cadence?,answerable,access_control.txt,False,True,1,0.125,1.0,8,240,240,0,0,0.0,0,0,0,0,False,False,,48,0.153
+global_topk,n01,What is the office wifi password?,no_match,,False,False,0,1.0,1.0,0,0,0,0,0,0.0,0,0,0,0,False,False,,48,0.135
+global_topk,n02,Who won the 2022 world cup final?,no_match,,True,False,0,0.0,0.0,1,33,33,0,0,0.0,0,0,0,0,False,False,,48,0.146
+global_topk,n03,What is the capital city of Portugal?,no_match,,False,False,0,1.0,1.0,0,0,0,0,0,0.0,0,0,0,0,False,False,,48,0.139
+global_topk,n04,Can you book me a flight to Tokyo?,no_match,,True,False,0,0.0,0.0,1,32,32,0,0,0.0,0,0,0,0,False,False,,48,0.141
+global_topk,n05,What is the recommended daily calorie intake for adults?,no_match,,False,False,0,1.0,1.0,0,0,0,0,0,0.0,0,0,0,0,False,False,,48,0.159
+global_topk,n06,Explain quantum chromodynamics lattice gauge theory.,no_match,,False,False,0,1.0,1.0,0,0,0,0,0,0.0,0,0,0,0,False,False,,48,0.145
+agentic_no_map,q01,Within how many days may a customer request a full refund?,answerable,refund_policy.txt,False,True,1,0.25,1.0,4,132,249,0,-117,-46.99,4,4,48,2,False,False,flat_deterministic,4,0.263
+agentic_no_map,q02,What is the refund window for electronics?,answerable,refund_policy.txt,False,True,1,0.25,1.0,4,120,249,0,-129,-51.81,4,4,48,2,False,False,flat_deterministic,4,0.194
+agentic_no_map,q03,How many business days does refund settlement take?,answerable,refund_policy.txt,False,True,1,0.25,1.0,4,132,250,0,-118,-47.2,4,4,48,2,False,False,flat_deterministic,4,0.216
+agentic_no_map,q04,How long does domestic ground shipping take?,answerable,shipping_times.txt,False,True,1,0.25,1.0,4,118,118,0,0,0.0,4,4,48,2,False,False,flat_deterministic,4,0.195
+agentic_no_map,q05,When is expedited delivery available?,answerable,shipping_times.txt,False,True,1,0.25,1.0,4,128,253,0,-125,-49.41,4,4,48,2,False,False,flat_deterministic,4,0.18
+agentic_no_map,q06,How long does international customs clearance take?,answerable,shipping_times.txt,False,True,1,0.5,1.0,2,59,59,0,0,0.0,2,2,48,2,False,False,flat_deterministic,2,0.185
+agentic_no_map,q07,How long is the manufacturer warranty?,answerable,warranty_terms.txt,False,True,1,0.25,1.0,4,116,210,0,-94,-44.76,4,4,48,2,False,False,flat_deterministic,4,0.178
+agentic_no_map,q08,What do I need to submit a warranty claim?,answerable,warranty_terms.txt,False,True,1,0.25,1.0,4,119,207,0,-88,-42.51,4,4,48,2,False,False,flat_deterministic,4,0.225
+agentic_no_map,q09,Is water damage covered by warranty?,answerable,warranty_terms.txt,False,True,1,0.25,1.0,4,114,179,0,-65,-36.31,4,4,48,2,False,False,flat_deterministic,4,0.185
+agentic_no_map,q10,What defines a severity 1 incident?,answerable,incident_runbook.txt,False,True,1,0.25,1.0,4,139,165,0,-26,-15.76,4,4,48,2,False,False,flat_deterministic,4,0.177
+agentic_no_map,q11,Who owns the incident response?,answerable,incident_runbook.txt,False,True,1,0.25,1.0,4,132,195,0,-63,-32.31,4,4,48,2,False,False,flat_deterministic,4,0.171
+agentic_no_map,q12,What is the public status update cadence for an outage?,answerable,incident_runbook.txt,False,True,1,0.5,1.0,2,73,73,0,0,0.0,2,2,48,2,False,False,flat_deterministic,2,0.202
+agentic_no_map,q13,What blocks a release?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,109,109,0,0,0.0,4,4,48,2,False,False,flat_deterministic,4,0.157
+agentic_no_map,q14,How long is the staging soak time?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,113,208,0,-95,-45.67,4,4,48,2,False,False,flat_deterministic,4,0.189
+agentic_no_map,q15,What is the staged rollout plan for production?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,116,141,0,-25,-17.73,4,4,48,2,False,False,flat_deterministic,4,0.194
+agentic_no_map,q16,On which working day of the month does the payroll run?,answerable,payroll_policy.txt,False,True,1,0.25,1.0,4,116,181,0,-65,-35.91,4,4,48,2,False,False,flat_deterministic,4,0.22
+agentic_no_map,q17,When are timesheets due?,answerable,payroll_policy.txt,False,True,1,0.3333,1.0,3,86,86,0,0,0.0,3,3,48,2,False,False,flat_deterministic,3,0.154
+agentic_no_map,q18,How is overtime paid?,answerable,payroll_policy.txt,False,True,1,1.0,1.0,1,30,30,0,0,0.0,1,1,48,2,False,False,flat_deterministic,1,0.144
+agentic_no_map,q19,What is the default API rate limit quota?,answerable,api_rate_limits.txt,False,True,1,0.25,1.0,4,124,245,0,-121,-49.39,4,4,48,2,False,False,flat_deterministic,4,0.295
+agentic_no_map,q20,What happens when I exceed the burst allowance?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,62,62,0,0,0.0,2,2,48,2,False,False,flat_deterministic,2,0.215
+agentic_no_map,q21,How should clients handle throttling responses?,answerable,api_rate_limits.txt,False,True,1,0.3333,1.0,3,88,88,0,0,0.0,3,3,48,2,False,False,flat_deterministic,3,0.193
+agentic_no_map,q22,Which principle governs access grants?,answerable,access_control.txt,False,True,1,0.25,1.0,4,118,152,0,-34,-22.37,4,4,48,2,False,False,flat_deterministic,4,0.199
+agentic_no_map,q23,Is multi factor authentication mandatory?,answerable,access_control.txt,False,True,1,1.0,1.0,1,26,26,0,0,0.0,1,1,48,2,False,False,flat_deterministic,1,0.179
+agentic_no_map,q24,How are break glass accounts reviewed?,answerable,access_control.txt,False,True,1,0.25,1.0,4,121,152,0,-31,-20.39,4,4,48,2,False,False,flat_deterministic,4,0.186
+agentic_no_map,q25,What is the quarterly access review cadence?,answerable,access_control.txt,False,True,1,0.25,1.0,4,118,240,0,-122,-50.83,4,4,48,2,False,False,flat_deterministic,4,0.194
+agentic_no_map,n01,What is the office wifi password?,no_match,,False,False,0,1.0,1.0,0,0,0,0,0,0.0,0,0,48,1,False,False,flat_deterministic,0,0.155
+agentic_no_map,n02,Who won the 2022 world cup final?,no_match,,True,False,0,0.0,0.0,1,33,33,0,0,0.0,1,1,48,2,False,False,flat_deterministic,1,0.178
+agentic_no_map,n03,What is the capital city of Portugal?,no_match,,False,False,0,1.0,1.0,0,0,0,0,0,0.0,0,0,48,1,False,False,flat_deterministic,0,0.166
+agentic_no_map,n04,Can you book me a flight to Tokyo?,no_match,,True,False,0,0.0,0.0,1,32,32,0,0,0.0,1,1,48,2,False,False,flat_deterministic,1,0.173
+agentic_no_map,n05,What is the recommended daily calorie intake for adults?,no_match,,False,False,0,1.0,1.0,0,0,0,0,0,0.0,0,0,48,1,False,False,flat_deterministic,0,0.179
+agentic_no_map,n06,Explain quantum chromodynamics lattice gauge theory.,no_match,,False,False,0,1.0,1.0,0,0,0,0,0,0.0,0,0,48,1,False,False,flat_deterministic,0,0.166
+map_agent_low_resolution,q01,Within how many days may a customer request a full refund?,answerable,refund_policy.txt,False,True,1,0.1667,1.0,6,189,249,922,-60,-24.1,2,2,16,1,True,False,deterministic,6,10.975
+map_agent_low_resolution,q02,What is the refund window for electronics?,answerable,refund_policy.txt,False,True,1,0.1667,1.0,6,189,249,922,-60,-24.1,2,2,16,1,True,False,deterministic,6,10.743
+map_agent_low_resolution,q03,How many business days does refund settlement take?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,247,250,922,-3,-1.2,4,2,16,1,True,False,deterministic,12,10.428
+map_agent_low_resolution,q04,How long does domestic ground shipping take?,answerable,shipping_times.txt,False,True,1,0.3333,1.0,3,87,118,922,-31,-26.27,2,2,16,1,True,False,deterministic,6,9.971
+map_agent_low_resolution,q05,When is expedited delivery available?,answerable,shipping_times.txt,False,True,1,0.25,1.0,4,131,253,922,-122,-48.22,4,2,16,1,True,False,deterministic,12,10.383
+map_agent_low_resolution,q06,How long does international customs clearance take?,answerable,shipping_times.txt,False,True,1,0.5,1.0,2,59,59,922,0,0.0,4,2,16,2,False,True,deterministic,60,10.346
+map_agent_low_resolution,q07,How long is the manufacturer warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,210,922,-31,-14.76,2,2,16,1,True,False,deterministic,6,10.007
+map_agent_low_resolution,q08,What do I need to submit a warranty claim?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,207,922,-28,-13.53,2,2,16,1,True,False,deterministic,6,10.159
+map_agent_low_resolution,q09,Is water damage covered by warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,179,922,0,0.0,2,2,16,1,True,False,deterministic,6,9.933
+map_agent_low_resolution,q10,What defines a severity 1 incident?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,165,922,0,0.0,2,2,16,1,True,False,deterministic,6,10.196
+map_agent_low_resolution,q11,Who owns the incident response?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,195,922,-30,-15.38,2,2,16,1,True,False,deterministic,6,10.165
+map_agent_low_resolution,q12,What is the public status update cadence for an outage?,answerable,incident_runbook.txt,False,True,1,0.5,1.0,2,73,73,922,0,0.0,2,2,16,1,True,False,deterministic,6,9.961
+map_agent_low_resolution,q13,What blocks a release?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,109,109,922,0,0.0,2,2,16,2,False,True,deterministic,54,10.186
+map_agent_low_resolution,q14,How long is the staging soak time?,answerable,release_checklist.txt,False,False,0,0.0,0.0,2,59,208,922,-149,-71.63,2,2,16,1,True,False,deterministic,6,10.108
+map_agent_low_resolution,q15,What is the staged rollout plan for production?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,115,141,922,-26,-18.44,2,2,16,1,True,False,deterministic,6,10.385
+map_agent_low_resolution,q16,On which working day of the month does the payroll run?,answerable,payroll_policy.txt,False,True,1,0.3333,1.0,3,87,181,922,-94,-51.93,2,2,16,1,True,False,deterministic,6,10.628
+map_agent_low_resolution,q17,When are timesheets due?,answerable,payroll_policy.txt,False,True,1,0.5,1.0,2,55,86,922,-31,-36.05,4,2,16,1,True,False,deterministic,12,9.96
+map_agent_low_resolution,q18,How is overtime paid?,answerable,payroll_policy.txt,False,True,1,1.0,1.0,1,30,30,922,0,0.0,4,2,16,1,True,False,deterministic,12,10.184
+map_agent_low_resolution,q19,What is the default API rate limit quota?,answerable,api_rate_limits.txt,False,True,1,0.2,1.0,5,156,245,922,-89,-36.33,2,2,16,1,True,False,deterministic,6,10.368
+map_agent_low_resolution,q20,What happens when I exceed the burst allowance?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,62,62,922,0,0.0,2,2,16,1,True,False,deterministic,6,10.012
+map_agent_low_resolution,q21,How should clients handle throttling responses?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,59,88,922,-29,-32.95,4,2,16,1,True,False,deterministic,12,10.263
+map_agent_low_resolution,q22,Which principle governs access grants?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,152,922,0,0.0,2,2,16,1,True,False,deterministic,6,10.209
+map_agent_low_resolution,q23,Is multi factor authentication mandatory?,answerable,access_control.txt,False,True,1,1.0,1.0,1,26,26,922,0,0.0,4,2,16,1,True,False,deterministic,12,10.064
+map_agent_low_resolution,q24,How are break glass accounts reviewed?,answerable,access_control.txt,False,True,1,0.25,1.0,4,122,152,922,-30,-19.74,4,2,16,1,True,False,deterministic,12,10.366
+map_agent_low_resolution,q25,What is the quarterly access review cadence?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,240,922,-88,-36.67,2,2,16,1,True,False,deterministic,6,9.95
+map_agent_low_resolution,n01,What is the office wifi password?,no_match,,False,False,0,1.0,1.0,0,0,0,922,0,0.0,2,2,16,2,False,True,deterministic,54,10.398
+map_agent_low_resolution,n02,Who won the 2022 world cup final?,no_match,,True,False,0,0.0,0.0,1,33,33,922,0,0.0,4,2,16,1,True,False,deterministic,12,10.211
+map_agent_low_resolution,n03,What is the capital city of Portugal?,no_match,,False,False,0,1.0,1.0,0,0,0,922,0,0.0,2,2,16,2,False,True,deterministic,54,9.934
+map_agent_low_resolution,n04,Can you book me a flight to Tokyo?,no_match,,True,False,0,0.0,0.0,1,32,32,922,0,0.0,2,2,16,2,False,True,deterministic,54,10.84
+map_agent_low_resolution,n05,What is the recommended daily calorie intake for adults?,no_match,,False,False,0,1.0,1.0,0,0,0,922,0,0.0,2,2,16,2,False,True,deterministic,54,10.372
+map_agent_low_resolution,n06,Explain quantum chromodynamics lattice gauge theory.,no_match,,False,False,0,1.0,1.0,0,0,0,922,0,0.0,2,2,16,2,False,True,deterministic,54,10.002
+map_agent_high_resolution,q01,Within how many days may a customer request a full refund?,answerable,refund_policy.txt,False,True,1,0.25,1.0,4,132,249,2484,-117,-46.99,4,2,48,1,True,False,deterministic,4,26.157
+map_agent_high_resolution,q02,What is the refund window for electronics?,answerable,refund_policy.txt,False,True,1,0.25,1.0,4,132,249,2484,-117,-46.99,4,2,48,1,True,False,deterministic,4,25.247
+map_agent_high_resolution,q03,How many business days does refund settlement take?,answerable,refund_policy.txt,False,True,1,0.25,1.0,4,127,250,2484,-123,-49.2,4,2,48,1,True,False,deterministic,4,25.512
+map_agent_high_resolution,q04,How long does domestic ground shipping take?,answerable,shipping_times.txt,False,True,1,0.3333,1.0,3,87,118,2484,-31,-26.27,4,2,48,1,True,False,deterministic,4,25.379
+map_agent_high_resolution,q05,When is expedited delivery available?,answerable,shipping_times.txt,False,True,1,0.3333,1.0,3,88,253,2484,-165,-65.22,4,2,48,1,True,False,deterministic,4,25.597
+map_agent_high_resolution,q06,How long does international customs clearance take?,answerable,shipping_times.txt,False,True,1,1.0,1.0,1,28,59,2484,-31,-52.54,4,2,48,1,True,False,deterministic,4,25.625
+map_agent_high_resolution,q07,How long is the manufacturer warranty?,answerable,warranty_terms.txt,False,True,1,0.25,1.0,4,120,210,2484,-90,-42.86,4,2,48,1,True,False,deterministic,4,25.685
+map_agent_high_resolution,q08,What do I need to submit a warranty claim?,answerable,warranty_terms.txt,False,True,1,0.25,1.0,4,124,207,2484,-83,-40.1,4,2,48,1,True,False,deterministic,4,25.116
+map_agent_high_resolution,q09,Is water damage covered by warranty?,answerable,warranty_terms.txt,False,True,1,0.25,1.0,4,115,179,2484,-64,-35.75,4,2,48,1,True,False,deterministic,4,25.371
+map_agent_high_resolution,q10,What defines a severity 1 incident?,answerable,incident_runbook.txt,False,True,1,0.25,1.0,4,130,165,2484,-35,-21.21,4,2,48,1,True,False,deterministic,4,25.416
+map_agent_high_resolution,q11,Who owns the incident response?,answerable,incident_runbook.txt,False,True,1,0.5,1.0,2,67,195,2484,-128,-65.64,3,2,48,1,True,False,deterministic,3,25.346
+map_agent_high_resolution,q12,What is the public status update cadence for an outage?,answerable,incident_runbook.txt,False,True,1,0.5,1.0,2,73,73,2484,0,0.0,4,2,48,1,True,False,deterministic,4,25.539
+map_agent_high_resolution,q13,What blocks a release?,answerable,release_checklist.txt,False,True,1,0.3333,1.0,3,81,109,2484,-28,-25.69,4,2,48,1,True,False,deterministic,4,25.228
+map_agent_high_resolution,q14,How long is the staging soak time?,answerable,release_checklist.txt,False,True,1,0.5,1.0,2,56,208,2484,-152,-73.08,4,2,48,1,True,False,deterministic,4,25.445
+map_agent_high_resolution,q15,What is the staged rollout plan for production?,answerable,release_checklist.txt,False,True,1,0.3333,1.0,3,88,141,2484,-53,-37.59,4,2,48,1,True,False,deterministic,4,27.048
+map_agent_high_resolution,q16,On which working day of the month does the payroll run?,answerable,payroll_policy.txt,False,True,1,0.5,1.0,2,61,181,2484,-120,-66.3,3,2,48,1,True,False,deterministic,3,25.598
+map_agent_high_resolution,q17,When are timesheets due?,answerable,payroll_policy.txt,False,True,1,0.5,1.0,2,55,86,2484,-31,-36.05,4,2,48,1,True,False,deterministic,4,25.32
+map_agent_high_resolution,q18,How is overtime paid?,answerable,payroll_policy.txt,False,True,1,1.0,1.0,1,30,30,2484,0,0.0,4,2,48,1,True,False,deterministic,4,26.525
+map_agent_high_resolution,q19,What is the default API rate limit quota?,answerable,api_rate_limits.txt,False,True,1,0.25,1.0,4,126,245,2484,-119,-48.57,4,2,48,1,True,False,deterministic,4,25.431
+map_agent_high_resolution,q20,What happens when I exceed the burst allowance?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,62,62,2484,0,0.0,4,2,48,1,True,False,deterministic,4,25.497
+map_agent_high_resolution,q21,How should clients handle throttling responses?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,59,88,2484,-29,-32.95,4,2,48,1,True,False,deterministic,4,25.518
+map_agent_high_resolution,q22,Which principle governs access grants?,answerable,access_control.txt,False,True,1,0.3333,1.0,3,99,152,2484,-53,-34.87,4,2,48,1,True,False,deterministic,4,25.071
+map_agent_high_resolution,q23,Is multi factor authentication mandatory?,answerable,access_control.txt,False,True,1,1.0,1.0,1,26,26,2484,0,0.0,4,2,48,1,True,False,deterministic,4,25.6
+map_agent_high_resolution,q24,How are break glass accounts reviewed?,answerable,access_control.txt,False,True,1,0.3333,1.0,3,91,152,2484,-61,-40.13,4,2,48,1,True,False,deterministic,4,25.1
+map_agent_high_resolution,q25,What is the quarterly access review cadence?,answerable,access_control.txt,False,True,1,0.3333,1.0,3,92,240,2484,-148,-61.67,4,2,48,1,True,False,deterministic,4,25.621
+map_agent_high_resolution,n01,What is the office wifi password?,no_match,,False,False,0,1.0,1.0,0,0,0,2484,0,0.0,3,2,48,2,False,True,deterministic,51,25.314
+map_agent_high_resolution,n02,Who won the 2022 world cup final?,no_match,,True,False,0,0.0,0.0,1,33,33,2484,0,0.0,4,2,48,1,True,False,deterministic,4,25.55
+map_agent_high_resolution,n03,What is the capital city of Portugal?,no_match,,False,False,0,1.0,1.0,0,0,0,2484,0,0.0,3,2,48,2,False,True,deterministic,51,25.283
+map_agent_high_resolution,n04,Can you book me a flight to Tokyo?,no_match,,True,False,0,0.0,0.0,1,32,32,2484,0,0.0,4,2,48,1,True,False,deterministic,4,25.776
+map_agent_high_resolution,n05,What is the recommended daily calorie intake for adults?,no_match,,False,False,0,1.0,1.0,0,0,0,2484,0,0.0,3,2,48,2,False,True,deterministic,51,26.072
+map_agent_high_resolution,n06,Explain quantum chromodynamics lattice gauge theory.,no_match,,False,False,0,1.0,1.0,0,0,0,2484,0,0.0,3,2,48,2,False,True,deterministic,51,25.79
+map_agent_full,q01,Within how many days may a customer request a full refund?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,254,249,467,5,2.01,2,2,8,1,True,False,deterministic,12,5.403
+map_agent_full,q02,What is the refund window for electronics?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,249,249,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.846
+map_agent_full,q03,How many business days does refund settlement take?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,247,250,467,-3,-1.2,2,2,8,1,True,False,deterministic,12,5.352
+map_agent_full,q04,How long does domestic ground shipping take?,answerable,shipping_times.txt,False,True,1,0.3333,1.0,3,87,118,467,-31,-26.27,2,2,8,1,True,False,deterministic,12,5.389
+map_agent_full,q05,When is expedited delivery available?,answerable,shipping_times.txt,False,True,1,0.25,1.0,4,131,253,467,-122,-48.22,2,2,8,1,True,False,deterministic,12,5.667
+map_agent_full,q06,How long does international customs clearance take?,answerable,shipping_times.txt,False,False,0,0.0,0.0,0,0,59,467,-59,-100.0,3,2,8,2,True,True,deterministic,30,5.306
+map_agent_full,q07,How long is the manufacturer warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,210,467,-31,-14.76,2,2,8,1,True,False,deterministic,12,5.194
+map_agent_full,q08,What do I need to submit a warranty claim?,answerable,warranty_terms.txt,False,True,1,0.1429,1.0,7,207,207,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.507
+map_agent_full,q09,Is water damage covered by warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,179,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.15
+map_agent_full,q10,What defines a severity 1 incident?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,165,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.176
+map_agent_full,q11,Who owns the incident response?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,195,467,-30,-15.38,2,2,8,1,True,False,deterministic,12,5.982
+map_agent_full,q12,What is the public status update cadence for an outage?,answerable,incident_runbook.txt,False,True,1,0.5,1.0,2,73,73,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.29
+map_agent_full,q13,What blocks a release?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,109,109,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.342
+map_agent_full,q14,How long is the staging soak time?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,111,208,467,-97,-46.63,2,2,8,1,True,False,deterministic,12,5.909
+map_agent_full,q15,What is the staged rollout plan for production?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,115,141,467,-26,-18.44,2,2,8,1,True,False,deterministic,12,5.216
+map_agent_full,q16,On which working day of the month does the payroll run?,answerable,payroll_policy.txt,False,True,1,0.3333,1.0,3,87,181,467,-94,-51.93,2,2,8,1,True,False,deterministic,12,5.349
+map_agent_full,q17,When are timesheets due?,answerable,payroll_policy.txt,False,True,1,0.5,1.0,2,55,86,467,-31,-36.05,2,2,8,1,True,False,deterministic,12,5.515
+map_agent_full,q18,How is overtime paid?,answerable,payroll_policy.txt,False,True,1,1.0,1.0,1,30,30,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.095
+map_agent_full,q19,What is the default API rate limit quota?,answerable,api_rate_limits.txt,False,True,1,0.2,1.0,5,156,245,467,-89,-36.33,2,2,8,1,True,False,deterministic,12,5.229
+map_agent_full,q20,What happens when I exceed the burst allowance?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,62,62,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.53
+map_agent_full,q21,How should clients handle throttling responses?,answerable,api_rate_limits.txt,False,False,0,0.0,0.0,1,29,88,467,-59,-67.05,2,2,8,1,True,False,deterministic,12,5.323
+map_agent_full,q22,Which principle governs access grants?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,152,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.149
+map_agent_full,q23,Is multi factor authentication mandatory?,answerable,access_control.txt,False,True,1,1.0,1.0,1,26,26,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.843
+map_agent_full,q24,How are break glass accounts reviewed?,answerable,access_control.txt,False,True,1,0.25,1.0,4,122,152,467,-30,-19.74,2,2,8,1,True,False,deterministic,12,5.183
+map_agent_full,q25,What is the quarterly access review cadence?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,240,467,-88,-36.67,2,2,8,1,True,False,deterministic,12,5.184
+map_agent_full,n01,What is the office wifi password?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.579
+map_agent_full,n02,Who won the 2022 world cup final?,no_match,,True,False,0,0.0,0.0,1,33,33,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.248
+map_agent_full,n03,What is the capital city of Portugal?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.265
+map_agent_full,n04,Can you book me a flight to Tokyo?,no_match,,True,False,0,0.0,0.0,1,32,32,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.572
+map_agent_full,n05,What is the recommended daily calorie intake for adults?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.413
+map_agent_full,n06,Explain quantum chromodynamics lattice gauge theory.,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.314
+map_agent_adaptive,q01,Within how many days may a customer request a full refund?,answerable,refund_policy.txt,False,True,1,0.1667,1.0,6,189,249,1358,-60,-24.1,3,2,24,1,True,False,deterministic,6,15.019
+map_agent_adaptive,q02,What is the refund window for electronics?,answerable,refund_policy.txt,False,True,1,0.1667,1.0,6,189,249,1358,-60,-24.1,3,2,24,1,True,False,deterministic,6,15.015
+map_agent_adaptive,q03,How many business days does refund settlement take?,answerable,refund_policy.txt,False,True,1,0.1667,1.0,6,189,250,1358,-61,-24.4,3,2,24,1,True,False,deterministic,6,14.975
+map_agent_adaptive,q04,How long does domestic ground shipping take?,answerable,shipping_times.txt,False,True,1,0.3333,1.0,3,87,118,1358,-31,-26.27,3,2,24,1,True,False,deterministic,6,14.89
+map_agent_adaptive,q05,When is expedited delivery available?,answerable,shipping_times.txt,False,True,1,0.2,1.0,5,154,253,1358,-99,-39.13,4,2,24,1,True,False,deterministic,8,15.108
+map_agent_adaptive,q06,How long does international customs clearance take?,answerable,shipping_times.txt,False,True,1,1.0,1.0,1,28,59,1358,-31,-52.54,4,2,24,1,True,False,deterministic,8,15.074
+map_agent_adaptive,q07,How long is the manufacturer warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,210,1358,-31,-14.76,3,2,24,1,True,False,deterministic,6,14.902
+map_agent_adaptive,q08,What do I need to submit a warranty claim?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,207,1358,-28,-13.53,3,2,24,1,True,False,deterministic,6,14.788
+map_agent_adaptive,q09,Is water damage covered by warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,179,1358,0,0.0,3,2,24,1,True,False,deterministic,6,14.599
+map_agent_adaptive,q10,What defines a severity 1 incident?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,165,1358,0,0.0,3,2,24,1,True,False,deterministic,6,14.615
+map_agent_adaptive,q11,Who owns the incident response?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,195,1358,-30,-15.38,3,2,24,1,True,False,deterministic,6,14.938
+map_agent_adaptive,q12,What is the public status update cadence for an outage?,answerable,incident_runbook.txt,False,True,1,0.5,1.0,2,73,73,1358,0,0.0,3,2,24,1,True,False,deterministic,6,15.823
+map_agent_adaptive,q13,What blocks a release?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,109,109,1358,0,0.0,4,2,24,1,True,False,deterministic,8,14.861
+map_agent_adaptive,q14,How long is the staging soak time?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,111,208,1358,-97,-46.63,4,2,24,1,True,False,deterministic,8,14.898
+map_agent_adaptive,q15,What is the staged rollout plan for production?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,115,141,1358,-26,-18.44,3,2,24,1,True,False,deterministic,6,14.863
+map_agent_adaptive,q16,On which working day of the month does the payroll run?,answerable,payroll_policy.txt,False,True,1,0.3333,1.0,3,87,181,1358,-94,-51.93,3,2,24,1,True,False,deterministic,6,14.864
+map_agent_adaptive,q17,When are timesheets due?,answerable,payroll_policy.txt,False,True,1,0.5,1.0,2,55,86,1358,-31,-36.05,4,2,24,1,True,False,deterministic,8,14.786
+map_agent_adaptive,q18,How is overtime paid?,answerable,payroll_policy.txt,False,True,1,1.0,1.0,1,30,30,1358,0,0.0,4,2,24,1,True,False,deterministic,8,14.938
+map_agent_adaptive,q19,What is the default API rate limit quota?,answerable,api_rate_limits.txt,False,True,1,0.2,1.0,5,156,245,1358,-89,-36.33,3,2,24,1,True,False,deterministic,6,15.161
+map_agent_adaptive,q20,What happens when I exceed the burst allowance?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,62,62,1358,0,0.0,3,2,24,1,True,False,deterministic,6,14.764
+map_agent_adaptive,q21,How should clients handle throttling responses?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,59,88,1358,-29,-32.95,3,2,24,1,True,False,deterministic,6,14.698
+map_agent_adaptive,q22,Which principle governs access grants?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,152,1358,0,0.0,3,2,24,1,True,False,deterministic,6,14.84
+map_agent_adaptive,q23,Is multi factor authentication mandatory?,answerable,access_control.txt,False,True,1,1.0,1.0,1,26,26,1358,0,0.0,4,2,24,1,True,False,deterministic,8,15.266
+map_agent_adaptive,q24,How are break glass accounts reviewed?,answerable,access_control.txt,False,True,1,0.25,1.0,4,122,152,1358,-30,-19.74,3,2,24,1,True,False,deterministic,6,14.93
+map_agent_adaptive,q25,What is the quarterly access review cadence?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,240,1358,-88,-36.67,3,2,24,1,True,False,deterministic,6,14.919
+map_agent_adaptive,n01,What is the office wifi password?,no_match,,False,False,0,1.0,1.0,0,0,0,1358,0,0.0,3,2,24,2,False,True,deterministic,54,15.159
+map_agent_adaptive,n02,Who won the 2022 world cup final?,no_match,,True,False,0,0.0,0.0,1,33,33,1358,0,0.0,4,2,24,1,True,False,deterministic,8,15.194
+map_agent_adaptive,n03,What is the capital city of Portugal?,no_match,,False,False,0,1.0,1.0,0,0,0,1358,0,0.0,3,2,24,2,False,True,deterministic,54,15.16
+map_agent_adaptive,n04,Can you book me a flight to Tokyo?,no_match,,True,False,0,0.0,0.0,1,32,32,1358,0,0.0,3,2,24,2,False,True,deterministic,54,15.002
+map_agent_adaptive,n05,What is the recommended daily calorie intake for adults?,no_match,,False,False,0,1.0,1.0,0,0,0,1358,0,0.0,3,2,24,2,False,True,deterministic,54,15.027
+map_agent_adaptive,n06,Explain quantum chromodynamics lattice gauge theory.,no_match,,False,False,0,1.0,1.0,0,0,0,1358,0,0.0,3,2,24,2,False,True,deterministic,54,15.158
+map_agent_refine,q01,Within how many days may a customer request a full refund?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,254,249,467,5,2.01,2,2,8,1,True,False,deterministic,12,19.323
+map_agent_refine,q02,What is the refund window for electronics?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,249,249,467,0,0.0,2,2,8,1,True,False,deterministic,12,19.075
+map_agent_refine,q03,How many business days does refund settlement take?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,254,250,467,4,1.6,2,2,8,1,True,False,deterministic,12,18.978
+map_agent_refine,q04,How long does domestic ground shipping take?,answerable,shipping_times.txt,False,True,1,0.3333,1.0,3,87,118,467,-31,-26.27,2,2,8,1,True,False,deterministic,12,19.169
+map_agent_refine,q05,When is expedited delivery available?,answerable,shipping_times.txt,False,True,1,0.1667,1.0,6,183,253,467,-70,-27.67,2,2,8,1,True,False,deterministic,12,22.029
+map_agent_refine,q06,How long does international customs clearance take?,answerable,shipping_times.txt,False,False,0,0.0,0.0,0,0,59,467,-59,-100.0,3,2,8,2,True,True,deterministic,30,18.732
+map_agent_refine,q07,How long is the manufacturer warranty?,answerable,warranty_terms.txt,False,True,1,0.1429,1.0,7,210,210,467,0,0.0,2,2,8,1,True,False,deterministic,12,18.538
+map_agent_refine,q08,What do I need to submit a warranty claim?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,207,467,-28,-13.53,2,2,8,1,True,False,deterministic,12,18.537
+map_agent_refine,q09,Is water damage covered by warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,179,467,0,0.0,2,2,8,1,True,False,deterministic,12,18.489
+map_agent_refine,q10,What defines a severity 1 incident?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,165,467,0,0.0,2,2,8,1,True,False,deterministic,12,18.742
+map_agent_refine,q11,Who owns the incident response?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,195,467,-30,-15.38,1,1,8,1,True,False,deterministic,6,18.566
+map_agent_refine,q12,What is the public status update cadence for an outage?,answerable,incident_runbook.txt,False,True,1,0.5,1.0,2,73,73,467,0,0.0,1,1,8,1,True,False,deterministic,6,18.686
+map_agent_refine,q13,What blocks a release?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,109,109,467,0,0.0,1,1,8,1,True,False,deterministic,6,19.041
+map_agent_refine,q14,How long is the staging soak time?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,111,208,467,-97,-46.63,2,2,8,1,True,False,deterministic,12,18.852
+map_agent_refine,q15,What is the staged rollout plan for production?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,115,141,467,-26,-18.44,2,2,8,1,True,False,deterministic,12,18.793
+map_agent_refine,q16,On which working day of the month does the payroll run?,answerable,payroll_policy.txt,False,True,1,0.3333,1.0,3,87,181,467,-94,-51.93,2,2,8,1,True,False,deterministic,12,19.093
+map_agent_refine,q17,When are timesheets due?,answerable,payroll_policy.txt,False,True,1,0.5,1.0,2,55,86,467,-31,-36.05,2,2,8,1,True,False,deterministic,12,18.491
+map_agent_refine,q18,How is overtime paid?,answerable,payroll_policy.txt,False,True,1,1.0,1.0,1,30,30,467,0,0.0,1,1,8,1,True,False,deterministic,6,18.454
+map_agent_refine,q19,What is the default API rate limit quota?,answerable,api_rate_limits.txt,False,True,1,0.1667,1.0,6,190,245,467,-55,-22.45,2,2,8,1,True,False,deterministic,12,18.879
+map_agent_refine,q20,What happens when I exceed the burst allowance?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,62,62,467,0,0.0,2,2,8,1,True,False,deterministic,12,19.062
+map_agent_refine,q21,How should clients handle throttling responses?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,59,88,467,-29,-32.95,2,2,8,1,True,False,deterministic,12,19.666
+map_agent_refine,q22,Which principle governs access grants?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,152,467,0,0.0,2,2,8,1,True,False,deterministic,12,19.526
+map_agent_refine,q23,Is multi factor authentication mandatory?,answerable,access_control.txt,False,True,1,1.0,1.0,1,26,26,467,0,0.0,1,1,8,1,True,False,deterministic,6,18.559
+map_agent_refine,q24,How are break glass accounts reviewed?,answerable,access_control.txt,False,True,1,0.25,1.0,4,122,152,467,-30,-19.74,2,2,8,1,True,False,deterministic,12,19.067
+map_agent_refine,q25,What is the quarterly access review cadence?,answerable,access_control.txt,False,True,1,0.1667,1.0,6,184,240,467,-56,-23.33,2,2,8,1,True,False,deterministic,12,18.777
+map_agent_refine,n01,What is the office wifi password?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,deterministic,60,19.113
+map_agent_refine,n02,Who won the 2022 world cup final?,no_match,,True,False,0,0.0,0.0,1,33,33,467,0,0.0,1,1,8,1,True,False,deterministic,6,18.9
+map_agent_refine,n03,What is the capital city of Portugal?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,deterministic,60,18.662
+map_agent_refine,n04,Can you book me a flight to Tokyo?,no_match,,True,False,0,0.0,0.0,1,32,32,467,0,0.0,1,1,8,1,True,False,deterministic,6,18.412
+map_agent_refine,n05,What is the recommended daily calorie intake for adults?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,deterministic,60,18.877
+map_agent_refine,n06,Explain quantum chromodynamics lattice gauge theory.,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,deterministic,60,18.773
+map_agent_no_neighbors,q01,Within how many days may a customer request a full refund?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,254,249,467,5,2.01,2,2,8,1,True,False,deterministic,12,5.699
+map_agent_no_neighbors,q02,What is the refund window for electronics?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,249,249,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.195
+map_agent_no_neighbors,q03,How many business days does refund settlement take?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,247,250,467,-3,-1.2,2,2,8,1,True,False,deterministic,12,5.32
+map_agent_no_neighbors,q04,How long does domestic ground shipping take?,answerable,shipping_times.txt,False,True,1,0.3333,1.0,3,87,118,467,-31,-26.27,2,2,8,1,True,False,deterministic,12,5.5
+map_agent_no_neighbors,q05,When is expedited delivery available?,answerable,shipping_times.txt,False,True,1,0.25,1.0,4,131,253,467,-122,-48.22,2,2,8,1,True,False,deterministic,12,5.133
+map_agent_no_neighbors,q06,How long does international customs clearance take?,answerable,shipping_times.txt,False,False,0,0.0,0.0,0,0,59,467,-59,-100.0,3,2,8,2,True,True,deterministic,30,5.25
+map_agent_no_neighbors,q07,How long is the manufacturer warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,210,467,-31,-14.76,2,2,8,1,True,False,deterministic,12,5.435
+map_agent_no_neighbors,q08,What do I need to submit a warranty claim?,answerable,warranty_terms.txt,False,True,1,0.1429,1.0,7,207,207,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.143
+map_agent_no_neighbors,q09,Is water damage covered by warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,179,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.117
+map_agent_no_neighbors,q10,What defines a severity 1 incident?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,165,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.433
+map_agent_no_neighbors,q11,Who owns the incident response?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,195,467,-30,-15.38,2,2,8,1,True,False,deterministic,12,5.141
+map_agent_no_neighbors,q12,What is the public status update cadence for an outage?,answerable,incident_runbook.txt,False,True,1,0.5,1.0,2,73,73,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.228
+map_agent_no_neighbors,q13,What blocks a release?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,109,109,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.23
+map_agent_no_neighbors,q14,How long is the staging soak time?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,111,208,467,-97,-46.63,2,2,8,1,True,False,deterministic,12,5.232
+map_agent_no_neighbors,q15,What is the staged rollout plan for production?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,115,141,467,-26,-18.44,2,2,8,1,True,False,deterministic,12,5.251
+map_agent_no_neighbors,q16,On which working day of the month does the payroll run?,answerable,payroll_policy.txt,False,True,1,0.3333,1.0,3,87,181,467,-94,-51.93,2,2,8,1,True,False,deterministic,12,5.452
+map_agent_no_neighbors,q17,When are timesheets due?,answerable,payroll_policy.txt,False,True,1,0.5,1.0,2,55,86,467,-31,-36.05,2,2,8,1,True,False,deterministic,12,5.137
+map_agent_no_neighbors,q18,How is overtime paid?,answerable,payroll_policy.txt,False,True,1,1.0,1.0,1,30,30,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.017
+map_agent_no_neighbors,q19,What is the default API rate limit quota?,answerable,api_rate_limits.txt,False,True,1,0.2,1.0,5,156,245,467,-89,-36.33,2,2,8,1,True,False,deterministic,12,5.16
+map_agent_no_neighbors,q20,What happens when I exceed the burst allowance?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,62,62,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.77
+map_agent_no_neighbors,q21,How should clients handle throttling responses?,answerable,api_rate_limits.txt,False,False,0,0.0,0.0,1,29,88,467,-59,-67.05,2,2,8,1,True,False,deterministic,12,5.12
+map_agent_no_neighbors,q22,Which principle governs access grants?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,152,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.09
+map_agent_no_neighbors,q23,Is multi factor authentication mandatory?,answerable,access_control.txt,False,True,1,1.0,1.0,1,26,26,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.464
+map_agent_no_neighbors,q24,How are break glass accounts reviewed?,answerable,access_control.txt,False,True,1,0.25,1.0,4,122,152,467,-30,-19.74,2,2,8,1,True,False,deterministic,12,5.148
+map_agent_no_neighbors,q25,What is the quarterly access review cadence?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,240,467,-88,-36.67,2,2,8,1,True,False,deterministic,12,5.125
+map_agent_no_neighbors,n01,What is the office wifi password?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.655
+map_agent_no_neighbors,n02,Who won the 2022 world cup final?,no_match,,True,False,0,0.0,0.0,1,33,33,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.127
+map_agent_no_neighbors,n03,What is the capital city of Portugal?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.233
+map_agent_no_neighbors,n04,Can you book me a flight to Tokyo?,no_match,,True,False,0,0.0,0.0,1,32,32,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.589
+map_agent_no_neighbors,n05,What is the recommended daily calorie intake for adults?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.319
+map_agent_no_neighbors,n06,Explain quantum chromodynamics lattice gauge theory.,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,deterministic,60,5.265
+map_agent_no_reflection,q01,Within how many days may a customer request a full refund?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,254,249,467,5,2.01,2,2,8,1,True,False,deterministic,12,5.632
+map_agent_no_reflection,q02,What is the refund window for electronics?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,249,249,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.184
+map_agent_no_reflection,q03,How many business days does refund settlement take?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,247,250,467,-3,-1.2,2,2,8,1,True,False,deterministic,12,5.316
+map_agent_no_reflection,q04,How long does domestic ground shipping take?,answerable,shipping_times.txt,False,True,1,0.3333,1.0,3,87,118,467,-31,-26.27,2,2,8,1,True,False,deterministic,12,5.414
+map_agent_no_reflection,q05,When is expedited delivery available?,answerable,shipping_times.txt,False,True,1,0.25,1.0,4,131,253,467,-122,-48.22,2,2,8,1,True,False,deterministic,12,5.128
+map_agent_no_reflection,q06,How long does international customs clearance take?,answerable,shipping_times.txt,False,False,0,0.0,0.0,0,0,59,467,-59,-100.0,2,2,8,1,True,True,deterministic,12,5.204
+map_agent_no_reflection,q07,How long is the manufacturer warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,210,467,-31,-14.76,2,2,8,1,True,False,deterministic,12,5.519
+map_agent_no_reflection,q08,What do I need to submit a warranty claim?,answerable,warranty_terms.txt,False,True,1,0.1429,1.0,7,207,207,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.209
+map_agent_no_reflection,q09,Is water damage covered by warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,179,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.119
+map_agent_no_reflection,q10,What defines a severity 1 incident?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,165,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.586
+map_agent_no_reflection,q11,Who owns the incident response?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,195,467,-30,-15.38,2,2,8,1,True,False,deterministic,12,5.239
+map_agent_no_reflection,q12,What is the public status update cadence for an outage?,answerable,incident_runbook.txt,False,True,1,0.5,1.0,2,73,73,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.171
+map_agent_no_reflection,q13,What blocks a release?,answerable,release_checklist.txt,False,False,0,0.0,0.0,0,0,109,467,-109,-100.0,2,2,8,1,True,True,deterministic,12,5.279
+map_agent_no_reflection,q14,How long is the staging soak time?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,111,208,467,-97,-46.63,2,2,8,1,True,False,deterministic,12,5.209
+map_agent_no_reflection,q15,What is the staged rollout plan for production?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,115,141,467,-26,-18.44,2,2,8,1,True,False,deterministic,12,5.189
+map_agent_no_reflection,q16,On which working day of the month does the payroll run?,answerable,payroll_policy.txt,False,True,1,0.3333,1.0,3,87,181,467,-94,-51.93,2,2,8,1,True,False,deterministic,12,5.323
+map_agent_no_reflection,q17,When are timesheets due?,answerable,payroll_policy.txt,False,True,1,0.5,1.0,2,55,86,467,-31,-36.05,2,2,8,1,True,False,deterministic,12,5.032
+map_agent_no_reflection,q18,How is overtime paid?,answerable,payroll_policy.txt,False,True,1,1.0,1.0,1,30,30,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.02
+map_agent_no_reflection,q19,What is the default API rate limit quota?,answerable,api_rate_limits.txt,False,True,1,0.2,1.0,5,156,245,467,-89,-36.33,2,2,8,1,True,False,deterministic,12,5.451
+map_agent_no_reflection,q20,What happens when I exceed the burst allowance?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,62,62,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.128
+map_agent_no_reflection,q21,How should clients handle throttling responses?,answerable,api_rate_limits.txt,False,False,0,0.0,0.0,1,29,88,467,-59,-67.05,2,2,8,1,True,False,deterministic,12,5.145
+map_agent_no_reflection,q22,Which principle governs access grants?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,152,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.463
+map_agent_no_reflection,q23,Is multi factor authentication mandatory?,answerable,access_control.txt,False,False,0,0.0,0.0,0,0,26,467,-26,-100.0,2,2,8,1,True,True,deterministic,12,5.033
+map_agent_no_reflection,q24,How are break glass accounts reviewed?,answerable,access_control.txt,False,True,1,0.25,1.0,4,122,152,467,-30,-19.74,2,2,8,1,True,False,deterministic,12,5.142
+map_agent_no_reflection,q25,What is the quarterly access review cadence?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,240,467,-88,-36.67,2,2,8,1,True,False,deterministic,12,5.663
+map_agent_no_reflection,n01,What is the office wifi password?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,1,True,True,deterministic,12,5.069
+map_agent_no_reflection,n02,Who won the 2022 world cup final?,no_match,,True,False,0,0.0,0.0,1,33,33,467,0,0.0,2,2,8,1,True,False,deterministic,12,5.127
+map_agent_no_reflection,n03,What is the capital city of Portugal?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,1,True,True,deterministic,12,5.328
+map_agent_no_reflection,n04,Can you book me a flight to Tokyo?,no_match,,True,False,0,1.0,1.0,0,0,32,467,-32,-100.0,2,2,8,1,True,True,deterministic,12,5.05
+map_agent_no_reflection,n05,What is the recommended daily calorie intake for adults?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,1,True,True,deterministic,12,5.157
+map_agent_no_reflection,n06,Explain quantum chromodynamics lattice gauge theory.,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,1,True,True,deterministic,12,5.469
+map_agent_single_section,q01,Within how many days may a customer request a full refund?,answerable,refund_policy.txt,False,True,1,0.1667,1.0,6,189,249,467,-60,-24.1,1,1,8,1,True,False,deterministic,6,5.26
+map_agent_single_section,q02,What is the refund window for electronics?,answerable,refund_policy.txt,False,True,1,0.1667,1.0,6,189,249,467,-60,-24.1,1,1,8,1,True,False,deterministic,6,5.097
+map_agent_single_section,q03,How many business days does refund settlement take?,answerable,refund_policy.txt,False,True,1,0.1667,1.0,6,189,250,467,-61,-24.4,1,1,8,1,True,False,deterministic,6,5.57
+map_agent_single_section,q04,How long does domestic ground shipping take?,answerable,shipping_times.txt,False,True,1,0.3333,1.0,3,87,118,467,-31,-26.27,1,1,8,1,True,False,deterministic,6,5.215
+map_agent_single_section,q05,When is expedited delivery available?,answerable,shipping_times.txt,False,True,1,0.3333,1.0,3,90,253,467,-163,-64.43,1,1,8,1,True,False,deterministic,6,5.08
+map_agent_single_section,q06,How long does international customs clearance take?,answerable,shipping_times.txt,False,False,0,0.0,0.0,0,0,59,467,-59,-100.0,1,1,8,1,True,True,deterministic,6,5.281
+map_agent_single_section,q07,How long is the manufacturer warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,210,467,-31,-14.76,1,1,8,1,True,False,deterministic,6,5.081
+map_agent_single_section,q08,What do I need to submit a warranty claim?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,207,467,-28,-13.53,1,1,8,1,True,False,deterministic,6,5.079
+map_agent_single_section,q09,Is water damage covered by warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,179,467,0,0.0,1,1,8,1,True,False,deterministic,6,5.232
+map_agent_single_section,q10,What defines a severity 1 incident?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,165,467,0,0.0,1,1,8,1,True,False,deterministic,6,5.211
+map_agent_single_section,q11,Who owns the incident response?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,195,467,-30,-15.38,1,1,8,1,True,False,deterministic,6,5.076
+map_agent_single_section,q12,What is the public status update cadence for an outage?,answerable,incident_runbook.txt,False,True,1,0.5,1.0,2,73,73,467,0,0.0,1,1,8,1,True,False,deterministic,6,5.147
+map_agent_single_section,q13,What blocks a release?,answerable,release_checklist.txt,False,False,0,0.0,0.0,0,0,109,467,-109,-100.0,1,1,8,1,True,True,deterministic,6,5.118
+map_agent_single_section,q14,How long is the staging soak time?,answerable,release_checklist.txt,False,False,0,0.0,0.0,2,59,208,467,-149,-71.63,1,1,8,1,True,False,deterministic,6,5.144
+map_agent_single_section,q15,What is the staged rollout plan for production?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,115,141,467,-26,-18.44,1,1,8,1,True,False,deterministic,6,5.11
+map_agent_single_section,q16,On which working day of the month does the payroll run?,answerable,payroll_policy.txt,False,True,1,0.3333,1.0,3,87,181,467,-94,-51.93,1,1,8,1,True,False,deterministic,6,5.581
+map_agent_single_section,q17,When are timesheets due?,answerable,payroll_policy.txt,False,True,1,1.0,1.0,1,28,86,467,-58,-67.44,1,1,8,1,True,False,deterministic,6,5.001
+map_agent_single_section,q18,How is overtime paid?,answerable,payroll_policy.txt,False,True,1,1.0,1.0,1,30,30,467,0,0.0,1,1,8,1,True,False,deterministic,6,4.984
+map_agent_single_section,q19,What is the default API rate limit quota?,answerable,api_rate_limits.txt,False,True,1,0.2,1.0,5,156,245,467,-89,-36.33,1,1,8,1,True,False,deterministic,6,5.488
+map_agent_single_section,q20,What happens when I exceed the burst allowance?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,62,62,467,0,0.0,1,1,8,1,True,False,deterministic,6,5.144
+map_agent_single_section,q21,How should clients handle throttling responses?,answerable,api_rate_limits.txt,False,False,0,0.0,0.0,1,29,88,467,-59,-67.05,1,1,8,1,True,False,deterministic,6,5.104
+map_agent_single_section,q22,Which principle governs access grants?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,152,467,0,0.0,1,1,8,1,True,False,deterministic,6,5.61
+map_agent_single_section,q23,Is multi factor authentication mandatory?,answerable,access_control.txt,False,False,0,0.0,0.0,0,0,26,467,-26,-100.0,1,1,8,1,True,True,deterministic,6,4.996
+map_agent_single_section,q24,How are break glass accounts reviewed?,answerable,access_control.txt,False,True,1,0.25,1.0,4,122,152,467,-30,-19.74,1,1,8,1,True,False,deterministic,6,5.093
+map_agent_single_section,q25,What is the quarterly access review cadence?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,240,467,-88,-36.67,1,1,8,1,True,False,deterministic,6,5.438
+map_agent_single_section,n01,What is the office wifi password?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,1,1,8,1,True,True,deterministic,6,4.991
+map_agent_single_section,n02,Who won the 2022 world cup final?,no_match,,True,False,0,0.0,0.0,1,33,33,467,0,0.0,1,1,8,1,True,False,deterministic,6,5.094
+map_agent_single_section,n03,What is the capital city of Portugal?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,1,1,8,1,True,True,deterministic,6,5.235
+map_agent_single_section,n04,Can you book me a flight to Tokyo?,no_match,,True,False,0,1.0,1.0,0,0,32,467,-32,-100.0,1,1,8,1,True,True,deterministic,6,5.004
+map_agent_single_section,n05,What is the recommended daily calorie intake for adults?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,1,1,8,1,True,True,deterministic,6,5.101
+map_agent_single_section,n06,Explain quantum chromodynamics lattice gauge theory.,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,1,1,8,1,True,True,deterministic,6,5.285
+map_agent_oracle_planner,q01,Within how many days may a customer request a full refund?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,254,249,467,5,2.01,2,2,8,1,True,False,injected_fallback_deterministic,12,5.359
+map_agent_oracle_planner,q02,What is the refund window for electronics?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,249,249,467,0,0.0,2,2,8,1,True,False,injected_fallback_deterministic,12,5.203
+map_agent_oracle_planner,q03,How many business days does refund settlement take?,answerable,refund_policy.txt,False,True,1,0.125,1.0,8,247,250,467,-3,-1.2,2,2,8,1,True,False,injected_fallback_deterministic,12,5.673
+map_agent_oracle_planner,q04,How long does domestic ground shipping take?,answerable,shipping_times.txt,False,True,1,0.3333,1.0,3,87,118,467,-31,-26.27,2,2,8,1,True,False,injected_fallback_deterministic,12,5.251
+map_agent_oracle_planner,q05,When is expedited delivery available?,answerable,shipping_times.txt,False,True,1,0.25,1.0,4,131,253,467,-122,-48.22,2,2,8,1,True,False,injected_fallback_deterministic,12,5.159
+map_agent_oracle_planner,q06,How long does international customs clearance take?,answerable,shipping_times.txt,False,False,0,0.0,0.0,0,0,59,467,-59,-100.0,3,2,8,2,True,True,injected_fallback_deterministic,30,5.551
+map_agent_oracle_planner,q07,How long is the manufacturer warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,210,467,-31,-14.76,2,2,8,1,True,False,injected_fallback_deterministic,12,5.255
+map_agent_oracle_planner,q08,What do I need to submit a warranty claim?,answerable,warranty_terms.txt,False,True,1,0.1429,1.0,7,207,207,467,0,0.0,2,2,8,1,True,False,injected_fallback_deterministic,12,5.258
+map_agent_oracle_planner,q09,Is water damage covered by warranty?,answerable,warranty_terms.txt,False,True,1,0.1667,1.0,6,179,179,467,0,0.0,2,2,8,1,True,False,injected_fallback_deterministic,12,5.555
+map_agent_oracle_planner,q10,What defines a severity 1 incident?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,165,467,0,0.0,2,2,8,1,True,False,injected_fallback_deterministic,12,5.166
+map_agent_oracle_planner,q11,Who owns the incident response?,answerable,incident_runbook.txt,False,True,1,0.2,1.0,5,165,195,467,-30,-15.38,2,2,8,1,True,False,injected_fallback_deterministic,12,5.124
+map_agent_oracle_planner,q12,What is the public status update cadence for an outage?,answerable,incident_runbook.txt,False,True,1,0.5,1.0,2,73,73,467,0,0.0,2,2,8,1,True,False,injected_fallback_deterministic,12,5.582
+map_agent_oracle_planner,q13,What blocks a release?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,109,109,467,0,0.0,2,2,8,2,False,True,injected_fallback_deterministic,60,5.221
+map_agent_oracle_planner,q14,How long is the staging soak time?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,111,208,467,-97,-46.63,2,2,8,1,True,False,injected_fallback_deterministic,12,5.189
+map_agent_oracle_planner,q15,What is the staged rollout plan for production?,answerable,release_checklist.txt,False,True,1,0.25,1.0,4,115,141,467,-26,-18.44,2,2,8,1,True,False,injected_fallback_deterministic,12,5.495
+map_agent_oracle_planner,q16,On which working day of the month does the payroll run?,answerable,payroll_policy.txt,False,True,1,0.3333,1.0,3,87,181,467,-94,-51.93,2,2,8,1,True,False,injected_fallback_deterministic,12,5.265
+map_agent_oracle_planner,q17,When are timesheets due?,answerable,payroll_policy.txt,False,True,1,0.5,1.0,2,55,86,467,-31,-36.05,2,2,8,1,True,False,injected_fallback_deterministic,12,5.097
+map_agent_oracle_planner,q18,How is overtime paid?,answerable,payroll_policy.txt,False,True,1,1.0,1.0,1,30,30,467,0,0.0,2,2,8,1,True,False,injected_fallback_deterministic,12,5.447
+map_agent_oracle_planner,q19,What is the default API rate limit quota?,answerable,api_rate_limits.txt,False,True,1,0.2,1.0,5,156,245,467,-89,-36.33,2,2,8,1,True,False,injected_fallback_deterministic,12,5.198
+map_agent_oracle_planner,q20,What happens when I exceed the burst allowance?,answerable,api_rate_limits.txt,False,True,1,0.5,1.0,2,62,62,467,0,0.0,2,2,8,1,True,False,injected_fallback_deterministic,12,5.185
+map_agent_oracle_planner,q21,How should clients handle throttling responses?,answerable,api_rate_limits.txt,False,False,0,0.0,0.0,1,29,88,467,-59,-67.05,2,2,8,1,True,False,injected_fallback_deterministic,12,5.38
+map_agent_oracle_planner,q22,Which principle governs access grants?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,152,467,0,0.0,2,2,8,1,True,False,injected_fallback_deterministic,12,5.176
+map_agent_oracle_planner,q23,Is multi factor authentication mandatory?,answerable,access_control.txt,False,True,1,1.0,1.0,1,26,26,467,0,0.0,2,2,8,2,False,True,injected_fallback_deterministic,60,5.293
+map_agent_oracle_planner,q24,How are break glass accounts reviewed?,answerable,access_control.txt,False,True,1,0.25,1.0,4,122,152,467,-30,-19.74,2,2,8,1,True,False,injected_fallback_deterministic,12,5.383
+map_agent_oracle_planner,q25,What is the quarterly access review cadence?,answerable,access_control.txt,False,True,1,0.2,1.0,5,152,240,467,-88,-36.67,2,2,8,1,True,False,injected_fallback_deterministic,12,5.35
+map_agent_oracle_planner,n01,What is the office wifi password?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,injected_fallback_deterministic,60,5.229
+map_agent_oracle_planner,n02,Who won the 2022 world cup final?,no_match,,True,False,0,0.0,0.0,1,33,33,467,0,0.0,2,2,8,1,True,False,injected_fallback_deterministic,12,5.415
+map_agent_oracle_planner,n03,What is the capital city of Portugal?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,injected_fallback_deterministic,60,5.275
+map_agent_oracle_planner,n04,Can you book me a flight to Tokyo?,no_match,,True,False,0,0.0,0.0,1,32,32,467,0,0.0,2,2,8,2,False,True,injected_fallback_deterministic,60,5.261
+map_agent_oracle_planner,n05,What is the recommended daily calorie intake for adults?,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,injected_fallback_deterministic,60,5.458
+map_agent_oracle_planner,n06,Explain quantum chromodynamics lattice gauge theory.,no_match,,False,False,0,1.0,1.0,0,0,0,467,0,0.0,2,2,8,2,False,True,injected_fallback_deterministic,60,5.332

@@ -2,30 +2,64 @@ services:
   docmind:
     build:
       context: .
+      dockerfile: Dockerfile
     image: docmind-local:latest
     container_name: docmind
     restart: unless-stopped
+    init: true
+    user: "10001:10001"
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
     read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,nodev,size=512m
-      - /home/appuser/.cache:rw,noexec,nosuid,nodev,size=2g
+      - /tmp:rw,noexec,nosuid,nodev,size=512m,uid=10001,gid=10001
+      - /home/appuser/.cache:rw,noexec,nosuid,nodev,size=2g,uid=10001,gid=10001
     volumes:
-      - docmind-data:/home/appuser/data
-      - docmind-index-cache:/home/appuser/.index_cache
+      - type: volume
+        source: docmind-data
+        target: /home/appuser/data
+      - type: volume
+        source: docmind-index-cache
+        target: /home/appuser/.index_cache
+      - type: volume
+        source: docmind-logs
+        target: /home/appuser/logs
     environment:
-      DOCMIND_LOG_FILE: /home/appuser/data/docmind.log
+      DOCMIND_ALLOW_REMOTE_BIND: "true"
+      DOCMIND_BIND_ADDRESS: "0.0.0.0"
+      DOCMIND_INGESTION_LOCK_PATH: /home/appuser/data/.docmind-ingestion.lock
+      DOCMIND_LOG_FILE: /home/appuser/logs/docmind.log
+      DOCMIND_R2R_STATE_DIR: /home/appuser/data/r2r
+      HOME: /home/appuser
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      STREAMLIT_SERVER_ADDRESS: "0.0.0.0"
+      XDG_CACHE_HOME: /home/appuser/.cache
     extra_hosts:
       - host.docker.internal:host-gateway
     ports:
-      - "8501:8501/tcp"
+      - "127.0.0.1:8501:8501/tcp"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     mem_limit: 8g
-    cpus: 4
+    cpus: 4.0
     pids_limit: 512
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
+    stop_grace_period: 30s
 
 volumes:
   docmind-data:
   docmind-index-cache:
+  docmind-logs:

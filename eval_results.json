@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-09-24 01:03",
+    "generated": "2026-09-26 14:32",
     "overall": {
       "overall_score": 1.0,
       "passed": 42,
@@ -25,7 +25,7 @@
           "test": "excluded_patterns",
           "pass": true,
           "detail": "loaded=1 patterns=34",
-          "ms": 331
+          "ms": 355
         },
         {
           "test": "title_aware",
@@ -37,31 +37,31 @@
           "test": "dedupe",
           "pass": true,
           "detail": "3 -> 2",
-          "ms": 154
+          "ms": 269
         },
         {
           "test": "multiformat_index",
           "pass": true,
           "detail": "docs=4 docx=yes",
-          "ms": 193
+          "ms": 305
         },
         {
           "test": "cache_key_and_persist",
           "pass": true,
-          "detail": "key=addcf0894136d88ff3c4 persist=hit",
-          "ms": 49
+          "detail": "key=f7756eff4949b3aa5378 persist=hit",
+          "ms": 215
         },
         {
           "test": "min_chunk_filter",
           "pass": true,
           "detail": "MIN_CHARS=15 docs_in=2",
-          "ms": 7
+          "ms": 65
         },
         {
           "test": "helpers_github_normalize",
           "pass": true,
           "detail": "owner/repo=True url=True reject_gitlab=True",
-          "ms": 5
+          "ms": 6
         }
       ],
       "passed": 7,
@@ -81,10 +81,10 @@
           "hybrid_hit": true,
           "plain_top": "refund_policy.txt",
           "hybrid_top": "refund_policy.txt",
-          "plain_score": 0.434,
-          "hybrid_score": 0.481,
-          "plain_latency": 0.0007,
-          "hybrid_latency": 0.0016
+          "plain_score": 0.423,
+          "hybrid_score": 0.468,
+          "plain_latency": 0.0006,
+          "hybrid_latency": 0.0022
         },
         {
           "query": "money back rules",
@@ -92,10 +92,10 @@
           "feature": "synonym",
           "plain_hit": false,
           "hybrid_hit": true,
-          "plain_top": "python_guide.txt",
+          "plain_top": null,
           "hybrid_top": "hr_policy.txt",
-          "plain_score": 0.333,
-          "hybrid_score": 0.236,
+          "plain_score": 0.0,
+          "hybrid_score": 0.177,
           "plain_latency": 0.0004,
           "hybrid_latency": 0.0015
         },
@@ -107,8 +107,8 @@
           "hybrid_hit": true,
           "plain_top": "refund_policy.txt",
           "hybrid_top": "refund_policy.txt",
-          "plain_score": 0.391,
-          "hybrid_score": 0.391,
+          "plain_score": 0.38,
+          "hybrid_score": 0.38,
           "plain_latency": 0.0004,
           "hybrid_latency": 0.0013
         },
@@ -120,10 +120,10 @@
           "hybrid_hit": true,
           "plain_top": "refund_policy.txt",
           "hybrid_top": "refund_policy.txt",
-          "plain_score": 0.505,
-          "hybrid_score": 0.481,
+          "plain_score": 0.491,
+          "hybrid_score": 0.468,
           "plain_latency": 0.0004,
-          "hybrid_latency": 0.0008
+          "hybrid_latency": 0.0009
         },
         {
           "query": "annual report revenue growth",
@@ -135,7 +135,7 @@
           "hybrid_top": "annual_report.txt",
           "plain_score": 0.421,
           "hybrid_score": 0.421,
-          "plain_latency": 0.0003,
+          "plain_latency": 0.0004,
           "hybrid_latency": 0.0013
         },
         {
@@ -146,10 +146,10 @@
           "hybrid_hit": true,
           "plain_top": "python_guide.txt",
           "hybrid_top": "python_guide.txt",
-          "plain_score": 0.424,
-          "hybrid_score": 0.31,
+          "plain_score": 0.43,
+          "hybrid_score": 0.314,
           "plain_latency": 0.0004,
-          "hybrid_latency": 0.0013
+          "hybrid_latency": 0.0014
         },
         {
           "query": "How many leave days per year?",
@@ -162,7 +162,7 @@
           "plain_score": 0.5,
           "hybrid_score": 0.5,
           "plain_latency": 0.0004,
-          "hybrid_latency": 0.0024
+          "hybrid_latency": 0.0023
         },
         {
           "query": "pasta cooking time",
@@ -174,7 +174,7 @@
           "hybrid_top": "cooking.txt",
           "plain_score": 0.459,
           "hybrid_score": 0.459,
-          "plain_latency": 0.0006,
+          "plain_latency": 0.0004,
           "hybrid_latency": 0.001
         },
         {
@@ -185,9 +185,9 @@
           "hybrid_hit": true,
           "plain_top": "refund_policy.txt",
           "hybrid_top": null,
-          "plain_score": 0.317,
+          "plain_score": 0.309,
           "hybrid_score": 0.0,
-          "plain_latency": 0.0005,
+          "plain_latency": 0.0003,
           "hybrid_latency": 0.0008
         },
         {
@@ -211,10 +211,10 @@
           "hybrid_hit": true,
           "plain_top": "refund_policy.txt",
           "hybrid_top": "refund_policy.txt",
-          "plain_score": 0.481,
-          "hybrid_score": 0.412,
-          "plain_latency": 0.0004,
-          "hybrid_latency": 0.0008
+          "plain_score": 0.535,
+          "hybrid_score": 0.401,
+          "plain_latency": 0.0006,
+          "hybrid_latency": 0.0016
         },
         {
           "query": "tell me about the annual report",
@@ -227,7 +227,7 @@
           "plain_score": 0.0,
           "hybrid_score": 0.341,
           "plain_latency": 0.0004,
-          "hybrid_latency": 0.0012
+          "hybrid_latency": 0.0013
         }
       ],
       "summary": {
@@ -236,7 +236,7 @@
         "plain_rejection": 0.5,
         "hybrid_rejection": 1.0,
         "plain_avg_ms": 0.4,
-        "hybrid_avg_ms": 1.2,
+        "hybrid_avg_ms": 1.4,
         "is_hybrid": true,
         "embedding": "hash-mock",
         "hybrid_basic_rate": 1.0,
@@ -260,7 +260,7 @@
         {
           "test": "qa_template_guards",
           "pass": true,
-          "detail": "has_guards=True len=738",
+          "detail": "has_guards=True len=938",
           "ms": 0
         },
         {
@@ -273,19 +273,19 @@
           "test": "no_match_fallback",
           "pass": true,
           "detail": "fallback=hit",
-          "ms": 21
+          "ms": 30
         },
         {
           "test": "tone_presets",
           "pass": true,
           "detail": "presets=6 distinct=True",
-          "ms": 7
+          "ms": 6
         },
         {
           "test": "multi_turn_history",
           "pass": true,
           "detail": "messages_in_prompt=4",
-          "ms": 6
+          "ms": 15
         },
         {
           "test": "e2e_real_llm",
@@ -306,20 +306,20 @@
         {
           "test": "ingest_5_docs",
           "pass": true,
-          "detail": "0.0s for 5 docs",
-          "ms": 23
+          "detail": "0.1s for 5 docs",
+          "ms": 107
         },
         {
           "test": "cache_round_trip",
           "pass": true,
-          "detail": "cold 0.0s vs cache load 0.04s",
-          "ms": 49
+          "detail": "cold 0.0s vs cache load 0.02s",
+          "ms": 121
         },
         {
           "test": "retrieval_latency",
           "pass": true,
           "detail": "vector 0ms hybrid 1ms",
-          "ms": 15
+          "ms": 71
         },
         {
           "test": "eco_mode_trims",
@@ -356,7 +356,7 @@
         {
           "test": "empty_docs_rejected",
           "pass": true,
-          "detail": "Index creation failed: No usable content was extracted from the documents. The f"
+          "detail": "Index creation failed safely."
         },
         {
           "test": "binary_exclusion",
@@ -396,7 +396,7 @@
         {
           "test": "browser_settings_contract",
           "pass": true,
-          "detail": "settings=30 secrets_excluded=True"
+          "detail": "settings=39 secrets_excluded=True"
         },
         {
           "test": "ollama_helpers",

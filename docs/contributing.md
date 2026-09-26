@@ -1,90 +1,135 @@
 # Contributing
 
-## Development Setup
+## Development setup
 
-Use the setup guide in [docs/setup.md](setup.md). The declared Python version is 3.13.
+Use the locked [setup guide](setup.md). The supported target is Python 3.13.15. `Pipfile` records Python 3.13, and `Pipfile.lock` is committed with hashes for the 3.13 dependency contract.
 
-The repository uses a `Pipfile`. No `Pipfile.lock` or `requirements.txt` is currently committed. Generate and commit a lockfile when reproducibility is required.
+Install the exact environment used by CI:
 
-## Code Style
+```bash
+python -m pip install "pipenv==2026.8.0"
+pipenv verify
+pipenv install --deploy --dev --extra-pip-args="--require-hashes"
+```
+
+Do not use an unlocked install for verification. For an intentional dependency update, run `pipenv lock`, review the lockfile and hashes, then run `pipenv verify` and the locked install again.
+
+## Code style
 
 - Follow the surrounding Streamlit and Python patterns.
 - Keep UI changes small and consistent.
-- Do not add provider, ingestion, or security behavior without tests.
-- Run Ruff and Black when they are installed in the development environment.
+- Do not add provider, ingestion, security, cache, or reset behavior without tests.
+- Run Ruff and Black when they are installed.
+- Avoid exposing credentials, private documents, sensitive logs, or registry contents in tests and reports.
+- Do not add comments unless the task requires them.
 
-The CI workflow runs fatal Ruff checks. It does not currently run Black.
+The configured commands are:
+
+```bash
+pipenv run ruff check .
+pipenv run black --check .
+```
+
+`pyproject.toml` targets Python 3.13, configures the Ruff rules, and checks Black formatting. There is no separate static type-check command configured in the project; `compileall` is the repository syntax check.
 
 ## Tests
 
-Run the full unit suite:
+Run the full unit/integration suite:
 
 ```bash
 pipenv run python -m unittest discover -s tests -v
 ```
 
-Run compile checks:
+The current snapshot result is 320 tests: 319 passed and one intentional opt-in live-R2R test skipped. The suite covers provider profiles, browser persistence, format extraction, parser/archive limits, source/index transactions, cache identity and rollback, R2R lifecycle, website SSRF controls, upload signatures, retrieval, evidence, citations, logging, runtime binding, and deployment contracts.
+
+Run compile and dependency checks:
 
 ```bash
-pipenv run python -m py_compile \
-  main.py \
-  components/page_state.py \
-  components/tabs/settings.py \
-  utils/browser_settings.py \
-  utils/ollama.py
+pipenv run python -m compileall -q main.py components utils eval_harness.py tests
+pipenv run python -m pip check
+pipenv verify
 ```
 
-Run the Streamlit health smoke test:
+The current local gate passed all of these checks.
+
+## Browser and integration tests
+
+Install Playwright Chromium and run the dedicated browser/integration module:
 
 ```bash
-pipenv run streamlit run main.py \
-  --server.headless=true \
-  --server.port=8520 \
-  --server.address=127.0.0.1
+pipenv run python -m playwright install chromium
+pipenv run python -m unittest tests.test_e2e_integration
+pipenv run python -m unittest tests.test_e2e_contract
 ```
 
-Then check:
+`tests.test_e2e_integration` contains 18 integration/browser tests, including real Chrome UI flows backed by local bounded fake provider and R2R servers. `tests.test_e2e_contract` contains three tests for the pinned Playwright dependency and the read-only E2E workflow. The real Chrome run passed locally.
+
+The dedicated E2E workflow installs locked dependencies and Playwright Chromium, uses Python 3.13.15, has read-only repository permissions, and runs only `tests.test_e2e_integration`. The quality workflow runs the full unit suite, compileall, `pip check`, Ruff, Black, and mock evaluation.
+
+For a local health smoke test:
 
 ```bash
-curl http://127.0.0.1:8520/_stcore/health
+pipenv run streamlit run main.py --server.headless=true --server.port=8520 --server.address=127.0.0.1
 ```
 
-Stop the smoke-test process after checking it.
+Check `http://127.0.0.1:8520/_stcore/health`, then stop the process.
 
-## Evaluation Harness
+## Evaluation harness
+
+Run the deterministic mock evaluation:
 
 ```bash
 pipenv run python eval_harness.py --mock --out ./eval-output
+```
+
+The current result is 42/42 scored checks passed with one real-LLM check skipped. Mock mode still exercises validation paths that can perform DNS resolution, so it is not completely hermetic.
+
+The real evaluation is separate:
+
+```bash
 pipenv run python eval_harness.py --out ./eval-output-real
 ```
 
-The harness is not currently part of CI. Mock mode still executes some live DNS validation and should not be described as fully hermetic.
+The current real Ollama/LLM evaluation was not rerun because the live service was unavailable. The 43/43 result dated 2026-09-23 is historical evidence, not a current result. The harness uses small fixtures and is not a browser load test, security audit, or proof of arbitrary-document factuality.
 
-## Security-Sensitive Areas
+## Security-sensitive review areas
 
 Review changes carefully in:
 
-- Upload validation and path containment
-- Website URL validation and redirects
-- GitHub normalization, cloning, and file-symlink handling
-- Ollama and OpenAI-compatible endpoint handling
-- R2R uploads and remote document lifecycle
-- Cache identity and local index contents
-- Logging and browser persistence
+- Upload validation, path containment, parser selection, and archive limits.
+- Website URL validation, DNS screening, pinned HTTPS transport, redirects, and response limits.
+- GitHub normalization, metadata, subprocess calls, checkout inspection, and atomic replacement.
+- Ollama and OpenAI-compatible endpoint validation, provider isolation, and credential binding.
+- R2R uploads, polling, rollback, replacement, ownership registry, and reset behavior.
+- Cross-process lifecycle locking and source/index generation state.
+- Cache identity, candidate validation, atomic persistence, pruning, and reparse-point checks.
+- Untrusted prompt boundaries, tokenizer-aware budgeting, evidence, and citation sanitization.
+- Log redaction/rotation, browser persistence, exports, and runtime binding.
+- Docker/Compose loopback publication, read-only filesystem, non-root user, and resource limits.
 
-## Dependencies
+Tests in `tests/test_security_workstream.py`, `tests/test_security_controls.py`, `tests/test_source_state.py`, `tests/test_r2r.py`, `tests/test_deployment_contract.py`, and the E2E modules cover many of these behaviors. Review the actual code and test contract rather than relying on a test name alone.
 
-`Pipfile` declares direct runtime and development dependencies. All versions currently use wildcards, so dependency resolution is not reproducible until a lockfile is committed.
+## Runtime and reset testing
 
-Dependabot configuration exists, but update classification and automatic merge behavior also depend on repository settings and the dependency's release semantics.
+The application has no built-in authentication. Keep the default bind at `127.0.0.1`. Any non-loopback or wildcard test requires `DOCMIND_ALLOW_REMOTE_BIND=true` and a controlled authenticated reverse proxy. Do not expose a test server directly to an untrusted network.
 
-## Pull Requests
+R2R lifecycle tests use local fake servers and ownership registries. A current live R2R server was unavailable. Reset tests should verify that only owned work paths and owned remote documents are handled, and that failed cleanup remains visible and retryable.
 
-- Keep changes focused
-- Add or update tests
-- Run unit and compile checks
-- Update documentation when behavior or limits change
-- Do not include credentials, private documents, or sensitive logs
+## Dependencies and CI
+
+`Pipfile` directly pins runtime and development dependencies. `Pipfile.lock` is hash-bearing and committed. CI uses Python 3.13.15, `pipenv verify`, `pipenv install --deploy --dev --extra-pip-args="--require-hashes"`, Ruff, Black, compileall, `pip check`, and mock evaluation. The Docker workflow builds `linux/amd64` without pushing or publishing.
+
+When changing dependencies, update the manifest and lockfile together, review hashes and transitive changes, and run the full gate. Do not update a lockfile only to silence a local installation error.
+
+## Pull requests
+
+- Keep changes focused.
+- Add or update tests for behavior changes.
+- Run unit/integration tests, E2E tests when relevant, compile checks, Ruff, and Black.
+- Update documentation when behavior, limits, environment names, or verification status changes.
+- Keep current and historical evaluation results clearly separated.
+- Do not include credentials, private documents, sensitive logs, or raw external responses.
+- Do not commit unless the repository maintainer explicitly requests it.
 
 ## License
 

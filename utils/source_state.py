@@ -4,14 +4,14 @@ import json
 import math
 import uuid
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from utils.provider_config import normalize_provider_kind, provider_slug
 
 SOURCE_KINDS = frozenset({"local", "github", "website", "r2r", None})
 SOURCE_STATUSES = frozenset({"idle", "pending", "stale", "ready", "failed"})
-PARSER_CACHE_VERSION = "format-ingestion-v1"
+PARSER_CACHE_VERSION = "format-ingestion-v2"
 INDEX_SETTINGS_VERSION = 1
 _UNSET = object()
 
@@ -73,7 +73,7 @@ def index_matches_settings(state, current_settings=None) -> bool:
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def stable_digest(value: Any) -> str:
@@ -195,7 +195,9 @@ def normalize_chunk_settings(
         raw_pct = chunk_overlap_pct
 
     try:
-        size = _integer(raw_size if raw_size not in (None, "") else 256, "Chunk Size", 1, 1_000_000)
+        size = _integer(
+            raw_size if raw_size not in (None, "") else 256, "Chunk Size", 1, 1_000_000
+        )
         if raw_pct not in (None, ""):
             pct = _number(raw_pct, "Chunk Overlap Percentage", 0, 50)
             overlap = int(size * pct // 100)
@@ -218,7 +220,7 @@ def normalize_chunk_settings(
     normalized = {
         "chunk_size": size,
         "chunk_overlap": overlap,
-        "chunk_overlap_pct": int(round(pct)),
+        "chunk_overlap_pct": round(pct),
     }
     if isinstance(state, Mapping):
         for key, value in normalized.items():
@@ -234,12 +236,12 @@ def effective_indexing_settings(state, *, strict: bool = True) -> dict[str, Any]
         provider = "r2r"
         embedding_backend = "r2r"
         model = None
-        endpoint = str(state.get("r2r_base_url", "http://localhost:7272") or "").rstrip("/")
+        endpoint = str(state.get("r2r_base_url", "http://localhost:7272") or "").rstrip(
+            "/"
+        )
         api_key = None
     else:
-        embedding_backend = str(
-            state.get("embedding_backend") or backend or "Ollama"
-        )
+        embedding_backend = str(state.get("embedding_backend") or backend or "Ollama")
         provider = normalize_provider_kind(embedding_backend)
         if provider == "ollama":
             model = state.get("embedding_model") or state.get("ollama_embedding_model")
@@ -257,8 +259,10 @@ def effective_indexing_settings(state, *, strict: bool = True) -> dict[str, Any]
                 "tabbyapi": state.get("tabby_embedding_model"),
                 "openai_compatible": state.get("openai_compatible_embedding_model"),
             }.get(slug)
-            model = state.get("embedding_model") or profile_model or state.get(
-                "openai_embedding_model"
+            model = (
+                state.get("embedding_model")
+                or profile_model
+                or state.get("openai_embedding_model")
             )
             profile_endpoint = {
                 "openai": state.get("openai_base_url"),
@@ -331,7 +335,9 @@ def indexing_settings_signature(state, *, strict: bool = True) -> str:
     return stable_digest(effective_indexing_settings(state, strict=strict))
 
 
-indexing_settings_signature.__doc__ = "Return a stable signature of active indexing settings."
+indexing_settings_signature.__doc__ = (
+    "Return a stable signature of active indexing settings."
+)
 
 
 def settings_signature(state, *, strict: bool = True) -> str:
@@ -389,10 +395,10 @@ def _record_from_source(state, source=None, **updates) -> dict[str, Any]:
         record = current
     if "source_id" in updates and "id" not in updates:
         updates["id"] = updates["source_id"]
-    if "id" in updates and updates["id"]:
+    if updates.get("id"):
         record["id"] = str(updates.pop("id"))
         record["source_id"] = record["id"]
-    if "source_id" in updates and updates["source_id"]:
+    if updates.get("source_id"):
         record["source_id"] = str(updates.pop("source_id"))
         record["id"] = record["source_id"]
     for key, value in updates.items():
@@ -451,7 +457,9 @@ def active_source(state) -> dict[str, Any]:
     return ensure_active_source(state)
 
 
-def active_index_matches_settings(state, current_settings: Mapping[str, Any] | None = None) -> bool:
+def active_index_matches_settings(
+    state, current_settings: Mapping[str, Any] | None = None
+) -> bool:
     source = ensure_active_source(state)
     if source["kind"] is None or source["status"] != "ready":
         return False
@@ -474,7 +482,9 @@ def active_index_matches_settings(state, current_settings: Mapping[str, Any] | N
     )
 
 
-def active_index_is_current(state, current_settings: Mapping[str, Any] | None = None) -> bool:
+def active_index_is_current(
+    state, current_settings: Mapping[str, Any] | None = None
+) -> bool:
     return active_index_matches_settings(state, current_settings)
 
 
@@ -502,11 +512,14 @@ def source_matches(
         return False
     if source_id is not None and source.get("id") != source_id:
         return False
-    if content_signature is not None and source.get("content_signature") != content_signature:
+    if (
+        content_signature is not None
+        and source.get("content_signature") != content_signature
+    ):
         return False
-    if index_generation is not None and source.get("index_generation") != index_generation:
-        return False
-    return True
+    return (
+        index_generation is None or source.get("index_generation") == index_generation
+    )
 
 
 def tag_report(
@@ -533,7 +546,9 @@ def report_matches_active_source(
 ) -> bool:
     if not report:
         return False
-    tagged = [entry for entry in report if "source_id" in entry or "index_generation" in entry]
+    tagged = [
+        entry for entry in report if "source_id" in entry or "index_generation" in entry
+    ]
     active = ensure_active_source(state)
     if not tagged:
         return "active_source" not in state and active.get("kind") is None
@@ -564,30 +579,30 @@ __all__ = [
     "active_index_matches_settings",
     "active_source",
     "credential_fingerprint",
+    "current_indexing_settings",
     "effective_indexing_settings",
     "ensure_active_source",
+    "index_matches_settings",
     "indexing_settings_signature",
     "initial_source_state",
     "initialize_active_source",
     "is_active_index_current",
-    "index_matches_settings",
-    "current_indexing_settings",
     "make_source_state",
-    "mark_failed",
-    "mark_pending",
-    "mark_ready",
-    "mark_stale",
-    "normalize_effective_chunk_settings",
     "mark_active_index_stale_if_needed",
-    "mark_source_failed",
-    "mark_source_pending",
-    "mark_source_ready",
-    "mark_source_stale",
     "mark_active_source_failed",
     "mark_active_source_pending",
     "mark_active_source_ready",
     "mark_active_source_stale",
+    "mark_failed",
+    "mark_pending",
+    "mark_ready",
+    "mark_source_failed",
+    "mark_source_pending",
+    "mark_source_ready",
+    "mark_source_stale",
+    "mark_stale",
     "normalize_chunk_settings",
+    "normalize_effective_chunk_settings",
     "report_matches_active_source",
     "reset_active_source",
     "reset_source_state",

@@ -16,6 +16,7 @@ class PageStateTests(unittest.TestCase):
             default_chat_model(["llama3:8b", "gemma4:latest"]),
             "gemma4:latest",
         )
+
     def test_ensure_valid_model_selections_repairs_inconsistent_chat_model(self):
         state = {
             "selected_model": "missing:latest",
@@ -23,6 +24,7 @@ class PageStateTests(unittest.TestCase):
         }
         ensure_valid_model_selections(state)
         self.assertEqual(state["selected_model"], "gemma4:latest")
+
     def test_ensure_valid_model_selections_clears_missing_ollama_embedding_model(self):
         state = {
             "selected_model": "gemma4:latest",
@@ -32,6 +34,7 @@ class PageStateTests(unittest.TestCase):
         }
         ensure_valid_model_selections(state)
         self.assertIsNone(state["ollama_embedding_model"])
+
     def test_ensure_valid_model_selections_prefers_embeddinggemma_latest(self):
         state = {
             "selected_model": "gemma4:latest",
@@ -44,8 +47,10 @@ class PageStateTests(unittest.TestCase):
         }
         ensure_valid_model_selections(state)
         self.assertEqual(state["ollama_embedding_model"], "embeddinggemma:latest")
+
     def test_initial_state_uses_persisted_endpoint_before_model_discovery(self):
         state = {}
+
         def restore_from_local_storage():
             state.update(
                 {
@@ -55,15 +60,21 @@ class PageStateTests(unittest.TestCase):
                     "ollama_embedding_model": "embeddinggemma",
                 }
             )
-        with patch("components.page_state.st.session_state", state), patch(
-            "components.page_state.restore_settings_from_browser_storage",
-            side_effect=restore_from_local_storage,
-        ), patch(
-            "components.page_state.get_models", return_value=["gemma4:latest"]
-        ) as get_models, patch(
-            "components.page_state.get_embedding_models",
-            return_value=["embeddinggemma"],
-        ) as get_embedding_models:
+
+        with (
+            patch("components.page_state.st.session_state", state),
+            patch(
+                "components.page_state.restore_settings_from_browser_storage",
+                side_effect=restore_from_local_storage,
+            ),
+            patch(
+                "components.page_state.get_models", return_value=["gemma4:latest"]
+            ) as get_models,
+            patch(
+                "components.page_state.get_embedding_models",
+                return_value=["embeddinggemma"],
+            ) as get_embedding_models,
+        ):
             set_initial_state()
         get_models.assert_called_once()
         get_embedding_models.assert_called_once()
@@ -75,6 +86,7 @@ class PageStateTests(unittest.TestCase):
         )
         self.assertEqual(state["selected_model"], "gemma4:latest")
         self.assertEqual(state["ollama_embedding_model"], "embeddinggemma")
+
     def test_project_reset_removes_only_owned_work_and_reports_failure(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -105,7 +117,9 @@ class PageStateTests(unittest.TestCase):
                 "components.page_state._remove_dir_retry",
                 side_effect=remove_owned,
             ):
-                result = __import__("components.page_state", fromlist=["perform_project_reset"]).perform_project_reset(
+                result = __import__(
+                    "components.page_state", fromlist=["perform_project_reset"]
+                ).perform_project_reset(
                     state, owned_dirs=[owned, failed, root / "missing"]
                 )
 
@@ -120,9 +134,9 @@ class PageStateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             state = {}
             with patch("components.page_state._remove_dir_retry") as remove:
-                result = __import__("components.page_state", fromlist=["perform_project_reset"]).perform_project_reset(
-                    state, owned_dirs=[Path(tmpdir) / "missing"]
-                )
+                result = __import__(
+                    "components.page_state", fromlist=["perform_project_reset"]
+                ).perform_project_reset(state, owned_dirs=[Path(tmpdir) / "missing"])
         remove.assert_not_called()
         self.assertEqual(result["failed"], [])
 
@@ -132,14 +146,17 @@ class PageStateTests(unittest.TestCase):
             "selected_model": "gemma4:latest",
             "ollama_embedding_model": "embeddinggemma",
         }
-        with patch("components.page_state.st.session_state", state), patch(
-            "components.page_state.restore_settings_from_browser_storage"
-        ), patch(
-            "components.page_state.get_models", return_value=["gemma4:latest"]
-        ) as get_models, patch(
-            "components.page_state.get_embedding_models",
-            return_value=["embeddinggemma"],
-        ) as get_embedding_models:
+        with (
+            patch("components.page_state.st.session_state", state),
+            patch("components.page_state.restore_settings_from_browser_storage"),
+            patch(
+                "components.page_state.get_models", return_value=["gemma4:latest"]
+            ) as get_models,
+            patch(
+                "components.page_state.get_embedding_models",
+                return_value=["embeddinggemma"],
+            ) as get_embedding_models,
+        ):
             set_initial_state()
         get_models.assert_called_once()
         get_embedding_models.assert_called_once()
@@ -149,5 +166,7 @@ class PageStateTests(unittest.TestCase):
             state["ollama_embedding_models_endpoint"],
             "http://localhost:11434",
         )
+
+
 if __name__ == "__main__":
     unittest.main()

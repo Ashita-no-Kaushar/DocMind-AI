@@ -32,15 +32,14 @@ class OllamaTests(unittest.TestCase):
             },
             show=lambda model_name: {
                 "capabilities": (
-                    ["completion"]
-                    if model_name == "gemma4:latest"
-                    else ["embedding"]
+                    ["completion"] if model_name == "gemma4:latest" else ["embedding"]
                 )
             },
         )
 
-        with patch("utils.ollama.st", SimpleNamespace(session_state=state)), patch(
-            "utils.ollama.create_client", return_value=client
+        with (
+            patch("utils.ollama.st", SimpleNamespace(session_state=state)),
+            patch("utils.ollama.create_client", return_value=client),
         ):
             models = get_embedding_models()
 
@@ -56,8 +55,11 @@ class OllamaTests(unittest.TestCase):
             "ollama_models": ["gemma4:latest"],
         }
 
-        with patch("utils.ollama.st", SimpleNamespace(session_state=state)), patch(
-            "utils.ollama.create_client", side_effect=RuntimeError("bad endpoint")
+        with (
+            patch("utils.ollama.st", SimpleNamespace(session_state=state)),
+            patch(
+                "utils.ollama.create_client", side_effect=RuntimeError("bad endpoint")
+            ),
         ):
             models = get_models()
 
@@ -76,43 +78,29 @@ class ChatModelValidationTests(unittest.TestCase):
             },
             show=lambda model_name: {
                 "capabilities": (
-                    ["completion"]
-                    if model_name == "qwen2.5:0.5b"
-                    else ["embedding"]
+                    ["completion"] if model_name == "qwen2.5:0.5b" else ["embedding"]
                 )
             },
         )
 
     def test_verify_chat_model_accepts_completion_model(self):
-        with patch(
-            "utils.ollama.create_client", return_value=self._client()
-        ):
-            self.assertTrue(
-                verify_chat_model("qwen2.5:0.5b", "http://localhost:11434")
-            )
+        with patch("utils.ollama.create_client", return_value=self._client()):
+            self.assertTrue(verify_chat_model("qwen2.5:0.5b", "http://localhost:11434"))
 
     def test_verify_chat_model_rejects_missing_model(self):
-        with patch(
-            "utils.ollama.create_client", return_value=self._client()
-        ):
+        with patch("utils.ollama.create_client", return_value=self._client()):
             self.assertFalse(
                 verify_chat_model("missing:latest", "http://localhost:11434")
             )
 
     def test_verify_chat_model_rejects_embedding_only_model(self):
-        with patch(
-            "utils.ollama.create_client", return_value=self._client()
-        ):
+        with patch("utils.ollama.create_client", return_value=self._client()):
             self.assertFalse(
-                verify_chat_model(
-                    "nomic-embed-text:latest", "http://localhost:11434"
-                )
+                verify_chat_model("nomic-embed-text:latest", "http://localhost:11434")
             )
 
     def test_verify_chat_model_false_when_server_down(self):
-        with patch(
-            "utils.ollama.create_client", side_effect=RuntimeError("boom")
-        ):
+        with patch("utils.ollama.create_client", side_effect=RuntimeError("boom")):
             self.assertFalse(
                 verify_chat_model("qwen2.5:0.5b", "http://localhost:11434")
             )
@@ -133,25 +121,22 @@ class GetOpenAIModelsTests(unittest.TestCase):
             models = get_openai_models("http://localhost:1234/v1")
 
         self.assertEqual(models, ["model-a", "model-b"])
-        self.assertEqual(
-            request.call_args.args[0], "http://localhost:1234/v1/models"
-        )
+        self.assertEqual(request.call_args.args[0], "http://localhost:1234/v1/models")
 
     def test_get_openai_models_returns_empty_on_error(self):
-        with patch(
-            "utils.ollama.requests.get", side_effect=RuntimeError("boom")
-        ):
+        with patch("utils.ollama.requests.get", side_effect=RuntimeError("boom")):
             self.assertEqual(get_openai_models("http://localhost:1234/v1"), [])
 
 
 class CreateLLMDispatchTests(unittest.TestCase):
     def test_dispatches_to_openai_for_official_backend(self):
         state = {"llm_backend": "OpenAI"}
-        with patch(
-            "utils.ollama.st", SimpleNamespace(session_state=state)
-        ), patch("utils.ollama.create_openai_llm") as openai_llm, patch(
-            "utils.ollama.create_openai_compatible_llm"
-        ) as compatible_llm, patch("utils.ollama.create_ollama_llm") as ollama_llm:
+        with (
+            patch("utils.ollama.st", SimpleNamespace(session_state=state)),
+            patch("utils.ollama.create_openai_llm") as openai_llm,
+            patch("utils.ollama.create_openai_compatible_llm") as compatible_llm,
+            patch("utils.ollama.create_ollama_llm") as ollama_llm,
+        ):
             create_llm("my-model", "https://api.openai.com/v1", "key", None, 0.7)
 
         openai_llm.assert_called_once_with(
@@ -167,15 +152,19 @@ class CreateLLMDispatchTests(unittest.TestCase):
 
     def test_dispatches_to_ollama_by_default(self):
         state = {"llm_backend": "Ollama"}
-        with patch(
-            "utils.ollama.st", SimpleNamespace(session_state=state)
-        ), patch("utils.ollama.create_openai_llm") as openai_llm, patch(
-            "utils.ollama.create_ollama_llm"
-        ) as ollama_llm:
+        with (
+            patch("utils.ollama.st", SimpleNamespace(session_state=state)),
+            patch("utils.ollama.create_openai_llm") as openai_llm,
+            patch("utils.ollama.create_ollama_llm") as ollama_llm,
+        ):
             create_llm("qwen2.5:0.5b", "http://localhost:11434", system_prompt="sys")
 
         ollama_llm.assert_called_once_with(
-            "qwen2.5:0.5b", "http://localhost:11434", "sys", temperature=0.4, eco_mode=False
+            "qwen2.5:0.5b",
+            "http://localhost:11434",
+            "sys",
+            temperature=0.4,
+            eco_mode=False,
         )
         openai_llm.assert_not_called()
 
@@ -183,13 +172,14 @@ class CreateLLMDispatchTests(unittest.TestCase):
         for backend in ("LM Studio (Local AI)", "TabbyAPI"):
             with self.subTest(backend=backend):
                 state = {"llm_backend": backend, "temperature": 0.2}
-                with patch(
-                    "utils.ollama.st", SimpleNamespace(session_state=state)
-                ), patch(
-                    "utils.ollama.create_openai_compatible_llm"
-                ) as compatible_llm, patch(
-                    "utils.ollama.create_openai_llm"
-                ) as openai_llm, patch("utils.ollama.create_ollama_llm") as ollama_llm:
+                with (
+                    patch("utils.ollama.st", SimpleNamespace(session_state=state)),
+                    patch(
+                        "utils.ollama.create_openai_compatible_llm"
+                    ) as compatible_llm,
+                    patch("utils.ollama.create_openai_llm") as openai_llm,
+                    patch("utils.ollama.create_ollama_llm") as ollama_llm,
+                ):
                     create_llm("local-model", "http://localhost:1234/v1", "key")
 
                 compatible_llm.assert_called_once_with(
@@ -230,9 +220,11 @@ class EcoModeTests(unittest.TestCase):
 class RAGMessageBuildingTests(unittest.TestCase):
     def _message(self, role, content):
         return utils.ollama.ChatMessage(
-            role=utils.ollama.MessageRole.ASSISTANT
-            if role == "assistant"
-            else utils.ollama.MessageRole.USER,
+            role=(
+                utils.ollama.MessageRole.ASSISTANT
+                if role == "assistant"
+                else utils.ollama.MessageRole.USER
+            ),
             content=content,
         )
 
@@ -260,9 +252,7 @@ class RAGMessageBuildingTests(unittest.TestCase):
     def test_rag_messages_work_without_history_or_system_prompt(self):
         state = {}
         with patch("utils.ollama.st", SimpleNamespace(session_state=state)):
-            messages = _build_rag_messages(
-                "Question?", "[1]:\nContext text.", [], ""
-            )
+            messages = _build_rag_messages("Question?", "[1]:\nContext text.", [], "")
 
         self.assertEqual(len(messages), 1)
         self.assertEqual(messages[0].role, utils.ollama.MessageRole.USER)
@@ -275,9 +265,7 @@ class RAGMessageBuildingTests(unittest.TestCase):
                 self._message("user", "word " * 4000),
                 self._message("assistant", "OK"),
             ]
-            messages = _build_rag_messages(
-                "Next?", "[1]:\nCtx", history, ""
-            )
+            messages = _build_rag_messages("Next?", "[1]:\nCtx", history, "")
 
         # The oversized first turn must be dropped, keeping only the tail.
         self.assertEqual(len(messages), 2)

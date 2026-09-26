@@ -160,8 +160,10 @@ def initialize_provider_state(state) -> dict:
             if legacy_endpoint and endpoint_host(legacy_endpoint) != "api.openai.com":
                 state[keys["base_url"]] = legacy_endpoint
                 legacy_base_allowed = True
-        if legacy_model and keys["model"] not in state and (
-            not legacy_base or legacy_base_allowed
+        if (
+            legacy_model
+            and keys["model"] not in state
+            and (not legacy_base or legacy_base_allowed)
         ):
             state[keys["model"]] = legacy_model
     for slug, defaults in PROFILE_DEFAULTS.items():
@@ -189,7 +191,9 @@ def initialize_provider_state(state) -> dict:
         keys = profile_keys(backend)
         state["openai_model"] = state[keys["model"]]
         if state.get(keys["api_key"]) and f"{keys['api_key']}_endpoint" not in state:
-            state[f"{keys['api_key']}_endpoint"] = get_chat_profile(state, backend)["base_url"]
+            state[f"{keys['api_key']}_endpoint"] = get_chat_profile(state, backend)[
+                "base_url"
+            ]
     if state.get("embedding_api_key"):
         key_provider = state.get("embedding_api_key_provider")
         current_embedding_kind = normalize_provider_kind(
@@ -324,7 +328,11 @@ def get_embedding_profile(state) -> dict:
         }
     base_url = state.get("embedding_base_url")
     if base_url is None or str(base_url).strip() == "":
-        base_url = chat["base_url"] if chat["provider_kind"] == kind else PROFILE_DEFAULTS[provider_slug(backend)]["base_url"]
+        base_url = (
+            chat["base_url"]
+            if chat["provider_kind"] == kind
+            else PROFILE_DEFAULTS[provider_slug(backend)]["base_url"]
+        )
     model = state.get("embedding_model")
     if model is None or str(model).strip() == "":
         model = chat["model"] if chat["provider_kind"] == kind else ""

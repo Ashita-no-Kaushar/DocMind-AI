@@ -1,12 +1,13 @@
 import streamlit as st
 
-from components.tabs.local_files import local_files
-from components.tabs.github_repo import github_repo
-from components.tabs.website import website
 from components.ingestion_prerequisites import (
     ingestion_is_configured,
     render_ingestion_settings_warning,
 )
+from components.retrieval_map_view import render_map_overview
+from components.tabs.github_repo import github_repo
+from components.tabs.local_files import local_files
+from components.tabs.website import website
 
 
 def sources():
@@ -17,6 +18,11 @@ def sources():
     if not ingestion_is_configured():
         render_ingestion_settings_warning()
         st.write("")
+
+    render_map_overview(
+        st.session_state.get("retrieval_map"),
+        st.session_state.get("last_retrieval_route"),
+    )
 
     with st.expander("💻 &nbsp; **Local Files**", expanded=False):
         local_files()

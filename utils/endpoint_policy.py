@@ -152,7 +152,9 @@ def validate_credential_endpoint(
     return normalized
 
 
-def model_catalog_signature(endpoint: str, api_key: str | None, provider_kind: str) -> str:
+def model_catalog_signature(
+    endpoint: str, api_key: str | None, provider_kind: str
+) -> str:
     normalized = normalize_provider_endpoint(endpoint)
     host = endpoint_host(normalized)
     fingerprint = (

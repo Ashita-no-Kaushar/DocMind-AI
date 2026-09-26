@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
 
 from components.tabs.local_files import supported_files
 from utils import helpers
@@ -46,20 +46,43 @@ class UploadSafetyTests(unittest.TestCase):
 
     def test_documented_upload_format_set_has_25_unique_extensions(self):
         expected = {
-            "csv", "doc", "docx", "eml", "epub", "htm", "html", "ipynb",
-            "json", "jsonl", "markdown", "mbox", "md", "mhtml", "msg", "odt",
-            "pdf", "ppt", "pptx", "rtf", "tsv", "txt", "xls", "xlsx", "xml",
+            "csv",
+            "doc",
+            "docx",
+            "eml",
+            "epub",
+            "htm",
+            "html",
+            "ipynb",
+            "json",
+            "jsonl",
+            "markdown",
+            "mbox",
+            "md",
+            "mhtml",
+            "msg",
+            "odt",
+            "pdf",
+            "ppt",
+            "pptx",
+            "rtf",
+            "tsv",
+            "txt",
+            "xls",
+            "xlsx",
+            "xml",
         }
 
         self.assertEqual(set(supported_files), expected)
         self.assertEqual(len(supported_files), 25)
-        self.assertEqual(helpers.ALLOWED_UPLOAD_EXTENSIONS, {f".{ext}" for ext in expected})
+        self.assertEqual(
+            helpers.ALLOWED_UPLOAD_EXTENSIONS, {f".{ext}" for ext in expected}
+        )
 
     def test_upload_extension_whitelist_still_blocks_executables(self):
         for name in ("payload.exe", "virus.bat", "lib.so", "archive.zip"):
-            with self.subTest(name=name):
-                with self.assertRaises(ValueError):
-                    helpers.safe_uploaded_filename(name)
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                helpers.safe_uploaded_filename(name)
 
     def test_upload_names_reject_case_insensitive_duplicates(self):
         uploads = [FakeUpload("Report.txt", b"a"), FakeUpload("report.TXT", b"b")]
@@ -68,19 +91,19 @@ class UploadSafetyTests(unittest.TestCase):
 
     def test_upload_names_reject_windows_device_basenames(self):
         for name in ("CON.txt", "nul.json", "COM1.md", "lpt9.csv"):
-            with self.subTest(name=name):
-                with self.assertRaisesRegex(ValueError, "reserved"):
-                    helpers.safe_uploaded_filename(name)
+            with (
+                self.subTest(name=name),
+                self.assertRaisesRegex(ValueError, "reserved"),
+            ):
+                helpers.safe_uploaded_filename(name)
 
     def test_upload_destination_rejects_path_traversal(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with self.assertRaises(ValueError):
-                helpers.upload_destination(tmpdir, "../notes.txt")
+        with tempfile.TemporaryDirectory() as tmpdir, self.assertRaises(ValueError):
+            helpers.upload_destination(tmpdir, "../notes.txt")
 
     def test_upload_destination_rejects_backslash_separator(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with self.assertRaises(ValueError):
-                helpers.upload_destination(tmpdir, "nested\\notes.txt")
+        with tempfile.TemporaryDirectory() as tmpdir, self.assertRaises(ValueError):
+            helpers.upload_destination(tmpdir, "nested\\notes.txt")
 
     def test_validate_uploaded_files_enforces_count_limit(self):
         uploads = [
@@ -96,7 +119,6 @@ class UploadSafetyTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             helpers.validate_uploaded_files([upload])
-
 
     def test_empty_input_selection_does_not_scan_directory(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -185,30 +207,34 @@ class GitHubRepoValidationTests(unittest.TestCase):
 
     def test_normalize_github_repo_rejects_dot_segments(self):
         for value in ("../repo", "owner/..", "https://github.com/../repo"):
-            with self.subTest(value=value):
-                with self.assertRaises(ValueError):
-                    helpers.normalize_github_repo(value)
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                helpers.normalize_github_repo(value)
 
     def test_clone_github_repo_accepts_isolated_destination_base(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.object(helpers.os, "getcwd", return_value=tmpdir):
-                with patch.object(helpers.subprocess, "run") as mock_run:
-                    mock_run.return_value = Mock(returncode=0)
-                    destination = helpers.clone_github_repo(
-                        "owner/repo", destination_base=Path(tmpdir) / "work" / "operation"
-                    )
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            patch.object(helpers.os, "getcwd", return_value=tmpdir),
+            patch.object(helpers.subprocess, "run") as mock_run,
+        ):
+            mock_run.return_value = Mock(returncode=0)
+            destination = helpers.clone_github_repo(
+                "owner/repo",
+                destination_base=Path(tmpdir) / "work" / "operation",
+            )
         self.assertEqual(
             destination,
             str(Path(tmpdir) / "work" / "operation" / "owner" / "repo"),
         )
 
     def test_clone_github_repo_returns_scoped_repo_directory(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.object(helpers.os, "getcwd", return_value=tmpdir):
-                with patch.object(helpers.subprocess, "run") as mock_run:
-                    mock_run.return_value = Mock(returncode=0)
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            patch.object(helpers.os, "getcwd", return_value=tmpdir),
+            patch.object(helpers.subprocess, "run") as mock_run,
+        ):
+            mock_run.return_value = Mock(returncode=0)
 
-                    destination = helpers.clone_github_repo("owner/repo")
+            destination = helpers.clone_github_repo("owner/repo")
 
         self.assertEqual(destination, str(Path(tmpdir) / "data" / "owner" / "repo"))
 

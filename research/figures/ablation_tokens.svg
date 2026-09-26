@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="460" viewBox="0 0 1000 460" font-family="Helvetica,Arial,sans-serif">
+<rect width="1000" height="460" fill="#ffffff"/>
+<text x="40" y="48" font-size="24" font-weight="600" fill="#14181f">Answerable-question evidence tokens</text>
+<text x="40" y="76" font-size="14" fill="#4a5568">Mean prompt-context tokens per question at identical top-k. Lower is a smaller prompt.</text>
+<text x="248" y="124" font-size="13" text-anchor="end" fill="#232a34">Naive vector RAG</text>
+<rect x="260" y="110" width="660" height="18" rx="3" fill="#2f6feb"/>
+<text x="930" y="124" font-size="13" fill="#232a34">221.96</text>
+<text x="248" y="147" font-size="13" text-anchor="end" fill="#232a34">Naive lexical RAG (BM25 top-k)</text>
+<rect x="260" y="133" width="467" height="18" rx="3" fill="#2f6feb"/>
+<text x="737" y="147" font-size="13" fill="#232a34">157.08</text>
+<text x="248" y="170" font-size="13" text-anchor="end" fill="#232a34">Agentic text RAG (no map)</text>
+<rect x="260" y="156" width="310" height="18" rx="3" fill="#2f6feb"/>
+<text x="580" y="170" font-size="13" fill="#232a34">104.36</text>
+<text x="248" y="194" font-size="13" text-anchor="end" fill="#232a34">Map agent (low resolution, 4 chunks/section)</text>
+<rect x="260" y="180" width="359" height="18" rx="3" fill="#2f6feb"/>
+<text x="629" y="194" font-size="13" fill="#232a34">121.04</text>
+<text x="248" y="217" font-size="13" text-anchor="end" fill="#232a34">Map agent (high resolution, 1 chunk/section)</text>
+<rect x="260" y="203" width="255" height="18" rx="3" fill="#2f6feb"/>
+<text x="525" y="217" font-size="13" fill="#232a34">85.96</text>
+<text x="248" y="240" font-size="13" text-anchor="end" fill="#232a34">Map agent (production default, 6 chunks/section)</text>
+<rect x="260" y="226" width="373" height="18" rx="3" fill="#2f6feb"/>
+<text x="643" y="240" font-size="13" fill="#232a34">125.68</text>
+<text x="248" y="264" font-size="13" text-anchor="end" fill="#232a34">Map agent (adaptive, 3 sections/document)</text>
+<rect x="260" y="250" width="358" height="18" rx="3" fill="#2f6feb"/>
+<text x="628" y="264" font-size="13" fill="#232a34">120.48</text>
+<text x="248" y="287" font-size="13" text-anchor="end" fill="#232a34">Map agent (with candidate refinement)</text>
+<rect x="260" y="273" width="392" height="18" rx="3" fill="#2f6feb"/>
+<text x="662" y="287" font-size="13" fill="#232a34">132.00</text>
+<text x="248" y="310" font-size="13" text-anchor="end" fill="#232a34">Map agent (no neighbours)</text>
+<rect x="260" y="296" width="373" height="18" rx="3" fill="#2f6feb"/>
+<text x="643" y="310" font-size="13" fill="#232a34">125.68</text>
+<text x="248" y="334" font-size="13" text-anchor="end" fill="#232a34">Map agent (no reflection)</text>
+<rect x="260" y="320" width="357" height="18" rx="3" fill="#2f6feb"/>
+<text x="627" y="334" font-size="13" fill="#232a34">120.28</text>
+<text x="248" y="357" font-size="13" text-anchor="end" fill="#232a34">Map agent (single section)</text>
+<rect x="260" y="343" width="318" height="18" rx="3" fill="#2f6feb"/>
+<text x="588" y="357" font-size="13" fill="#232a34">107.04</text>
+<text x="248" y="380" font-size="13" text-anchor="end" fill="#232a34">Map agent (oracle planner)</text>
+<rect x="260" y="366" width="373" height="18" rx="3" fill="#2f6feb"/>
+<text x="643" y="380" font-size="13" fill="#232a34">125.68</text>
+<line x1="260" y1="102" x2="260" y2="390" stroke="#cbd2da" stroke-width="1"/>
+<text x="40" y="432" font-size="12" fill="#6b7480">Offline deterministic corpus; 8 documents, 31 queries.</text>
+</svg>

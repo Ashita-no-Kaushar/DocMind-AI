@@ -9,7 +9,9 @@ venv/
 # App data & caches
 data/
 .index_cache/
+.docmind-ingestion.lock
 *.log
+*.log.*
 
 # Streamlit
 .streamlit/secrets.toml

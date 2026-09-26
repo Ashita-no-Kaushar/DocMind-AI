@@ -9,10 +9,28 @@ import utils.helpers as func
 import utils.llama_index as llama_index
 import utils.logs as logs
 import utils.ollama as ollama
+from utils.format_ingestion import (
+    MAX_INGESTED_DOCUMENTS as _MAX_INGESTED_DOCUMENTS,
+)
+from utils.format_ingestion import (
+    MAX_INGESTED_TEXT_CHARS as _MAX_INGESTED_TEXT_CHARS,
+)
+from utils.format_ingestion import (
+    text_limits,
+    validate_document_budget,
+)
+from utils.ingestion_lock import lifecycle_lock
 from utils.provider_config import (
     get_chat_profile,
     get_embedding_profile,
     initialize_provider_state,
+)
+from utils.retrieval_map import (
+    build_document_map,
+    map_document_config,
+    map_source_identity,
+    normalize_map_settings,
+    state_map_source_identity,
 )
 from utils.source_state import (
     effective_indexing_settings,
@@ -28,8 +46,8 @@ from utils.source_state import (
     tag_report,
 )
 
-MAX_INGESTED_DOCUMENTS = 300
-MAX_INGESTED_TEXT_CHARS = 4 * 1024 * 1024
+MAX_INGESTED_DOCUMENTS = _MAX_INGESTED_DOCUMENTS
+MAX_INGESTED_TEXT_CHARS = _MAX_INGESTED_TEXT_CHARS
 
 
 def _check_ingestion_deadline(deadline):
@@ -46,6 +64,8 @@ _SOURCE_STATE_KEYS = (
     "r2r_document_ids",
     "r2r_document_ids_signature",
     "llm",
+    "retrieval_map",
+    "last_retrieval_route",
     "file_extraction_report",
     "extraction_report",
     "file_ingestion_stages",
@@ -70,14 +90,12 @@ def _document_text(document):
 
 
 def validate_ingested_documents(documents):
-    if len(documents) > MAX_INGESTED_DOCUMENTS:
-        raise ValueError(
-            f"Too many documents were loaded. Limit: {MAX_INGESTED_DOCUMENTS}."
-        )
-
-    total_chars = sum(len(_document_text(document)) for document in documents)
-    if total_chars > MAX_INGESTED_TEXT_CHARS:
-        raise ValueError("Loaded documents exceed the ingestion text limit.")
+    limits = text_limits()
+    validate_document_budget(
+        documents,
+        max_documents=limits.max_documents,
+        max_characters=limits.max_characters,
+    )
 
 
 def render_pipeline_status(status_container, completed_stages, active_stage=None):
@@ -167,9 +185,16 @@ def render_extraction_report(
         )
 
 
+def _snapshot_value(value):
+    try:
+        return copy.deepcopy(value)
+    except Exception:
+        return value
+
+
 def _snapshot_state(state):
     return {
-        key: copy.deepcopy(state.get(key))
+        key: _snapshot_value(state.get(key))
         for key in _SOURCE_STATE_KEYS
         if key in state
     }
@@ -178,7 +203,7 @@ def _snapshot_state(state):
 def _restore_state(state, snapshot):
     for key in _SOURCE_STATE_KEYS:
         if key in snapshot:
-            state[key] = copy.deepcopy(snapshot[key])
+            state[key] = _snapshot_value(snapshot[key])
         elif key in {"active_source", "index_generation"}:
             state.pop(key, None)
     if "active_source" not in state:
@@ -241,30 +266,54 @@ def _unrecord_work_dir(state, path):
 
 
 def _show_ingestion_error(error):
-    message = str(error)
-    if "is not available on the Ollama server" in message:
-        warning = getattr(st, "warning", None)
-        if callable(warning):
-            warning(
-                "⚠️ **Model unavailable.**\n\n"
-                f"{message}\n\nCheck the active provider settings and model list."
-            )
-    elif getattr(error, "category", None):
-        error_renderer = getattr(st, "error", None)
-        if callable(error_renderer):
-            error_renderer(func.website_error_message(error))
-    else:
-        exception = getattr(st, "exception", None)
-        if callable(exception):
-            exception(error)
+    message = logs.safe_user_error(error)
+    renderer = getattr(st, "error", None)
+    if callable(renderer):
+        renderer(message)
     stop = getattr(st, "stop", None)
     if callable(stop):
         stop()
 
 
+def _build_source_retrieval_map(state, retriever, source, llm=None) -> bool:
+    """Build and cache the compact document map for a committed local index."""
+    try:
+        identity = map_source_identity(source)
+        if not identity:
+            state["retrieval_map"] = None
+            return False
+        document_map = build_document_map(
+            retriever,
+            tokenizer=ollama.resolve_tokenizer(llm),
+            config=map_document_config(normalize_map_settings(state)),
+            source_identity=identity,
+        )
+        state["retrieval_map"] = document_map
+        return True
+    except Exception:
+        state["retrieval_map"] = None
+        logs.log.warning("Retrieval map was not built for the committed source")
+        return False
+
+
+def clear_map_state(state) -> None:
+    """Drop map and route state during reset and source replacement."""
+    try:
+        state["retrieval_map"] = None
+        state["last_retrieval_route"] = {}
+    except Exception:
+        pass
+
+
+def active_map_identity(state) -> str | None:
+    """Return the map identity of the active source and index generation."""
+    return state_map_source_identity(state)
+
+
+@lifecycle_lock()
 def rag_pipeline(
-    uploaded_files: list = None,
-    documents: list = None,
+    uploaded_files: list | None = None,
+    documents: list | None = None,
     data_dir: str | None = None,
     status_container=None,
     initial_stages: list[str] | None = None,
@@ -281,18 +330,18 @@ def rag_pipeline(
     """Build one source index transactionally and commit it only on success."""
     state = st.session_state
     snapshot = _snapshot_state(state)
+    try:
+        global_settings_snapshot = llama_index.capture_ingestion_settings()
+    except Exception:
+        global_settings_snapshot = {}
     previous_source = ensure_active_source(state)
-    previous_committed = (
-        previous_source.get("status") == "ready"
-        and (
-            (
-                previous_source.get("kind") in {None, "local", "github", "website"}
-                and state.get("query_engine") is not None
-            )
-            or (
-                previous_source.get("kind") == "r2r"
-                and bool(state.get("r2r_document_ids"))
-            )
+    previous_committed = previous_source.get("status") == "ready" and (
+        (
+            previous_source.get("kind") in {None, "local", "github", "website"}
+            and state.get("query_engine") is not None
+        )
+        or (
+            previous_source.get("kind") == "r2r" and bool(state.get("r2r_document_ids"))
         )
     )
     owned_work_dir = None
@@ -324,10 +373,13 @@ def rag_pipeline(
             display_name = _default_source_name(
                 source_kind, uploaded_files, documents, source_uri
             )
-        generation = max(
-            int(state.get("index_generation") or 0),
-            int(previous_source.get("index_generation") or 0),
-        ) + 1
+        generation = (
+            max(
+                int(state.get("index_generation") or 0),
+                int(previous_source.get("index_generation") or 0),
+            )
+            + 1
+        )
         candidate = make_source_state(
             source_kind,
             source_id=source_id,
@@ -341,6 +393,7 @@ def rag_pipeline(
         mark_source_pending(state, candidate)
         state["file_extraction_report"] = []
         state["extraction_report"] = []
+        clear_map_state(state)
 
         if uploaded_files is not None:
             func.validate_uploaded_files(uploaded_files)
@@ -394,6 +447,7 @@ def rag_pipeline(
                 chat_profile["api_key"],
                 system_prompt=state.get("system_prompt"),
                 backend=backend,
+                set_global=False,
             )
             _check_ingestion_deadline(deadline)
             completed_stages.append("LLM Initialized")
@@ -423,7 +477,9 @@ def rag_pipeline(
             if documents is not None:
                 _check_ingestion_deadline(deadline)
                 if len(documents) == 0:
-                    raise ValueError("No documents were loaded from the selected source.")
+                    raise ValueError(
+                        "No documents were loaded from the selected source."
+                    )
                 validate_ingested_documents(documents)
                 report = [dict(entry) for entry in (ingestion_report or [])]
             else:
@@ -478,9 +534,12 @@ def rag_pipeline(
                     for key in ("query_engine", "retriever", "index", "cache_key")
                 }
             if not isinstance(bundle, dict) or not all(
-                key in bundle for key in ("query_engine", "retriever", "index", "cache_key")
+                key in bundle
+                for key in ("query_engine", "retriever", "index", "cache_key")
             ):
-                raise ValueError("Index builder did not return a complete candidate bundle.")
+                raise ValueError(
+                    "Index builder did not return a complete candidate bundle."
+                )
             _check_ingestion_deadline(deadline)
             completed_stages.append("Embeddings Generated")
             completed_stages.append("Index Ready")
@@ -508,6 +567,8 @@ def rag_pipeline(
                 state["website_ingestion_source_id"] = candidate["id"]
                 state["website_ingestion_generation"] = candidate["index_generation"]
             mark_source_ready(state, ready_source)
+            _build_source_retrieval_map(state, bundle["retriever"], candidate, llm)
+            state["last_retrieval_route"] = {}
             record_completed_stages()
             render_completed_ingestion_status(status_container, completed_stages)
     except Exception as err:
@@ -520,13 +581,9 @@ def rag_pipeline(
                 "Website ingestion exceeded its total deadline before indexing completed.",
             )
         error = err
-        logs.log.error(f"Source ingestion failed: {type(err).__name__}: {err}")
+        logs.log.error("Source ingestion failed: %s", logs.safe_log_exception(err))
         _restore_state(state, snapshot)
-        error_text = (
-            func.website_error_message(err)
-            if getattr(err, "category", None)
-            else str(err)
-        )
+        error_text = logs.safe_user_error(err)
         state["last_ingestion_error"] = error_text
         if not previous_committed:
             if candidate is not None:
@@ -546,13 +603,13 @@ def rag_pipeline(
             state["r2r_document_ids_signature"] = None
         _show_ingestion_error(err)
     finally:
+        if global_settings_snapshot:
+            llama_index.restore_ingestion_settings(global_settings_snapshot)
         if owned_work_dir:
             if func.cleanup_ingestion_work_dir(owned_work_dir):
                 _unrecord_work_dir(state, owned_work_dir)
             else:
                 _record_work_dir(state, owned_work_dir)
-                logs.log.warning(
-                    f"Unable to delete ingestion work directory: {owned_work_dir}"
-                )
+                logs.log.warning("Unable to delete an ingestion work directory")
 
     return error

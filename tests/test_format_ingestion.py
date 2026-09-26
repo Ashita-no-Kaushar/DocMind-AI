@@ -53,7 +53,10 @@ class FormatCapabilityTests(unittest.TestCase):
             ALLOWED_UPLOAD_EXTENSIONS, {f".{extension}" for extension in expected}
         )
         self.assertTrue(
-            all(capability.category in CAPABILITY_CATEGORIES for capability in PARSER_CAPABILITIES.values())
+            all(
+                capability.category in CAPABILITY_CATEGORIES
+                for capability in PARSER_CAPABILITIES.values()
+            )
         )
 
     def test_legacy_formats_are_explicitly_unavailable_without_conversion(self):
@@ -115,7 +118,9 @@ class TextFormatExtractionTests(unittest.TestCase):
             documents, report = self._load(tmpdir, path.name)
 
         self.assertEqual(len(documents), 2)
-        self.assertIn("not-jsonl-secret", "\n".join(document.text for document in documents))
+        self.assertIn(
+            "not-jsonl-secret", "\n".join(document.text for document in documents)
+        )
         self.assertIn("Invalid JSONL record", report[0]["warning"])
         self.assertEqual(report[0]["status"], "loaded")
 
@@ -213,7 +218,7 @@ class TextFormatExtractionTests(unittest.TestCase):
             f"Content-Type: text/plain; charset=utf-8\r\n\r\n"
             f"MHTML body sentinel\r\n"
             f"--{boundary}--\r\n"
-        ).encode("utf-8")
+        ).encode()
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "saved.mhtml"
             path.write_bytes(content)
@@ -297,7 +302,9 @@ class TextFormatExtractionTests(unittest.TestCase):
 
             documents, report = self._load(tmpdir, path.name)
 
-        self.assertIn("PPTX sentinel title", "\n".join(document.text for document in documents))
+        self.assertIn(
+            "PPTX sentinel title", "\n".join(document.text for document in documents)
+        )
         self.assertEqual(report[0]["status"], "loaded")
 
     def test_ipynb_extracts_notebook_code(self):
@@ -322,7 +329,9 @@ class TextFormatExtractionTests(unittest.TestCase):
 
             documents, report = self._load(tmpdir, path.name)
 
-        self.assertIn("IPYNB sentinel", "\n".join(document.text for document in documents))
+        self.assertIn(
+            "IPYNB sentinel", "\n".join(document.text for document in documents)
+        )
         self.assertEqual(report[0]["status"], "loaded")
 
     def test_parser_failure_in_mixed_batch_is_reported_per_file(self):

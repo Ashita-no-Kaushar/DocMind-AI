@@ -87,7 +87,9 @@ class BrowserSettingsTests(unittest.TestCase):
         self.assertIn('"advanced": true', payload)
         self.assertNotIn("query_params", payload)
 
-    def test_restore_hydrates_ollama_endpoint_and_model_settings_from_browser_storage(self):
+    def test_restore_hydrates_ollama_endpoint_and_model_settings_from_browser_storage(
+        self,
+    ):
         state = {}
         stored_settings = browser_storage_payload(
             {
@@ -98,8 +100,11 @@ class BrowserSettingsTests(unittest.TestCase):
         )
         storage_component = Mock(return_value={"value": stored_settings})
 
-        with patch("utils.browser_settings.st", SimpleNamespace(session_state=state)), patch(
-            "utils.browser_settings._browser_storage_component", storage_component
+        with (
+            patch("utils.browser_settings.st", SimpleNamespace(session_state=state)),
+            patch(
+                "utils.browser_settings._browser_storage_component", storage_component
+            ),
         ):
             restore_settings_from_browser_storage()
 
@@ -118,8 +123,11 @@ class BrowserSettingsTests(unittest.TestCase):
         }
         storage_component = Mock()
 
-        with patch("utils.browser_settings.st", SimpleNamespace(session_state=state)), patch(
-            "utils.browser_settings._browser_storage_component", storage_component
+        with (
+            patch("utils.browser_settings.st", SimpleNamespace(session_state=state)),
+            patch(
+                "utils.browser_settings._browser_storage_component", storage_component
+            ),
         ):
             persist_settings_to_browser_storage()
 
@@ -143,8 +151,11 @@ class BrowserSettingsTests(unittest.TestCase):
         }
         storage_component = Mock()
 
-        with patch("utils.browser_settings.st", SimpleNamespace(session_state=state)), patch(
-            "utils.browser_settings._browser_storage_component", storage_component
+        with (
+            patch("utils.browser_settings.st", SimpleNamespace(session_state=state)),
+            patch(
+                "utils.browser_settings._browser_storage_component", storage_component
+            ),
         ):
             persist_settings_to_browser_storage()
             persist_settings_to_browser_storage()
@@ -168,13 +179,18 @@ class BrowserSettingsTests(unittest.TestCase):
     def test_restore_stops_until_browser_local_storage_payload_is_available(self):
         state = {}
         storage_component = Mock(return_value=None)
-        streamlit = SimpleNamespace(session_state=state, stop=Mock(side_effect=RuntimeError("stopped")))
+        streamlit = SimpleNamespace(
+            session_state=state, stop=Mock(side_effect=RuntimeError("stopped"))
+        )
 
-        with patch("utils.browser_settings.st", streamlit), patch(
-            "utils.browser_settings._browser_storage_component", storage_component
+        with (
+            patch("utils.browser_settings.st", streamlit),
+            patch(
+                "utils.browser_settings._browser_storage_component", storage_component
+            ),
+            self.assertRaisesRegex(RuntimeError, "stopped"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "stopped"):
-                restore_settings_from_browser_storage()
+            restore_settings_from_browser_storage()
 
         streamlit.stop.assert_called_once()
         self.assertNotIn("browser_settings_restored", state)
@@ -186,8 +202,11 @@ class BrowserSettingsTests(unittest.TestCase):
         }
         storage_component = Mock()
 
-        with patch("utils.browser_settings.st", SimpleNamespace(session_state=state)), patch(
-            "utils.browser_settings._browser_storage_component", storage_component
+        with (
+            patch("utils.browser_settings.st", SimpleNamespace(session_state=state)),
+            patch(
+                "utils.browser_settings._browser_storage_component", storage_component
+            ),
         ):
             persist_settings_to_browser_storage()
 

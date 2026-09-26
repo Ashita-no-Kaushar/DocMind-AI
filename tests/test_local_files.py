@@ -3,15 +3,15 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from components.tabs.local_files import (
-    upload_limit_help_text,
     should_process_uploads,
+    upload_limit_help_text,
     upload_processing_signature,
     uploaded_files_signature,
 )
 
 
 class FakeUpload:
-    def __init__(self, name, payload, mime_type='application/octet-stream'):
+    def __init__(self, name, payload, mime_type="application/octet-stream"):
         self.name = name
         self.size = len(payload)
         self.type = mime_type
@@ -23,20 +23,23 @@ class FakeUpload:
 
 class UploadedFilesSignatureTests(unittest.TestCase):
     def test_same_uploads_have_same_signature_across_reruns(self):
-        first = [FakeUpload('resume.pdf', b'abc')]
-        second = [FakeUpload('resume.pdf', b'abc')]
+        first = [FakeUpload("resume.pdf", b"abc")]
+        second = [FakeUpload("resume.pdf", b"abc")]
 
-        self.assertEqual(uploaded_files_signature(first), uploaded_files_signature(second))
+        self.assertEqual(
+            uploaded_files_signature(first), uploaded_files_signature(second)
+        )
 
     def test_changed_contents_change_signature_even_when_name_and_size_match(self):
-        first = [FakeUpload('resume.pdf', b'abc')]
-        second = [FakeUpload('resume.pdf', b'abd')]
+        first = [FakeUpload("resume.pdf", b"abc")]
+        second = [FakeUpload("resume.pdf", b"abd")]
 
-        self.assertNotEqual(uploaded_files_signature(first), uploaded_files_signature(second))
-
+        self.assertNotEqual(
+            uploaded_files_signature(first), uploaded_files_signature(second)
+        )
 
     def test_processing_signature_does_not_change_with_chat_only_settings(self):
-        upload = [FakeUpload('resume.pdf', b'abc')]
+        upload = [FakeUpload("resume.pdf", b"abc")]
         first_state = {
             "llm_backend": "Ollama",
             "ollama_endpoint": "http://localhost:11434",
@@ -64,7 +67,7 @@ class UploadedFilesSignatureTests(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_processing_signature_changes_with_index_settings(self):
-        upload = [FakeUpload('resume.pdf', b'abc')]
+        upload = [FakeUpload("resume.pdf", b"abc")]
         first_state = {
             "llm_backend": "Ollama",
             "ollama_endpoint": "http://localhost:11434",
@@ -149,5 +152,5 @@ class UploadLimitHelpTextTests(unittest.TestCase):
         )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

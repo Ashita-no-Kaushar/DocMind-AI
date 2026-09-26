@@ -97,8 +97,12 @@ class HybridPoolTests(unittest.TestCase):
         self.assertEqual([result.node.node_id for result in results], [target.node_id])
 
     def test_weak_and_unmatched_candidates_are_filtered(self):
-        first = TextNode(text="A short unrelated sentence.", metadata={"file_name": "a.txt"})
-        second = TextNode(text="Another unrelated sentence.", metadata={"file_name": "b.txt"})
+        first = TextNode(
+            text="A short unrelated sentence.", metadata={"file_name": "a.txt"}
+        )
+        second = TextNode(
+            text="Another unrelated sentence.", metadata={"file_name": "b.txt"}
+        )
         retriever = self._retriever(
             [first, second],
             [
@@ -152,7 +156,9 @@ class HybridPoolTests(unittest.TestCase):
 
 class RagBudgetAndCitationTests(unittest.TestCase):
     def test_unified_budget_counts_all_rag_input_parts(self):
-        tokenizer = lambda value: re.findall(r"\w+|[^\w\s]", value)
+        def tokenizer(value):
+            return re.findall(r"\w+|[^\w\s]", value)
+
         history = [
             ChatMessage(role=MessageRole.USER, content="old question " * 100),
             ChatMessage(role=MessageRole.ASSISTANT, content="old answer " * 100),
@@ -184,8 +190,12 @@ class RagBudgetAndCitationTests(unittest.TestCase):
         self.assertIn("[1]", cleaned)
 
     def test_no_citation_is_added_when_sources_exist(self):
-        node = TextNode(text="A fact from the document.", metadata={"file_name": "a.txt"})
-        retriever = SimpleNamespace(retrieve=lambda query: [NodeWithScore(node=node, score=0.9)])
+        node = TextNode(
+            text="A fact from the document.", metadata={"file_name": "a.txt"}
+        )
+        retriever = SimpleNamespace(
+            retrieve=lambda query: [NodeWithScore(node=node, score=0.9)]
+        )
         state = {
             "messages": [{"role": "user", "content": "What is the fact?"}],
             "retriever": retriever,
@@ -199,23 +209,28 @@ class RagBudgetAndCitationTests(unittest.TestCase):
             "eco_mode": False,
         }
         llm = SimpleNamespace(
-            stream_chat=lambda messages: iter([SimpleNamespace(delta="A grounded answer.")])
+            stream_chat=lambda messages: iter(
+                [SimpleNamespace(delta="A grounded answer.")]
+            )
         )
 
         with (
             patch.object(ollama_module.st, "session_state", state),
             patch.object(ollama_module, "create_llm", return_value=llm),
             patch.object(ollama_module, "_active_chat_model", return_value="model"),
-            patch.object(ollama_module, "_active_base_url", return_value="http://localhost:11434"),
+            patch.object(
+                ollama_module, "_active_base_url", return_value="http://localhost:11434"
+            ),
             patch.object(ollama_module, "_active_api_key", return_value=""),
         ):
-            answer = "".join(ollama_module.context_chat("What is the fact?", state["query_engine"]))
+            answer = "".join(
+                ollama_module.context_chat("What is the fact?", state["query_engine"])
+            )
 
         self.assertEqual(answer, "A grounded answer.")
         self.assertNotIn("[1]", answer)
         self.assertEqual(state["last_rag_evidence"][0]["citation_index"], 1)
         self.assertEqual(state["last_rag_evidence"][0]["source"], "a.txt")
-
 
     def test_context_retries_expanded_followup_without_assistant_text(self):
         node = TextNode(
@@ -258,10 +273,16 @@ class RagBudgetAndCitationTests(unittest.TestCase):
             patch.object(ollama_module.st, "session_state", state),
             patch.object(ollama_module, "create_llm", return_value=llm),
             patch.object(ollama_module, "_active_chat_model", return_value="model"),
-            patch.object(ollama_module, "_active_base_url", return_value="http://localhost:11434"),
+            patch.object(
+                ollama_module, "_active_base_url", return_value="http://localhost:11434"
+            ),
             patch.object(ollama_module, "_active_api_key", return_value=""),
         ):
-            list(ollama_module.context_chat("What about electronics?", state["query_engine"]))
+            list(
+                ollama_module.context_chat(
+                    "What about electronics?", state["query_engine"]
+                )
+            )
 
         self.assertEqual(len(retriever.queries), 2)
         self.assertIn("refund policy", retriever.queries[1])
@@ -288,10 +309,14 @@ class RagBudgetAndCitationTests(unittest.TestCase):
             patch.object(ollama_module.st, "session_state", state),
             patch.object(ollama_module, "create_llm", return_value=llm),
             patch.object(ollama_module, "_active_chat_model", return_value="model"),
-            patch.object(ollama_module, "_active_base_url", return_value="http://localhost:11434"),
+            patch.object(
+                ollama_module, "_active_base_url", return_value="http://localhost:11434"
+            ),
             patch.object(ollama_module, "_active_api_key", return_value=""),
         ):
-            answer = "".join(ollama_module.context_chat("unknown", state["query_engine"]))
+            answer = "".join(
+                ollama_module.context_chat("unknown", state["query_engine"])
+            )
 
         self.assertIn("could not find", answer.lower())
         self.assertEqual(state["last_rag_evidence"], [])
@@ -343,8 +368,12 @@ class MessageEvidenceTests(unittest.TestCase):
             }
         ]
 
-        def fake_context_chat(prompt, query_engine, evidence_sink=None):
+        def fake_context_chat(
+            prompt, query_engine, evidence_sink=None, route_sink=None
+        ):
             evidence_sink.extend(evidence)
+            if isinstance(route_sink, dict):
+                route_sink.update({"planner_mode": "deterministic"})
             yield "answer"
 
         with (

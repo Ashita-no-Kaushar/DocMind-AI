@@ -2,9 +2,9 @@ import hashlib
 
 import streamlit as st
 
-import utils.rag_pipeline as rag
-import utils.r2r as r2r
 import utils.helpers as func
+import utils.r2r as r2r
+import utils.rag_pipeline as rag
 from components.ingestion_prerequisites import (
     ingestion_is_configured,
 )
@@ -178,9 +178,7 @@ def local_files():
         st.stop()
 
     large_files = [
-        f.name
-        for f in uploaded_files
-        if getattr(f, "size", 0) > 8 * 1024 * 1024
+        f.name for f in uploaded_files if getattr(f, "size", 0) > 8 * 1024 * 1024
     ]
     if large_files:
         st.info(
@@ -199,9 +197,10 @@ def local_files():
         retained_file_selection = False
     if previous_selection is None and st.session_state.get("file_list"):
         try:
-            retained_file_selection = uploaded_files_signature(
-                st.session_state["file_list"]
-            ) == selection_signature
+            retained_file_selection = (
+                uploaded_files_signature(st.session_state["file_list"])
+                == selection_signature
+            )
         except Exception:
             retained_file_selection = False
     retained_for_other_source = (
@@ -248,15 +247,20 @@ def local_files():
                         source_signature=r2r_source_signature,
                     )
                     r2r_settings = effective_indexing_settings(st.session_state)
-                    r2r_generation = max(
-                        int(st.session_state.get("index_generation") or 0),
-                        int(active_source.get("index_generation") or 0),
-                    ) + 1
+                    r2r_generation = (
+                        max(
+                            int(st.session_state.get("index_generation") or 0),
+                            int(active_source.get("index_generation") or 0),
+                        )
+                        + 1
+                    )
                     r2r_source = make_source_state(
                         "r2r",
                         source_id=r2r_source_id,
                         display_name=", ".join(
-                            sorted((item.name for item in uploaded_files), key=str.casefold)
+                            sorted(
+                                (item.name for item in uploaded_files), key=str.casefold
+                            )
                         ),
                         content_signature=content_signature,
                         settings_signature=stable_digest(r2r_settings),
@@ -277,8 +281,12 @@ def local_files():
                             "display_name": r2r_source["display_name"],
                         }
                     )
-                    st.session_state["processed_file_signature"] = current_upload_signature
-                    st.session_state["r2r_document_ids_signature"] = r2r_source_signature
+                    st.session_state["processed_file_signature"] = (
+                        current_upload_signature
+                    )
+                    st.session_state["r2r_document_ids_signature"] = (
+                        r2r_source_signature
+                    )
                     processing_succeeded = True
                 else:
                     error = rag.rag_pipeline(
@@ -289,12 +297,18 @@ def local_files():
                         content_signature=content_signature,
                     )
                     if error is None:
-                        st.session_state["processed_file_signature"] = current_upload_signature
+                        st.session_state["processed_file_signature"] = (
+                            current_upload_signature
+                        )
                         processing_succeeded = True
                     else:
-                        st.session_state["failed_upload_selection_signature"] = selection_signature
+                        st.session_state["failed_upload_selection_signature"] = (
+                            selection_signature
+                        )
             except BaseException:
-                st.session_state["failed_upload_selection_signature"] = selection_signature
+                st.session_state["failed_upload_selection_signature"] = (
+                    selection_signature
+                )
                 raise
             finally:
                 st.session_state["processing_file_signature"] = None
@@ -310,17 +324,16 @@ def local_files():
             )
 
     active_source = ensure_active_source(st.session_state)
-    if active_source.get("kind") in {"local", "r2r"} and active_source.get(
-        "content_signature"
-    ) == content_signature:
+    if (
+        active_source.get("kind") in {"local", "r2r"}
+        and active_source.get("content_signature") == content_signature
+    ):
         if not st.session_state.get("r2r_enabled"):
             rag.render_extraction_report(
                 source_id=active_source.get("id"),
                 index_generation=active_source.get("index_generation"),
             )
-        if st.session_state.get("r2r_enabled") and r2r.r2r_is_ready(
-            st.session_state
-        ):
+        if st.session_state.get("r2r_enabled") and r2r.r2r_is_ready(st.session_state):
             st.write("Your files are ready on the R2R server. Let's chat! 😎")
         elif st.session_state.get("query_engine") is not None:
             st.write("Your files are ready. Let's chat! 😎")

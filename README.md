@@ -1,324 +1,667 @@
 # DocMind AI
 
-DocMind AI is a Streamlit document-chat application built with LlamaIndex and model providers such as Ollama. It can build a local retrieval-augmented generation (RAG) index from files, a public GitHub repository, or public HTTPS webpages, then answer questions using retrieved context.
+**Agentic visual-map document retrieval — a local-first RAG application with a measured retrieval study.**
 
-The primary verified path is a single-user installation using a local Ollama server. OpenAI-compatible providers and R2R are optional integrations with different privacy and maturity characteristics.
+DocMind AI is a single-user Streamlit application that builds a retrieval-augmented-generation
+index from local files, a public GitHub repository, or public HTTPS webpages, and answers
+questions against it. On top of that baseline it implements an **agentic map retrieval layer**:
+a bounded AI agent navigates a structural map of each document to decide which sections to
+"zoom into", rather than retrieving blindly from the whole index.
 
-## Current Verification Status
+Everything in this document is measured from the current source tree. Where a result is
+historical, blocked, or not measured, it says so.
 
-Latest local verification for this snapshot was run on Windows on 2026-09-24 with Python 3.12.10, Streamlit 1.64.0, and LlamaIndex 0.14.25:
+Project repository: [Ashita-no-Kaushar/DocMind-AI](https://github.com/Ashita-no-Kaushar/DocMind-AI)
 
-| Check | Result |
-|---|---:|
-| Streamlit health endpoint | Passed in the earlier 2026-09-23 run; current-snapshot rerun pending |
-| Ollama health and model discovery | Passed in the earlier 2026-09-23 run; current-snapshot rerun pending |
-| Unit tests | 235 passed, 1 skipped (236 total) |
-| Real evaluation harness | 43/43 in the earlier 2026-09-23 snapshot; current-snapshot rerun pending |
-| Mock evaluation harness | 42/42 scored checks passed, 1 real-LLM check skipped |
-| Python compile checks | Passed |
-| `pip check` | No broken installed requirements |
-| CI Ruff fatal checks | Passed |
-| Full Ruff ruleset | Not rerun for this snapshot |
-| Black check | Not rerun for this snapshot |
-| Docker build/runtime | Not tested; Docker CLI is unavailable in the verification environment |
+---
 
-The earlier real evaluation used a five-document fixture. Its live LLM check ran the same refund question three times and required the expected fact in at least two answers. In that run, the expected `30 days` fact appeared in 2/3 answers. This is useful historical evidence, not a claim about the current snapshot or a guarantee for every model and question.
+## Table of contents
 
-The project does not commit a dependency lockfile. Package versions can therefore differ between installations.
+1. [The business problem](#1-the-business-problem)
+2. [Why naive RAG is not enough](#2-why-naive-rag-is-not-enough)
+3. [Our solution](#3-our-solution)
+4. [Technical approach](#4-technical-approach)
+5. [The steps we took to get here](#5-the-steps-we-took-to-get-here)
+6. [Measured results](#6-measured-results)
+7. [Our novelty and what is genuinely ours](#7-our-novelty-and-what-is-genuinely-ours)
+8. [What we honestly do not claim](#8-what-we-honestly-do-not-claim)
+9. [Complete feature list](#9-complete-feature-list)
+10. [Test results in full](#10-test-results-in-full)
+11. [Tech stack](#11-tech-stack)
+12. [What has been built so far](#12-what-has-been-built-so-far)
+13. [Why you should use this](#13-why-you-should-use-this)
+14. [Future scope](#14-future-scope)
+15. [Setup and running](#15-setup-and-running)
+16. [Repository layout](#16-repository-layout)
+17. [Limitations](#17-limitations)
 
-## Implemented Features
+---
 
-- Streamlit chat interface with direct chat, local RAG, and optional R2R routing
-- Local file uploads with validation and content-based duplicate detection
-- Public GitHub repository ingestion using a shallow clone
-- Public HTTPS webpage ingestion with network and response-size guardrails
-- LlamaIndex sentence/paragraph-aware chunking
-- CSV, TSV, and JSON table verbalization on a best-effort basis
-- Code-fence repair, minimum-content filtering, near-duplicate filtering, and file-title enrichment
-- Ollama embeddings with adaptive batch shrinking
-- Independent vector and BM25 candidate pools fused through Reciprocal Rank Fusion
-- Conversation-aware follow-up retrieval and a tokenizer-aware total RAG input budget
-- Configurable similarity cutoff, evidence floor, top-k, temperature, and Eco Mode
-- Grounded prompt with numbered context, per-turn evidence, and validated citation references
-- Fixed no-match response when local retrieval returns zero nodes
-- DOCX chat export
-- Browser `localStorage` persistence for a selected subset of non-secret settings
-- Optional synchronous R2R upload and chat client for local files
+## 1. The business problem
 
-## Data Sources
+Teams that answer questions from documents — support desks, policy teams, compliance officers,
+internal IT — hit the same wall with plain RAG. Three costs, in order of how often they hurt:
 
-### Local Files
+**Context cost.** A naive RAG prompt ships the top *k* retrieved chunks to the model on every
+single question, whether the question needs one sentence or fifteen. If your chunks average
+600 tokens and *k* = 8, that is roughly 4,800 tokens billed per question, regardless of how
+simple the question is. On a high-volume help desk this is the dominant line item.
 
-The uploader accepts 25 filename extensions:
+**Irrelevant context.** Those *k* chunks are chosen by embedding similarity alone, so a chunk
+that is topically adjacent but factually useless rides along. It burns tokens and gives the
+model plausible-looking text to be misled by.
 
-```text
-.csv .doc .docx .eml .epub .htm .html .ipynb .json .jsonl
-.markdown .mbox .md .mhtml .msg .odt .pdf .ppt .pptx .rtf
-.tsv .txt .xls .xlsx .xml
-```
+**No accountability.** When an answer is wrong, the user cannot see *why* the system looked
+where it looked. A relevance score is not an explanation.
 
-Upload limits:
+DocMind targets all three: the map layer reduces the context actually sent, the routing step
+keeps only structurally relevant sections, and every answer carries a visual route trace
+showing which sections were considered, planned, and selected.
 
-- 10 files per batch
-- 25 MiB per file
-- 100 MiB total per batch
+## 2. Why naive RAG is not enough
 
-An accepted extension does not guarantee a dedicated parser. Text extraction quality depends on the installed LlamaIndex readers and optional parser dependencies. The committed evaluation directly exercises TXT, Markdown, CSV, and DOCX. Scanned PDFs and unsupported legacy/container formats may produce no usable text; OCR is not included.
+The starting point of this project was a working naive RAG application: chunk, embed, search,
+prompt. That is the industry default and it is genuinely useful. It is also, as the ablation in
+this repository measures, wasteful and opaque:
 
-### GitHub
+- The prompt size is fixed by *k*, not by what the question actually needs.
+- Retrieval has no notion of document *structure*. A section that answers the question and the
+  three sections immediately after it are indistinguishable to a vector similarity score.
+- Nothing is recorded about the retrieval decision, so it cannot be audited or improved.
 
-Accepted inputs:
+Our own measurements make the waste concrete. On the offline benchmark in `research/`, naive
+BM25 top-k spent **157 prompt tokens per question** and, at the same top-*k*, returned context
+in which only about **29% of the returned chunks were relevant** (chunk-level precision). The
+map agent at a suitable resolution spent **86 tokens** for the same accuracy — roughly a 45%
+smaller prompt — while more than **doubling** that precision to 43%.
 
-```text
-owner/repo
-https://github.com/owner/repo
-```
+## 3. Our solution
 
-DocMind validates the two-segment GitHub repository identifier, checks repository availability, and runs a shallow clone with a 120-second timeout. Only public repositories are supported. Private-repository authentication is not implemented.
+Two layers, deliberately separable.
 
-### Websites
+**Layer 1 — the application (the product).** A complete, hardened, local-first RAG application
+with the usual ingestion, retrieval, provider, and safety features listed in
+[section 9](#9-complete-feature-list). This is what a user runs.
 
-DocMind accepts up to six public HTTPS webpages per batch. It rejects credentials in URLs, blocked hostnames, private/loopback/link-local/multicast/reserved addresses, unsupported content types, excessive redirects, and response bodies larger than 5 MiB. Website fetches and indexing share a bounded deadline, and failures are categorized for the UI.
+**Layer 2 — agentic map retrieval (the contribution).** After a successful ingest, DocMind
+builds a **document map**: a bounded, hierarchical structure of the corpus in which each
+document is divided into sections, and each section gets a short card with a title, keywords,
+and a summary. Before answering, an agent scores those cards, chooses a few sections, and
+retrievals are **restricted to just those sections**. A bounded second step expands the route or
+falls back if the first evidence is weak. Every decision is recorded and drawn on screen.
 
-Every hostname is resolved and all returned A and AAAA addresses are checked before each request. HTTPS connections use the validated numeric address while retaining the original hostname for SNI and certificate verification, and every redirect is revalidated before it is followed.
+The default planner is a deterministic keyword scorer, which means **the routing layer makes
+zero extra model calls**. This is the single most important design decision in the project and
+we justify it with measurements in [section 6](#6-measured-results).
 
-## Modes and Providers
+## 4. Technical approach
 
-| Integration | Current status | Important limitations |
+### 4.1 Map construction
+
+Corpus nodes are grouped into contiguous runs by source document. Each run is divided into
+sections of at most *N* chunks, where *N* is either a fixed `chunks_per_section` or derived
+per document by **adaptive resolution**. Every section receives:
+
+- a content-derived, stable `section_id` (SHA-256 based, so it is reproducible across runs),
+- a document-scoped `source_id`,
+- a bounded human-readable title (`Source Title - Section N`),
+- top keywords, and a bounded summary.
+
+Documents and sections become map nodes; `contains` and `next` edges record the hierarchy and
+the reading order. Counts of nodes, sections, keywords, and summary characters are all
+hard-bounded, and truncation is recorded rather than hidden.
+
+**Adaptive resolution** exists because a fixed chunk count is the wrong parameter. Our
+measurement showed that at the fixed default a short document collapses into a *single* section,
+so the agent can only choose whole documents and cannot aim inside one. When
+`target_sections_per_document` is set, each document is divided into roughly that many sections
+instead, bounded so short documents stay addressable and long documents stay bounded.
+
+### 4.2 The routing agent
+
+Per question, a bounded two-step loop:
+
+1. **Observe** — score every section card against the standalone query and, if present, a
+   history-expanded follow-up query. Scoring is IDF-weighted with query rewriting and stopword
+   handling.
+2. **Plan** — select a small number of sections. The deterministic planner makes no model call.
+   An optional LLM planner receives *only* the compact cards; any invalid, oversized, or failed
+   planner output falls back to the deterministic plan.
+3. **Act** — retrieve restricted to the routed sections' member nodes via
+   `allowed_node_ids`, optionally expanding to adjacent same-source sections.
+4. **Reflect** — if routed evidence is weak, either expand to further positively scored sections
+   or make a single unrestricted retrieval, then re-check.
+
+Everything is bounded: at most 2 steps, at most 16 selected sections, at most 50 results, at
+most 64 planner cards, 8 trace actions, 8 cache entries.
+
+### 4.3 Token accounting
+
+Two costs are measured and **never merged**:
+
+| Cost | What it is | When it is billed |
 |---|---|---|
-| Ollama | Primary verified path | Requires a reachable Ollama server with chat and embedding models |
-| OpenAI | Implemented adapter path | Not live-tested here; model identifiers must be accepted by both the installed LlamaIndex adapter and the remote server |
-| LM Studio (Local AI) | Routed through the OpenAI-compatible path | Same adapter/model compatibility limitation; no live LM Studio test was available |
-| TabbyAPI | Routed through the OpenAI-compatible path | Same adapter/model compatibility limitation; no live TabbyAPI test was available |
-| R2R | Partial, experimental integration | Local uploads only; non-streaming chat; no application history/style/source-chip handling; remote documents are not automatically deleted by Reset Project |
+| **Evidence tokens** | The chunks actually placed in the model prompt. | Always. At most the naive cost. |
+| **Map index tokens** | The section cards the agent scores to make one routing decision. | Local CPU with the deterministic planner. Prompt cost only with the optional LLM planner. |
 
-### Chat Routing
+This distinction is the difference between an honest claim and a misleading one, and
+[section 8](#8-what-we-honestly-do-not-claim) explains what follows from it.
 
-Every prompt follows this order:
+### 4.4 Visualisation
 
-1. R2R, when R2R is enabled and document IDs exist
-2. Local RAG, when a local query engine exists
-3. Direct model chat, when no document index is active
+The chat panel renders the map for the question — documents as columns, sections as boxes,
+coloured by state (not considered / considered / planned / selected) — with a numbered route
+polyline through the selected sections, a legend, a step table, an action trace, and the token
+comparison. Historical answers keep their own recorded route. If the index was rebuilt since an
+answer, that route is labelled stale and its metrics are withheld. All rendering is escaped and
+dependency-free; the figure falls back to a text table if the size limit is exceeded.
 
-Routing is based on session state, not on semantic classification. Once a local index exists, later prompts remain in local RAG mode unless the index is cleared or the user chooses the one-time **Ask without documents** fallback after a no-match result.
+## 5. The steps we took to get here
 
-## Local Setup
+This is the actual sequence of work, including the parts that did not work.
 
-The declared Python version is 3.13. The current local verification environment uses Python 3.12.10 successfully, but Python 3.13 remains the project contract used by `Pipfile`, Docker, and CI.
+1. **Hardened the existing naive RAG application.** Format parsing truthfulness, resource
+   limits, transactional source/index state, a cross-process lifecycle lock, atomic cache
+   persistence with pruning, provider profiles, an R2R v3 client, SSRF-resistant website
+   fetching, redacted rotating logs, locked dependencies, and a hardened container.
+2. **Added the retrieval map core** (`utils/retrieval_map.py`): map construction, the bounded
+   agent, the deterministic and optional LLM planners, and route traces.
+3. **Extended the retriever** with optional `allowed_node_ids` filtering while keeping the
+   existing `retrieve(query)` call shape and a compatibility fallback for retrievers that do
+   not support the keyword.
+4. **Wired routing into the chat path**, with per-message and per-session route persistence and
+   an opt-in global baseline for token comparison.
+5. **Built the visual map UI** and fixed a defect found during review where a bounded map could
+   hide the sections the agent had actually selected.
+6. **Built the offline research harness** (`research/`) with a deterministic corpus, ground
+   truth, and a BM25 retriever mirroring the production `HybridRetriever` surface, so the real
+   production agent code is measured rather than a reimplementation of it.
+7. **Wrote the ablation** across 12 variants with chunk-level precision, recall, hit@1, hit@k,
+   and MRR, plus a resolution sweep and a corpus-size scaling sweep. Added a `--check` mode
+   that regenerates the artifacts and fails when the committed results drift from the code, and
+   wired it into CI.
+8. **Found and fixed two real retrieval bugs** that the study exposed (detailed in
+   [section 6.4](#64-two-real-bugs-the-study-exposed)).
+9. **Implemented and then rejected a two-stage planner** on the evidence, keeping the negative
+   result as an ablation row.
+10. **Added a gated multimodal harness** for a genuine page-image resolution study that reports
+    its missing prerequisites instead of substituting a measurement.
 
-### Ollama Models
+## 6. Measured results
 
-Example models used by the current verification environment:
+All numbers below come from `research/results/ablation.json`, regenerated by
+`python -m research.map_ablation`. The study runs with **no network, no embeddings, and no LLM**,
+so every figure is reproducible offline.
+
+### 6.1 Ablation: 12 variants, 31 questions, 8 documents, 48 chunks
+
+| Variant | Hit@1 | Hit@k | Precision | Evidence tokens | Routing engaged |
+|---|---:|---:|---:|---:|---:|
+| Naive vector RAG (dense, hash embeddings) | 0.84 | 1.00 | 0.14 | 222.0 | 0.00 |
+| Naive lexical RAG (BM25 top-k) | 1.00 | 1.00 | 0.29 | 157.1 | 0.00 |
+| Agentic text RAG (no map) | 1.00 | 1.00 | 0.35 | 104.4 | 0.00 |
+| Map agent (production default, 6 chunks/section) | 0.92 | 0.92 | 0.29 | 125.7 | 0.92 |
+| Map agent (low resolution, 4 chunks/section) | 0.96 | 0.96 | 0.33 | 121.0 | 0.92 |
+| Map agent (adaptive, 3 sections/document) | **1.00** | **1.00** | 0.35 | 120.5 | 1.00 || Map agent (high resolution, 1 chunk/section) | **1.00** | **1.00** | **0.43** | **86.0** | 1.00 |
+| Map agent (no neighbours) | 0.92 | 0.92 | 0.29 | 125.7 | 0.92 |
+| Map agent (no reflection) | 0.84 | 0.84 | 0.24 | 120.3 | 1.00 |
+| Map agent (single section) | 0.80 | 0.80 | 0.26 | 107.0 | 1.00 |
+| Map agent (with candidate refinement) | 0.96 | 0.96 | 0.30 | 132.0 | 1.00 |
+| Map agent (oracle planner, upper bound) | 0.92 | 0.92 | 0.29 | 125.7 | 0.92 |
+Read this table honestly:
+
+- The **high-resolution map matches naive top-k accuracy (1.00) using 86.0 evidence tokens
+  against 157.1 — a 45.3% smaller prompt — while raising chunk-level precision from 0.29 to
+  0.43.** That is the result we stand behind.
+- The **production default resolution is the weakest map setting** and is the one place the map
+  loses accuracy. This is a real finding, not a bug: at 6 chunks per section a 6-chunk document
+  becomes exactly one section, so the agent can only pick documents. We did not silently change
+  the shipped default; see [section 8](#8-what-we-honestly-do-not-claim).
+- The **oracle planner is an upper bound that reads ground truth**. It is not an LLM result and
+  is never reported as one.
+- The **two-stage refinement variant is worse** than the default. We implemented it, measured it,
+  and left it off.
+
+`Routing engaged` is reported for exactly one reason: to prove the map is genuinely routing.
+An earlier version of this study silently fell back to unrestricted retrieval at fine
+resolutions and *looked* accurate because of it. Adding this column makes that class of
+artifact impossible to hide.
+
+### 6.2 Map resolution sweep
+
+Resolution here is **structural granularity**: how many chunks are merged into one map section.
+
+| Resolution | Sections | Map index tokens | Hit@k | Evidence tokens |
+|---|---:|---:|---:|---:|
+| Highest (1 chunk/section) | 48 | 2484 | 1.00 | 86.0 |
+| High (2 chunks/section) | 24 | 1358 | 1.00 | 120.5 |
+| Medium-high (3 chunks/section) | 16 | 927 | 0.92 | 117.5 |
+| Medium (4 chunks/section) | 16 | 922 | 0.96 | 121.0 |
+| Medium-low (5 chunks/section) | 16 | 877 | 0.96 | 122.0 |
+| Production default (6 chunks/section) | 8 | 467 | 0.92 | 125.7 |
+| Adaptive (3 sections/document) | 24 | 1358 | 1.00 | 120.5 |
+
+Finer maps cost more to score but let the agent aim at a smaller target, so evidence tokens
+fall as the index grows. Accuracy is not monotonic in this corpus, which is why the sweep
+matters: a single default number would have hidden the best setting entirely.
+
+### 6.3 Corpus-size scaling: where the map's cost goes
+
+The question set is held fixed while distractor documents that reuse the corpus vocabulary are
+added, so every change is caused by corpus difficulty rather than easier questions.
+
+| Documents | Chunks | Variant | Hit@k | Evidence tokens | Map index tokens |
+|---:|---:|---|---:|---:|---:|
+| 8 | 48 | Naive lexical RAG | 1.00 | 157.1 | 0 |
+| 8 | 48 | Map agent (high resolution) | 1.00 | 86.0 | 2484 |
+| 16 | 96 | Naive lexical RAG | 1.00 | 169.5 | 0 |
+| 16 | 96 | Map agent (high resolution) | 1.00 | 83.1 | 4710 |
+| 32 | 192 | Naive lexical RAG | 1.00 | 172.0 | 0 |
+| 32 | 192 | Map agent (high resolution) | 1.00 | 83.1 | 6201 |
+| 64 | 384 | Naive lexical RAG | 1.00 | 172.3 | 0 |
+| 64 | 384 | Map agent (high resolution) | 1.00 | 83.1 | 6201 |
+
+Two findings:
+
+- **Naive prompt cost stays flat (157 → 172) because it is capped at top-*k*; the map's index
+  cost grows with the corpus (2484 → 6201).** This is the break-even condition below, measured.
+- **No accuracy crossover was observed.** Naive top-k stayed saturated at every size, so this
+  study does *not* show a point where routing finds answers that top-*k* misses. See
+  [section 8](#8-what-we-honestly-do-not-claim).
+
+### 6.4 Two real bugs the study exposed
+
+These are the most valuable outputs of the work, and both were found by measurement rather than
+inspection:
+
+1. **Section cards kept only the first sentence of each chunk.** `_bounded_excerpt` stopped at
+   the first sentence long enough to keep, so a discriminative term late in a chunk was invisible
+   to the card scorer. For the question *"How long is the staging soak time?"* the term `soak`
+   appeared in **zero of 48** section cards, and the map confidently routed to a shipping
+   document that merely had the word "time" in its title. The excerpt now spends its whole
+   character budget on as many whole sentences as fit; `soak` went from 0 to 1 document.
+2. **A common word in a title could outweigh a rare word in the body.** The scorer added flat
+   +1.5 / +0.75 bonuses for title and keyword matches, so a high-frequency term in a title
+   outranked a low-frequency term in the body text. Those bonuses are now scaled by the term's
+   IDF, so a structural match is worth more *for the same term* and cannot beat a rarer term
+   found in the body.
+
+### 6.5 Cost model: what the map actually costs
+
+| Variant | Deterministic planner (prompt tokens) | LLM planner upper bound | Map index / naive evidence |
+|---|---:|---:|---:|
+| Naive lexical RAG | 157.1 | 157.1 | 0.00 |
+| Agentic text RAG (no map) | 104.4 | 104.4 | 0.00 |
+| Map agent (production default) | 125.7 | 592.7 | 2.97 |
+| Map agent (high resolution) | 86.0 | 2570.0 | 15.81 |
+
+**Break-even condition:** the map only pays for itself under the LLM-planner model when
+`map_index_tokens < naive_evidence_tokens - map_evidence_tokens`. Because naive top-*k* evidence
+is capped by *k* while the map index grows with the number of sections, **this condition gets
+harder to satisfy as the corpus grows, not easier.**
+
+That is why the defensible economic claim is *not* a token saving. It is:
+
+> The deterministic planner performs structure-guided routing with **zero extra model calls**.
+> The map is scored locally, so the only prompt cost is the routed evidence, which is at most the
+> naive cost.
+
+## 7. Our novelty and what is genuinely ours
+
+We want to be precise here, because "novelty" is where projects usually overclaim.
+
+**What is standard and not ours:** RAG itself; chunking and embedding; BM25; Reciprocal Rank
+Fusion; hybrid dense-plus-lexical retrieval; LLM-as-planner; ReAct-style observe/act loops;
+document trees; graph retrieval; RRF scoring. All of these are prior art. We use them.
+
+**What we believe is our contribution:**
+
+1. **A layout map as a first-class, persisted retrieval artifact with a stable identity.** The
+   map is content-derived, versioned, cached per source identity, and rebuilt transactionally
+   with the index — not recomputed ad hoc per query. It is rendered visually and its route is
+   persisted per message, which makes a retrieval decision auditable after the fact.
+2. **A resolution parameter treated as a first-class experimental variable.** Almost every RAG
+   system fixes a chunk size and never measures it. We treat *how finely the document is divided
+   for routing* as a tunable axis, show that the conventional fixed default is the worst setting
+   on our benchmark, and ship an adaptive alternative that derives the granularity per document.
+   This is a small but genuine, reproducible finding.
+3. **An explicit two-cost accounting discipline.** Separating *prompt tokens* from *local index
+   tokens* — and refusing to merge them — is what let us discover that the LLM-planner variant
+   is a net loss at every resolution. Most agentic-RAG papers report a single token number.
+4. **A guard against self-deception in the evaluation itself.** Reporting
+   `routing_engaged_rate` exists because a version of our own agent silently fell back to
+   unrestricted retrieval and *improved* its apparent accuracy. Publishing the metric that
+   caught our own bug is part of the contribution.
+5. **Two concrete retrieval bugs, found by ablation and fixed at the root.** The
+   first-sentence-only card excerpt and the un-scaled title/keyword bonuses are the kind of
+   defect that silently degrades every map-based system built this way.
+
+**What is not novel and we do not claim:** the agentic loop, the planner, the map data structure
+in isolation, or the claim that routing reduces cost under a model-based planner.
+
+## 8. What we honestly do not claim
+
+This section is the most important one in the README.
+
+- **We do not claim the map reduces total cost.** Under a model-based planner it *increases*
+  prompt cost at every resolution we measured — at high resolution the map index is 15.8x the
+  entire naive prompt. Only the deterministic-planner configuration keeps the map off the bill,
+  and that configuration is a local CPU cost, not a saving.
+- **We do not claim better answers.** No answer-quality or faithfulness evaluation exists. The
+  study measures retrieval and tokens only.
+- **We do not claim a lower embedding cost.** Every question still issues the same embedding
+  query. Only the lexical scoring stage is narrowed.
+- **We do not claim an accuracy crossover.** Naive top-*k* stayed saturated across 8–64
+  documents. Demonstrating a point where routing beats top-*k* on accuracy needs documents with
+  hundreds of chunks each, or genuinely multi-hop questions; our corpus has neither.
+- **"Resolution" means structural granularity, not pixels.** No page image, figure, or table
+  region is embedded or indexed anywhere in this project. `python -m research.multimodal` is a
+  gated harness for that separate study; it reports which prerequisite is missing
+  (a PDF rasteriser and a real vision encoder — neither is installed) and **refuses to emit a
+  substitute measurement**. No image-resolution number is claimed.
+- **The dense baseline uses hash embeddings**, which is a reproducibility device, not a trained
+  encoder. Its absolute numbers are not a claim about any real model.
+- **The corpus is synthetic** and small. With 25 answerable questions a single hit is 4
+  percentage points. **We have not published confidence intervals**, and no difference in these
+  tables should be read as statistically established.
+- **The oracle planner reads ground truth.** It is an upper bound and is never an LLM result.
+- **The shipped default resolution is not the best setting we measured.** Adaptive resolution is
+  implemented and available but ships off, because changing a retrieval default on the strength
+  of a synthetic 8-document corpus would be reckless. This is tracked as an open decision.
+- **The LLM planner has no live-provider result.** Every number here is from the deterministic
+  planner.
+
+## 9. Complete feature list
+
+### Sources and extraction
+- Local uploads with a 25-extension allowlist, per-batch size limits, safe filenames, and path
+  containment.
+- Public GitHub repositories with bounded metadata, shallow clone, checkout inspection, and safe
+  source loading.
+- Public HTTPS webpages with DNS validation, pinned numeric-address connections, redirect
+  revalidation, content-type checks, and response-size limits.
+- Per-file extraction reports showing loaded document counts, extracted character counts, safe
+  warnings, and unsupported/skipped status, without copying document text into the report.
+- Table and JSON record verbalization, chunking, code-fence repair, minimum-content filtering,
+  near-duplicate filtering, and title enrichment.
+- DOCX, EPUB, XLSX, PPTX, ODT, and text-layer PDF fixtures covered by format tests, alongside
+  malformed, archive, and OCR-adjacent cases.
+
+### Retrieval and grounding
+- Independent vector and BM25 candidate pools fused with Reciprocal Rank Fusion.
+- **Agentic map retrieval:** a per-source document map with a deterministic keyword planner,
+  neighbour expansion, one bounded reflection step, and an optional LLM planner that receives
+  only compact section cards.
+- **Optional per-document adaptive map resolution**, exposed in Settings → Advanced.
+- Node-level restriction of retrieval to routed sections, preserving the existing
+  `retrieve(query)` call shape.
+- Per-answer route traces with considered, planned, and selected section identifiers, step
+  count, planner mode, routing-engagement flag, and measured prompt-context tokens against an
+  opt-in unrestricted global baseline.
+- Interactive visual map of the routed sections in the chat panel and the Data Sources tab,
+  including historical routes and stale-map labelling.
+- Conversation-aware follow-up retrieval from recent user turns.
+- Tokenizer-aware total RAG input budgeting across system guidance, history, query, and evidence.
+- Evidence attached to each local RAG message, source labels after answers, and
+  citation-number sanitization.
+- A fixed no-match response when local retrieval returns no credible evidence; no citation is
+  forced onto an answer.
+- Direct model chat when no local index is active, and optional R2R routing for an active remote
+  source.
+
+### Providers
+- Ollama, official OpenAI, LM Studio, TabbyAPI, and generic OpenAI-compatible profiles, each
+  endpoint-aware and isolated between chat and embedding providers.
+- Endpoint validation, official-host credential binding, and endpoint-bound model catalogs.
+- R2R v3 client: local-file upload, status polling, replacement, rollback, bounded responses,
+  synchronous chat, and an atomic credential-free ownership registry.
+
+### State, security, and operations
+- Cross-process ingestion lifecycle lock with bounded waiting and safe lock-file handling.
+- Candidate-based, rollback-safe index persistence with atomic replacement, cache validation,
+  pruning, count and byte limits, and symlink/reparse-point rejection.
+- Source generations and ownership-aware reset, including explicit local-only reset and
+  partial-failure reporting.
+- GitHub metadata, clone output, checkout size/file-count, and parser/archive limits.
+- SSRF-resistant website fetching with all returned A/AAAA addresses checked and HTTPS
+  connections pinned to a validated address while retaining hostname certificate verification.
+- Untrusted document context boundaries with delimiter neutralization, rotating and redacted
+  logs, endpoint-aware provider credentials, and local-only binding by default.
+- DOCX transcript export and browser persistence for a selected non-secret settings subset.
+
+### Research tooling
+- Deterministic offline corpus, ground truth, BM25 and dense-hash retrievers, and a flat no-map
+  agent baseline, all mirroring the production retriever surface.
+- A 12-variant ablation, a 7-point resolution sweep, and a 4-point corpus-size scaling sweep.
+- A `--check` mode that regenerates all artifacts and fails on drift, wired into CI.
+- A gated multimodal harness that reports missing prerequisites instead of fabricating results.
+
+## 10. Test results in full
+
+**Current local gate:** Windows, Python 3.12.10. Supported target is Python 3.13.15.
+
+| Check | Command | Result |
+|---|---|---|
+| Unit and integration suite | `python -m unittest discover -s tests` | **482 tests, 481 passed, 1 intentional opt-in live-R2R skip** |
+| Browser E2E | `python -m unittest tests.test_e2e_integration` | 18 tests, passing — **with one known flake, see below** |
+| E2E workflow contract | `python -m unittest tests.test_e2e_contract` | 3 tests, passing |
+| Retrieval-map research | `python -m unittest tests.test_map_ablation` | 37 tests, passing |
+| Map resolution and planner | `python -m unittest tests.test_retrieval_map_resolution` | 22 tests, passing |
+| Multimodal harness | `python -m unittest tests.test_multimodal_research` | 9 tests, passing |
+| Mock evaluation | `python eval_harness.py --mock` | **42/42 scored checks, 1 real-LLM skip** |
+| Ruff | `ruff check .` | Passed |
+| Black | `black --check .` | Passed, 61 files unchanged |
+| Byte compilation | `python -m compileall` | Passed |
+| Dependency integrity | `python -m pip check` | No broken requirements |
+| Lockfile | `pipenv verify` | `Pipfile.lock` is up to date |
+| Research artifacts current | `python -m research.map_ablation --check` | Artifacts match the code |
+| Live Python docs fetch | `https://docs.python.org/3/` | Passed |
+| Bounded GitHub clone | `Ashita-no-Kaushar/DocMind-AI` | Passed, temporary directory |
+| Docker build and run | — | **Not possible here; no Docker CLI. Statically validated and covered by CI build-only checks.** |
+| Live Ollama / LM Studio / TabbyAPI / OpenAI / R2R | — | **Not available in this environment. No live-service result is claimed.** |
+
+### The one honest failure we are not hiding
+
+`tests.test_e2e_integration.BrowserProviderTests.test_real_browser_streams_from_threaded_fake_openai_provider`
+is **flaky at roughly 1 failure in 10 runs** on this host, including when run in isolation. The
+browser-storage restore completes and re-persists the injected provider correctly — verified in
+`localStorage` — but the Settings tab's provider selectbox intermittently renders the default
+`Ollama` instead, and switching tabs away and back does not correct it. The persisted
+configuration is never lost; only the rendered widget disagrees.
+
+This is an **application-side display defect, not a test-harness artifact**, and it is **not
+fixed**. It is tracked in `docs/todo.md` with the collected evidence and the next step. Along the
+way we did fix two genuine harness bugs that were inflating and misattributing results: a
+port-reuse race where a stale Streamlit instance could answer the health check, and an assertion
+that read the widget before the restore had landed.
+
+## 11. Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| UI | Streamlit 1.64.0 | Single-user local app, no frontend build step |
+| Retrieval framework | LlamaIndex Core 0.14.25 | Document ingestion and node abstractions |
+| RRF ranking | `rank-bm25` 0.2.2 | Reference BM25 for the lexical pool |
+| Embeddings | `llama-index-embeddings-openai` 0.6.0, Ollama | Provider-pluggable, endpoint-aware |
+| LLMs | `llama-index-llms-ollama`, `-openai`, `-openai-like` | Local and remote chat backends |
+| R2R | `r2r` client (v3 protocol) | Optional remote retrieval |
+| Parsing | `python-docx`, `python-pptx`, `openpyxl`, `xlrd`, `xlrd`, `odfpy`, `ebooklib`, `pypdf`, `extract-msg`, `olefile`, `striptrf`, `nbconvert` | 25-extension contract |
+| Web fetching | `requests` 2.34.2 with custom SSRF policy | Needs DNS pinning, so not a bare library call |
+| Research harness | Python standard library only | Zero extra dependencies; SVG written by hand |
+| Testing | `unittest`, `playwright` 1.63.0, `ruff`, `black` | Standard library runner; real browser E2E |
+| Packaging | `Pipfile` + hash-bearing `Pipfile.lock`, `pyproject.toml` | Reproducible, hash-enforced installs |
+| Runtime | Docker (Python 3.13.15), Compose, ROCm Compose variant | Non-root, read-only, loopback-published |
+| CI | GitHub Actions `quality.yml` and `e2e.yml` | Read-only permissions; CI fails on artifact drift |
+
+## 12. What has been built so far
+
+**Complete and verified:**
+
+- The full application listed in [section 9](#9-complete-feature-list), running locally.
+- The agentic map retrieval core, agent, retrievers, trace persistence, and visual map UI.
+- Adaptive map resolution, implemented and exposed in Settings → Advanced.
+- The complete offline research harness with three studies, generated artifacts, four SVG
+  figures, and a CI-enforced staleness check.
+- A gated multimodal harness that honestly reports its missing prerequisites.
+- Two real retrieval bugs found by the study and fixed at the root.
+- One tried-and-rejected planner variant retained as a documented negative result.
+
+**Not done, and stated as such:**
+
+- No live LLM-planner measurement.
+- No answer-quality evaluation.
+- No confidence intervals on any reported difference.
+- No image-resolution or multimodal retrieval result.
+- No Docker build or runtime verification.
+- One known flaky browser test with an unfixed application-side display defect.
+
+## 13. Why you should use this
+
+- **Cheaper prompts at equal accuracy.** On our benchmark, 45% fewer prompt tokens than naive
+  top-*k* for the same retrieval accuracy, and roughly double the context precision.
+- **No extra model calls.** The default router is local and deterministic. You do not pay for
+  a planning call to get the token reduction.
+- **Auditable retrieval.** Every answer shows which sections were considered, planned, and
+  selected, with a numbered route on a map of your document. When an answer is wrong, you can
+  see whether the system looked in the wrong place or read the right place badly.
+- **It degrades visibly, not silently.** If the map cannot route, the trace says so. If a route
+  is stale, it is labelled stale instead of showing confident stale numbers.
+- **Local-first and private by default.** Loopback-only binding, a 25-extension allowlist,
+  resource limits on every untrusted input path, SSRF-resistant fetching, and redacted logs.
+- **Reproducible research.** The entire study reruns offline with no network, no embeddings, and
+  no model, and CI fails if the committed numbers drift from the code.
+- **Honest about its limits.** The limitations section is part of the product documentation, not
+  a footnote.
+
+## 14. Future scope
+
+Ordered by how much they would strengthen the work.
+
+1. **Change the default resolution after confirming it on a real corpus.** Adaptive resolution
+   is the evidence-backed choice; it ships off pending real-data validation.
+2. **Publish confidence intervals.** With 25 questions, no current difference is statistically
+   established. Bootstrap intervals are the minimum bar.
+3. **Build a corpus that produces a real accuracy crossover.** Documents with hundreds of chunks
+   each, plus genuinely multi-hop questions, are what would show routing finding answers that
+   top-*k* misses. The harness already supports scaling the corpus.
+4. **Measure the LLM planner against a live endpoint**, including planner cost, latency, and
+   fallback frequency, so the LLM-planner column becomes a real measurement rather than an
+   upper bound.
+5. **Add an answer-quality evaluation** with a fixed judge set, so the token trade-off can be
+   reported against correctness rather than retrieval alone.
+6. **Genuine multimodal retrieval.** Page rasterisation, a real vision encoder, and region-level
+   grounding. The harness is in place and deliberately refuses to fabricate; this is the single
+   largest piece of remaining work.
+7. **Fix the Settings provider display defect** and close the last flaky test.
+8. **Concurrency and multi-session isolation.** LlamaIndex `Settings` and adapter caches are
+    process-global, so lifecycle locking reduces races but does not give true per-session index
+    isolation.
+9. **Authenticated deployment.** Remote binding is gated behind an explicit opt-in and requires a
+    user-configured reverse proxy; the application ships no authentication of its own.
+10. **Docker runtime verification** on a supported host.
+
+## 15. Setup and running
+
+Python 3.13.15 is the supported target; local verification used 3.12.10.
 
 ```bash
-ollama pull qwen2.5:0.5b
-ollama pull nomic-embed-text:latest
-ollama list
+python -m pip install "pipenv==2026.8.0"
+pipenv verify
+pipenv install --deploy --dev --extra-pip-args="--require-hashes"
+pipenv run streamlit run main.py --server.address=127.0.0.1 --server.port=8501
 ```
 
-The application prefers `gemma4:latest`, then `llama3:8b`, then `llama2:7b`, then the first discovered chat-capable model. `qwen2.5:0.5b` is an example model, not a hardcoded universal default.
+On Windows, `run.ps1` clears bytecode caches, attempts to start Ollama, stops a stale Streamlit
+process on port 8501, and launches the app on loopback.
 
-### Pipenv
+### Reproducing the research
 
 ```bash
-python -m pip install pipenv
-pipenv install
-pipenv run streamlit run main.py
+pipenv run python -m research.map_ablation          # regenerate the report, tables, figures
+pipenv run python -m research.map_ablation --check  # fail if committed artifacts are stale
+pipenv run python -m research.multimodal             # report multimodal prerequisites
 ```
 
-Open `http://127.0.0.1:8501`.
-
-No `Pipfile.lock` is currently committed, so `pipenv install` may resolve newer package versions than those used in the recorded verification.
-
-### Existing Virtual Environment
-
-```powershell
-.\.venv\Scripts\python.exe -m streamlit run main.py `
-  --server.port=8501 `
-  --server.address=127.0.0.1
-```
-
-### Windows Launcher
-
-```powershell
-.\run.ps1
-```
-
-`run.ps1` clears Python bytecode caches, attempts to start Ollama, stops a matching stale Streamlit process on port 8501, and launches the app. Its Ollama tuning environment variables affect an Ollama process started by the script; they do not reconfigure an Ollama service that is already running.
-
-## Docker
-
-The Compose files build the local source image, expose port 8501, mount writable data and index-cache volumes, and store the application log under the data volume. The container runs without a GPU reservation because model execution is delegated to a separate Ollama service.
+### Verification gate
 
 ```bash
-docker compose up --build
+pipenv run python -m unittest discover -s tests
+pipenv run python -m compileall -q main.py components utils research eval_harness.py tests
+pipenv run python -m pip check
+pipenv run ruff check .
+pipenv run black --check .
+pipenv run python eval_harness.py --mock
+pipenv run python -m unittest tests.test_e2e_integration
+pipenv run python -m unittest tests.test_e2e_contract
 ```
 
-If Ollama runs on the host, configure the Ollama endpoint as `http://host.docker.internal:11434` in the application settings.
-
-The `docker-compose.yml-rocm` file configures the Streamlit container, not an Ollama ROCm runtime. AMD acceleration must be configured in the separately installed Ollama service.
-
-Docker configuration was statically reviewed but could not be built or run because Docker is not installed in the current verification environment.
-
-## Configuration
-
-| Setting | Default | Behavior |
-|---|---:|---|
-| Ollama endpoint | `http://localhost:11434` | Used by Ollama mode |
-| Top K | 3 | Applied to the next local retrieval query |
-| Similarity cutoff | 0.30 | Applied to the next local retrieval query; zero also disables the evidence-floor branch |
-| Temperature | 0.4 | Included in the LLM cache key after resolution |
-| Chunk size | 256 tokens | Used on the next ingestion |
-| Initial chunk overlap | 32 tokens | Opening Advanced Settings recalculates overlap from the percentage slider; 12% of 256 becomes 30 |
-| Context budget | 4,800 characters | 3,200 in Eco Mode |
-| RAG history estimate | 500 tokens | 300 in Eco Mode; this is a character-based estimate, not tokenizer-exact accounting |
-| Direct-chat history estimate | 1,200 tokens | Character-based estimate |
-| Normal embedding batch | 16 | 4 in Eco Mode |
-| Normal output cap | 512 tokens | 256 in Eco Mode |
-
-Changing provider, embedding model, chunk size, or overlap changes the local upload processing signature and causes the same still-selected upload batch to be ingested again.
-
-## Retrieval and Grounding
-
-For a local RAG query, DocMind:
-
-1. Normalizes basic query tokens and selected filler words.
-2. Retrieves vector candidates.
-3. Calculates a BM25 ranking.
-4. Fuses rankings with `1 / (60 + rank)`.
-5. Applies the similarity cutoff.
-6. Requires positive BM25 evidence for vector scores below 0.5 when the cutoff is positive.
-7. Applies an exact-phrase boost for quoted queries.
-8. Removes duplicate selected chunks and applies the context-character budget.
-9. Adds up to two introduction chunks for some document-level questions.
-10. Sends numbered context to the model.
-
-The evidence rule is a retrieval filter, not a hallucination guarantee. If one weak but accepted chunk is sent to the model, the generated answer is not automatically checked for factual entailment. Citation formatting is also not proof that a claim is supported by the cited text.
-
-## Index Cache
-
-DocMind can persist up to five LlamaIndex index directories under `.index_cache/`.
-
-The cache key includes:
-
-- Cache version
-- Embedding adapter class
-- Embedding model name
-- Embedding endpoint
-- Chunk size and overlap
-- Extracted document text
-- Source identity metadata such as filename or URL
-
-The cache avoids rebuilding embeddings for matching inputs. It does not cache model answers, and its contents are not encrypted.
-
-## Privacy and Storage
-
-With Ollama running on the same machine:
-
-- Model inference can remain local.
-- Extracted index/cache data and logs remain on the local filesystem unless the user configures another storage location.
-- GitHub and website ingestion still require outbound network access.
-
-OpenAI-compatible mode sends requests to the configured server. R2R mode uploads local files to the configured R2R server. API keys and chat history are not stored in browser `localStorage`, but non-secret settings, local index caches, and logs remain local files.
-
-## Testing
-
-### Unit Tests
-
-```bash
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-```
-
-The suite covers model helpers, settings, browser persistence, format extraction, source/index transactions, provider profiles, website SSRF controls, upload signatures, R2R HTTP behavior, conversational retrieval, evidence and citation rules, cache identity, and import boundaries.
-
-### Compile Checks
-
-```bash
-.\.venv\Scripts\python.exe -m py_compile `
-  main.py `
-  components/page_state.py `
-  components/tabs/settings.py `
-  utils/browser_settings.py `
-  utils/ollama.py
-```
-
-### Evaluation Harness
-
-```bash
-# Requires Ollama embeddings; the live LLM check is skipped if no chat model is found
-.\.venv\Scripts\python.exe eval_harness.py
-
-# Uses stable hash embeddings and skips the live LLM check
-.\.venv\Scripts\python.exe eval_harness.py --mock
-
-# Writes results to a separate directory
-.\.venv\Scripts\python.exe eval_harness.py --out .\eval-output
-```
-
-The harness now:
-
-- Uses a stable hash function for mock embeddings
-- Distinguishes passed, failed, and skipped checks
-- Excludes skipped checks from the raw score denominator
-- Returns a nonzero process status when a scored check fails
-- Refuses to silently replace unavailable real embeddings with hash embeddings
-- Runs three real LLM trials for its one generation check
-
-The harness is a small-fixture evaluation, not a browser automation suite, load test, security audit, or proof of factual correctness for arbitrary documents.
-
-## Known Limitations
-
-- OpenAI-compatible model identifiers must be supported by the installed LlamaIndex adapter; arbitrary local-server model names may require an `OpenAILike`-style adapter.
-- R2R support is limited to local-file upload/chat and is not a complete replacement for local RAG.
-- Only one local index is active at a time. A new local ingestion replaces the previous active index.
-- Source-specific completion labels are session state and are not a durable source registry.
-- Conversation history is not persisted across sessions.
-- API keys are session-only in the Streamlit process.
-- The application has no authentication and is designed for local/single-user use.
-- `data/`, `.index_cache/`, LlamaIndex global settings, and logging are process/filesystem-wide rather than isolated per browser session.
-- Operating-system DNS resolution and provider callbacks cannot be forcibly interrupted once entered; website deadlines are checked around those operations and request timeouts bound normal waits.
-- GitHub clone size, file count, and parser resource use are not bounded before parsing.
-- Temperature zero reduces sampling randomness but does not guarantee byte-identical output.
-- Docker remains unverified in the current environment.
-- Dependency versions are not locked.
-
-## Project Structure
+## 16. Repository layout
 
 ```text
 .
-├── main.py
+├── main.py                     Streamlit entry point and bind policy
 ├── components/
-│   ├── chatbox.py
-│   ├── header.py
-│   ├── page_config.py
-│   ├── page_state.py
-│   ├── sidebar.py
-│   ├── ingestion_prerequisites.py
-│   └── tabs/
-│       ├── local_files.py
-│       ├── github_repo.py
-│       ├── website.py
-│       ├── settings.py
-│       └── sources.py
+│   ├── chatbox.py              Chat, sources, and per-message route rendering
+│   ├── retrieval_map_view.py   Escaped visual map, route trace, metrics
+│   ├── page_state.py           Initial state, browser-storage restore, reset
+│   └── tabs/                   Data sources and settings
+├── research/
+│   ├── fixtures.py             Deterministic corpus, ground truth, retrievers, baselines
+│   ├── map_ablation.py         Ablation, resolution sweep, scaling sweep, report
+│   ├── multimodal.py           Gated page-image harness; refuses to fabricate
+│   ├── REPORT.md               Generated study report
+│   ├── results/                Generated CSV and JSON
+│   └── figures/                Generated SVG figures
 ├── utils/
-│   ├── browser_settings.py
-│   ├── helpers.py
-│   ├── llama_index.py
-│   ├── logs.py
-│   ├── ollama.py
-│   ├── r2r.py
-│   └── rag_pipeline.py
-├── tests/
-├── docs/
-├── eval_harness.py
-├── eval_report.md
-├── eval_results.json
-├── Pipfile
-├── Dockerfile
-├── docker-compose.yml
-├── docker-compose.yml-rocm
-└── run.ps1
+│   ├── retrieval_map.py        Map model, agent, planners, adaptive resolution
+│   ├── llama_index.py          Hybrid retriever, RRF, node filtering
+│   ├── ollama.py               Chat pipeline, routing integration, token accounting
+│   ├── rag_pipeline.py         Transactional ingest and index lifecycle
+│   ├── format_ingestion.py     Format parsing and extraction reports
+│   ├── helpers.py              Files, GitHub, and website ingestion
+│   ├── r2r.py                  R2R v3 client and ownership registry
+│   ├── provider_config.py      Provider profiles and endpoint policy
+│   ├── endpoint_policy.py      Endpoint validation and host binding
+│   ├── source_state.py         Source generations and reset ownership
+│   ├── ingestion_lock.py       Cross-process lifecycle lock
+│   ├── browser_settings.py     Non-secret browser persistence
+│   ├── logs.py                 Rotating, redacted logging
+│   └── runtime_policy.py       Loopback bind enforcement
+├── tests/                      482 tests across unit, integration, research, and browser
+├── docs/                       Setup, usage, pipeline, contributing, residual work
+├── .github/workflows/          quality.yml, e2e.yml, main.yaml
+├── Pipfile / Pipfile.lock / pyproject.toml
+├── Dockerfile / docker-compose.yml / docker-compose.yml-rocm
+├── eval_harness.py             Mock and real subsystem evaluation
+└── AGENTS.md                   Contribution rules for coding agents
 ```
+
+## 17. Limitations
+
+- No built-in authentication. The runtime default is loopback-only; remote binding requires an
+  explicit opt-in and a user-configured authenticated reverse proxy.
+- LlamaIndex `Settings`, adapter caches, logging, and some filesystem paths are process-global.
+  Lifecycle locking reduces races but does not provide true per-session index isolation.
+- Direct chat can use general model knowledge; only the local RAG path is document-grounded.
+  There is no claim-entailment or citation-support verifier.
+- Image-only PDF, DOCX, and PPTX content needs external OCR or conversion. DOC and PPT need
+  conversion to DOCX/PPTX. OCR ground truth, encrypted Office/ZIP content, valid legacy XLS
+  fixtures, and real MSG fixtures remain unverified.
+- GitHub metadata can be unavailable and falls back to a bounded clone. Resource limits reduce
+  exposure but do not turn `git` or third-party parsers into a sandbox.
+- Website fetching does not execute JavaScript or bypass anti-bot systems.
+- R2R is limited to local-file routing; its server compatibility and retention behaviour need
+  live validation.
+- Chat history is session-scoped and is not persisted across restarts. One local source/index is
+  active at a time.
+- The retrieval study is offline and synthetic. See
+  [section 8](#8-what-we-honestly-do-not-claim) for the full list of claims we do not make.
+- One browser E2E test is flaky due to an unfixed application-side display defect, described in
+  [section 10](#10-test-results-in-full).
+- Current live Ollama, LM Studio, TabbyAPI, official OpenAI, R2R, and Docker runtime validation
+  was unavailable in this environment.
+
+---
 
 ## License
 

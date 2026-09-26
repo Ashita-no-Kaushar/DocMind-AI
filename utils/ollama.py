@@ -1,3 +1,5 @@
+import contextlib
+import copy
 import re
 import time
 from collections.abc import Mapping
@@ -26,6 +28,7 @@ from utils.llama_index import (
     build_retrieval_query,
     normalize_evidence,
     retrieval_query_candidates,
+    sanitize_untrusted_context,
 )
 from utils.provider_config import (
     OLLAMA,
@@ -36,6 +39,22 @@ from utils.provider_config import (
     get_embedding_profile,
     initialize_provider_state,
     normalize_provider_kind,
+)
+from utils.retrieval_map import (
+    MAP_PLANNER_LLM,
+    DocumentMap,
+    LlmMapPlanner,
+    MapRetrievalAgent,
+    annotate_planner_trace,
+    build_map_retrieval_agent,
+    count_map_tokens,
+    json_safe,
+    map_agent_config,
+    map_document_config,
+    map_source_identity,
+    normalize_map_settings,
+    retriever_supports_map,
+    state_map_source_identity,
 )
 
 CHAT_HISTORY_TOKEN_BUDGET = 1200
@@ -54,6 +73,20 @@ RAG_TOTAL_CONTEXT_TOKENS = RAG_CONTEXT_WINDOW
 RAG_OUTPUT_RESERVE_TOKENS = 512
 RAG_SAFETY_RESERVE_TOKENS = 64
 RAG_MESSAGE_OVERHEAD_TOKENS = 4
+OPENAI_COMPATIBLE_QA_TEMPLATE = TEXT_QA_TEMPLATE
+TOKEN_ACCOUNTING_BASIS = "tokenizer_prompt_and_selected_evidence_text"
+TOKEN_ACCOUNTING_NOTE = (
+    "Tokenizer and prompt-context measurements only. They are not total compute, "
+    "latency, GPU, embedding, retrieval-speed, or answer-quality measurements."
+)
+TOKEN_ACCOUNTING_DELTA_FIELDS = (
+    "actual_rag_input_prompt_tokens",
+    "actual_selected_evidence_tokens",
+    "baseline_input_prompt_tokens",
+    "baseline_selected_evidence_tokens",
+    "selected_minus_baseline_input_tokens",
+    "selected_minus_baseline_input_pct",
+)
 validate_endpoint = validate_provider_endpoint
 validate_local = validate_local_endpoint
 is_loopback = is_loopback_endpoint
@@ -118,6 +151,29 @@ def _active_api_key() -> str:
     return _active_chat_profile().get("api_key", "")
 
 
+def _session_llm():
+    try:
+        llm = st.session_state.get("llm")
+        if llm is None:
+            return None
+        profile = _active_chat_profile()
+    except Exception:
+        return None
+    model = getattr(llm, "model", None) or getattr(llm, "model_name", None)
+    endpoint = getattr(llm, "base_url", None) or getattr(llm, "api_base", None)
+    if model and profile.get("model") and str(model) != str(profile["model"]):
+        return None
+    if endpoint and profile.get("base_url"):
+        try:
+            if normalize_provider_endpoint(endpoint) != normalize_provider_endpoint(
+                profile["base_url"]
+            ):
+                return None
+        except (TypeError, ValueError):
+            return None
+    return llm
+
+
 def _fallback_tokenize(text: str):
     return re.findall(r"\w+|[^\w\s]", str(text or ""), flags=re.UNICODE)
 
@@ -154,6 +210,11 @@ def _token_count(text: str, tokenizer=None) -> int:
 
 def _estimate_tokens(text: str) -> int:
     return max(1, _token_count(text))
+
+
+def resolve_tokenizer(llm=None):
+    """Return the active tokenizer callable for token and context measurements."""
+    return _resolve_tokenizer(llm)
 
 
 def _message_text(message) -> str:
@@ -229,10 +290,13 @@ def _messages_token_count(messages, tokenizer=None) -> int:
     total = 0
     for message in messages:
         role = _message_role(message)
-        total += _token_count(
-            f"{role}\n{_message_text(message)}",
-            tokenizer,
-        ) + RAG_MESSAGE_OVERHEAD_TOKENS
+        total += (
+            _token_count(
+                f"{role}\n{_message_text(message)}",
+                tokenizer,
+            )
+            + RAG_MESSAGE_OVERHEAD_TOKENS
+        )
     return total
 
 
@@ -257,7 +321,7 @@ def _truncate_text_to_budget(text: str, max_tokens: int, tokenizer=None) -> str:
 def _chunk_content(chunk) -> str:
     if isinstance(chunk, Mapping):
         for key in ("content", "text", "excerpt"):
-            if key in chunk and chunk[key]:
+            if chunk.get(key):
                 return str(chunk[key])
         return ""
     if isinstance(chunk, str):
@@ -270,13 +334,16 @@ def _chunk_content(chunk) -> str:
     return str(getattr(chunk, "text", "") or "")
 
 
+def _neutralize_context_markers(value: str) -> str:
+    return sanitize_untrusted_context(value)
+
+
 def _format_rag_context(chunks, formatted: bool = False) -> str:
-    values = [_chunk_content(chunk) for chunk in chunks]
+    values = [_neutralize_context_markers(_chunk_content(chunk)) for chunk in chunks]
     if formatted:
         return "\n\n".join(values)
     return "\n\n".join(
-        f"[{index}]:\n{content}"
-        for index, content in enumerate(values, start=1)
+        f"[{index}]:\n{content}" for index, content in enumerate(values, start=1)
     )
 
 
@@ -311,9 +378,7 @@ def _fit_rag_base(
     history = _normalize_history(history)
     original_history = list(history)
     for _ in range(4):
-        empty_context_messages = _base_rag_messages(
-            query, "", history, system
-        )
+        empty_context_messages = _base_rag_messages(query, "", history, system)
         if _messages_token_count(empty_context_messages, tokenizer) <= budget:
             return system, original_history, query, empty_context_messages
         fixed = _base_rag_messages("", "", [], system)
@@ -341,9 +406,13 @@ def _fit_rag_base(
         if query:
             query = _truncate_text_to_budget(
                 query,
-                max(0, budget - _messages_token_count(
-                    _base_rag_messages("", "", [], system), tokenizer
-                )),
+                max(
+                    0,
+                    budget
+                    - _messages_token_count(
+                        _base_rag_messages("", "", [], system), tokenizer
+                    ),
+                ),
                 tokenizer,
             )
             if query:
@@ -383,9 +452,7 @@ def _fit_rag_history(
     selected = []
     for message in reversed(normalized_history):
         candidate = [message, *selected]
-        candidate_messages = _base_rag_messages(
-            effective_prompt, "", candidate, system
-        )
+        candidate_messages = _base_rag_messages(effective_prompt, "", candidate, system)
         if _messages_token_count(candidate_messages, tokenizer) > budget:
             break
         selected = candidate
@@ -548,6 +615,75 @@ build_rag_prompt = plan_rag_prompt
 plan_rag_context = plan_rag_prompt
 
 
+def _selected_evidence_tokens(plan, tokenizer=None) -> int:
+    return sum(
+        count_map_tokens(_chunk_content(chunk), tokenizer)
+        for chunk in list((plan or {}).get("selected_chunks") or [])
+    )
+
+
+def measure_rag_token_accounting(
+    prompt: str,
+    plan,
+    *,
+    tokenizer=None,
+    history=None,
+    system_prompt: str = "",
+    baseline_chunks=None,
+    output_tokens: int | None = None,
+    safety_tokens: int = RAG_SAFETY_RESERVE_TOKENS,
+    context_window: int = RAG_CONTEXT_WINDOW,
+) -> dict:
+    """Measure the tokens of the real plan and an optional hypothetical baseline."""
+    accounting = {
+        "token_basis": TOKEN_ACCOUNTING_BASIS,
+        "notes": TOKEN_ACCOUNTING_NOTE,
+        "baseline_measured": False,
+        "baseline_result_count": None,
+        "actual_selected_evidence_tokens": _selected_evidence_tokens(plan, tokenizer),
+        "actual_rag_input_prompt_tokens": max(
+            0, int((plan or {}).get("input_tokens") or 0)
+        ),
+        "rag_input_budget_tokens": max(0, int((plan or {}).get("input_budget") or 0)),
+        "output_reserve_tokens": max(0, int((plan or {}).get("output_reserve") or 0)),
+        "context_window_tokens": max(0, int(context_window or 0)),
+        "baseline_input_prompt_tokens": None,
+        "baseline_selected_evidence_tokens": None,
+        "selected_minus_baseline_input_tokens": None,
+        "selected_minus_baseline_input_pct": None,
+    }
+    if not baseline_chunks:
+        return accounting
+    baseline_plan = plan_rag_prompt(
+        prompt,
+        list(baseline_chunks),
+        history,
+        system_prompt,
+        output_tokens=output_tokens,
+        safety_tokens=safety_tokens,
+        context_window=context_window,
+        tokenizer=tokenizer,
+    )
+    baseline_input = max(0, int(baseline_plan.get("input_tokens") or 0))
+    accounting["baseline_measured"] = True
+    accounting["baseline_result_count"] = len(
+        list(baseline_plan.get("selected_chunks") or [])
+    )
+    accounting["baseline_input_prompt_tokens"] = baseline_input
+    accounting["baseline_selected_evidence_tokens"] = _selected_evidence_tokens(
+        baseline_plan, tokenizer
+    )
+    if baseline_input > 0:
+        actual_input = accounting["actual_rag_input_prompt_tokens"]
+        delta = actual_input - baseline_input
+        accounting["selected_minus_baseline_input_tokens"] = delta
+        accounting["selected_minus_baseline_input_pct"] = round(
+            delta * 100.0 / baseline_input,
+            2,
+        )
+    return accounting
+
+
 def _build_rag_messages(
     prompt: str,
     context: str,
@@ -591,6 +727,24 @@ def set_rag_evidence(evidence, evidence_sink=None) -> list:
     return normalized
 
 
+def set_retrieval_route(route, route_sink=None) -> dict:
+    payload = json_safe(route) if isinstance(route, Mapping) else {}
+    with contextlib.suppress(Exception):
+        st.session_state["last_retrieval_route"] = copy.deepcopy(payload)
+    if isinstance(route_sink, dict):
+        route_sink.clear()
+        route_sink.update(copy.deepcopy(payload))
+    elif isinstance(route_sink, list):
+        route_sink.clear()
+        if payload:
+            route_sink.append(copy.deepcopy(payload))
+    return payload
+
+
+def clear_retrieval_route(route_sink=None) -> dict:
+    return set_retrieval_route({}, route_sink=route_sink)
+
+
 def evidence_sources(evidence) -> list[tuple[str, float]]:
     sources = []
     for item in evidence or []:
@@ -625,6 +779,8 @@ _CITATION_LEFTOVER_WRAPPER_RE = re.compile(
     r"\(\s*(?:from|source|citation|evidence)\s*[\[\]]+\s*\)",
     flags=re.IGNORECASE,
 )
+
+
 def _citation_values(body: str, maximum: int):
     value = str(body or "").strip()
     if re.fullmatch(r"\d+(?:\s*[,;]\s*\d+)*", value):
@@ -736,7 +892,9 @@ def create_client(host: str):
         logs.log.info("Ollama client created successfully")
         return client
     except Exception as err:
-        logs.log.error(f"Failed to create Ollama client: {err}")
+        logs.log.error(
+            "Failed to create Ollama client: %s", logs.safe_log_exception(err)
+        )
         return False
 
 
@@ -787,7 +945,7 @@ def _ollama_discovery(endpoint: str) -> dict:
         try:
             capabilities[name] = _capabilities(client.show(name))
         except Exception as err:
-            errors[name] = str(err)
+            errors[name] = logs.safe_log_exception(err)
     discovery = {
         "endpoint": endpoint,
         "created_at": now,
@@ -811,9 +969,9 @@ def _models_from_discovery(state, discovery, kind):
             if name in previous or kind == "chat":
                 result.append(name)
             continue
-        if kind == "chat" and ("completion" in values or not values):
-            result.append(name)
-        elif kind == "embedding" and "embedding" in values:
+        if (kind == "chat" and ("completion" in values or not values)) or (
+            kind == "embedding" and "embedding" in values
+        ):
             result.append(name)
     return result
 
@@ -898,16 +1056,14 @@ def get_openai_model_catalog(
     api_key = str(api_key).strip() if api_key else ""
     endpoint = normalize_provider_endpoint(
         base_url,
-        default=(
-            DEFAULT_OPENAI_BASE_URL
-            if provider_kind == OPENAI_OFFICIAL
-            else None
-        ),
+        default=(DEFAULT_OPENAI_BASE_URL if provider_kind == OPENAI_OFFICIAL else None),
         label="OpenAI-compatible endpoint",
     )
     endpoint = validate_credential_endpoint(api_key, endpoint, provider_kind)
     if provider_kind == OPENAI_OFFICIAL and not api_key:
-        raise ValueError("Official OpenAI model discovery requires an explicit API key.")
+        raise ValueError(
+            "Official OpenAI model discovery requires an explicit API key."
+        )
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     try:
         response = requests.get(
@@ -919,7 +1075,10 @@ def get_openai_model_catalog(
         response.raise_for_status()
         data = response.json()
     except Exception as err:
-        logs.log.error(f"Failed to fetch OpenAI-compatible models: {err}")
+        logs.log.error(
+            "Failed to fetch OpenAI-compatible models: %s",
+            logs.safe_log_exception(err),
+        )
         return {
             "all": [],
             "chat": [],
@@ -959,7 +1118,9 @@ def get_openai_models(
     return catalog["all"]
 
 
-def get_openai_chat_models(base_url: str, api_key: str = "", provider_kind=OPENAI_COMPATIBLE):
+def get_openai_chat_models(
+    base_url: str, api_key: str = "", provider_kind=OPENAI_COMPATIBLE
+):
     return get_openai_models(
         base_url,
         api_key,
@@ -1007,7 +1168,10 @@ def get_models():
             logs.log.warning("Ollama did not return any chat-capable models")
         return models
     except Exception as err:
-        logs.log.error(f"Failed to retrieve Ollama model list: {err}")
+        logs.log.error(
+            "Failed to retrieve Ollama model list: %s",
+            logs.safe_log_exception(err),
+        )
         state["ollama_models"] = []
         return []
 
@@ -1031,7 +1195,10 @@ def get_embedding_models(endpoint: str | None = None):
             logs.log.warning("Ollama did not return any embedding-capable models")
         return embedding_models
     except Exception as err:
-        logs.log.error(f"Failed to retrieve Ollama embedding model list: {err}")
+        logs.log.error(
+            "Failed to retrieve Ollama embedding model list: %s",
+            logs.safe_log_exception(err),
+        )
         state["ollama_embedding_models"] = []
         return []
 
@@ -1079,10 +1246,11 @@ def _create_ollama_llm_cached(
 def create_ollama_llm(
     model: str,
     base_url: str,
-    system_prompt: str = None,
+    system_prompt: str | None = None,
     request_timeout: int = OLLAMA_REQUEST_TIMEOUT,
-    temperature: float = None,
+    temperature: float | None = None,
     eco_mode: bool | None = None,
+    set_global: bool = True,
 ) -> Ollama:
     if not model:
         raise ValueError("An Ollama chat model is required.")
@@ -1094,6 +1262,7 @@ def create_ollama_llm(
     if request_timeout is None:
         request_timeout = OLLAMA_REQUEST_TIMEOUT
     bounded_timeout = min(max(int(request_timeout), 1), OLLAMA_REQUEST_TIMEOUT)
+    previous_llm = getattr(Settings, "_llm", None)
     try:
         result = _create_ollama_llm_cached(
             model=model,
@@ -1107,8 +1276,15 @@ def create_ollama_llm(
         logs.log.info("Ollama LLM instance created successfully")
         return result
     except Exception as err:
-        logs.log.error(f"Error creating Ollama language model: {err}")
+        logs.log.error(
+            "Error creating Ollama language model: %s",
+            logs.safe_log_exception(err),
+        )
         raise
+    finally:
+        if not set_global:
+            with contextlib.suppress(Exception):
+                Settings.llm = previous_llm
 
 
 def _load_openai_adapter(compatible: bool):
@@ -1176,9 +1352,10 @@ def create_openai_llm(
     model: str,
     base_url: str,
     api_key: str = "",
-    temperature: float = None,
+    temperature: float | None = None,
     eco_mode: bool | None = None,
-    backend: str = None,
+    backend: str | None = None,
+    set_global: bool = True,
 ):
     kind = provider_kind(backend)
     api_key = str(api_key).strip() if api_key else ""
@@ -1188,11 +1365,7 @@ def create_openai_llm(
         raise ValueError("An OpenAI provider chat model is required.")
     endpoint = normalize_provider_endpoint(
         base_url,
-        default=(
-            DEFAULT_OPENAI_BASE_URL
-            if kind == OPENAI_OFFICIAL
-            else None
-        ),
+        default=(DEFAULT_OPENAI_BASE_URL if kind == OPENAI_OFFICIAL else None),
         label="OpenAI endpoint",
     )
     endpoint = validate_credential_endpoint(api_key, endpoint, kind)
@@ -1202,6 +1375,7 @@ def create_openai_llm(
         temperature = float(st.session_state.get("temperature", DEFAULT_TEMPERATURE))
     if eco_mode is None:
         eco_mode = _is_eco_mode()
+    previous_llm = getattr(Settings, "_llm", None)
     try:
         result = _create_openai_llm_cached(
             model=model,
@@ -1212,23 +1386,34 @@ def create_openai_llm(
             provider_kind=kind,
         )
         Settings.llm = result
-        logs.log.info(f"OpenAI provider LLM created successfully ({endpoint})")
+        logs.log.info(
+            "OpenAI provider LLM created successfully (%s)", logs.redact_text(endpoint)
+        )
         return result
     except Exception as err:
-        logs.log.error(f"Error creating OpenAI provider language model: {err}")
+        logs.log.error(
+            "Error creating OpenAI provider language model: %s",
+            logs.safe_log_exception(err),
+        )
         raise
+    finally:
+        if not set_global:
+            with contextlib.suppress(Exception):
+                Settings.llm = previous_llm
 
 
 def create_openai_compatible_llm(
     model: str,
     base_url: str,
     api_key: str = "",
-    temperature: float = None,
+    temperature: float | None = None,
     eco_mode: bool | None = None,
-    backend: str = None,
+    backend: str | None = None,
+    set_global: bool = True,
 ):
     if backend is not None and provider_kind(backend) != OPENAI_COMPATIBLE:
         raise ValueError("The selected backend is not OpenAI-compatible.")
+    dispatch_global = {} if set_global else {"set_global": False}
     return create_openai_llm(
         model,
         base_url,
@@ -1236,6 +1421,7 @@ def create_openai_compatible_llm(
         temperature=temperature,
         eco_mode=eco_mode,
         backend=backend or "LM Studio (Local AI)",
+        **dispatch_global,
     )
 
 
@@ -1243,15 +1429,17 @@ def create_llm(
     model: str,
     base_url: str,
     api_key: str = "",
-    system_prompt: str = None,
-    temperature: float = None,
-    backend: str = None,
+    system_prompt: str | None = None,
+    temperature: float | None = None,
+    backend: str | None = None,
+    set_global: bool = True,
 ):
     backend = backend or st.session_state.get("llm_backend", "Ollama")
     kind = provider_kind(backend)
     eco_mode = st.session_state.get("eco_mode", False)
     if temperature is None:
         temperature = float(st.session_state.get("temperature", DEFAULT_TEMPERATURE))
+    dispatch_global = {} if set_global else {"set_global": False}
     if kind == OPENAI_OFFICIAL:
         return create_openai_llm(
             model,
@@ -1260,6 +1448,7 @@ def create_llm(
             temperature,
             eco_mode=eco_mode,
             backend=backend,
+            **dispatch_global,
         )
     if kind == OPENAI_COMPATIBLE:
         return create_openai_compatible_llm(
@@ -1269,6 +1458,7 @@ def create_llm(
             temperature,
             eco_mode=eco_mode,
             backend=backend,
+            **dispatch_global,
         )
     return create_ollama_llm(
         model,
@@ -1276,6 +1466,7 @@ def create_llm(
         system_prompt,
         temperature=temperature,
         eco_mode=eco_mode,
+        **dispatch_global,
     )
 
 
@@ -1297,12 +1488,15 @@ def chat(prompt: str):
         - str: Successive chunks of conversation from the model.
     """
     try:
-        llm = create_llm(
-            _active_chat_model(),
-            _active_base_url(),
-            _active_api_key(),
-            system_prompt=st.session_state.get("system_prompt"),
-        )
+        llm = _session_llm()
+        if llm is None:
+            llm = create_llm(
+                _active_chat_model(),
+                _active_base_url(),
+                _active_api_key(),
+                system_prompt=st.session_state.get("system_prompt"),
+                set_global=False,
+            )
 
         chat_messages = []
         system_prompt = st.session_state.get("system_prompt")
@@ -1316,33 +1510,39 @@ def chat(prompt: str):
             if not content:
                 continue
             if role_str == "assistant":
-                chat_messages.append(ChatMessage(role=MessageRole.ASSISTANT, content=content))
+                chat_messages.append(
+                    ChatMessage(role=MessageRole.ASSISTANT, content=content)
+                )
             elif role_str == "user":
-                chat_messages.append(ChatMessage(role=MessageRole.USER, content=content))
+                chat_messages.append(
+                    ChatMessage(role=MessageRole.USER, content=content)
+                )
             elif role_str == "system":
-                chat_messages.append(ChatMessage(role=MessageRole.SYSTEM, content=content))
+                chat_messages.append(
+                    ChatMessage(role=MessageRole.SYSTEM, content=content)
+                )
 
         # Trim the conversational history (not the system message) so it fits
         # comfortably inside the model's context window. Oversized histories
         # silently truncate and degrade response quality.
-        history = _trim_history(chat_messages[1:]) if system_prompt else _trim_history(chat_messages)
+        history = (
+            _trim_history(chat_messages[1:])
+            if system_prompt
+            else _trim_history(chat_messages)
+        )
         if not history or history[-1].content != prompt:
             history.append(ChatMessage(role=MessageRole.USER, content=prompt))
 
-        recent_messages = ([chat_messages[0]] + history) if system_prompt else history
+        recent_messages = [chat_messages[0], *history] if system_prompt else history
         stream = llm.stream_chat(recent_messages)
         for chunk in stream:
             yield chunk.delta
     except Exception as err:
-        logs.log.error(f"Ollama chat stream error: {err}")
+        logs.log.error("Chat stream failed: %s", logs.safe_log_exception(err))
         if provider_kind() != OLLAMA:
-            yield (
-                f"⚠️ **Error during chat:** {err}. Please ensure the "
-                f"configured provider is running and model "
-                f"'{_active_chat_model()}' is available on it."
-            )
+            yield "⚠️ **Error during chat:** The configured provider could not complete the request."
         else:
-            yield f"⚠️ **Error during chat:** {err}. Please ensure Ollama is running and model '{st.session_state.get('selected_model')}' is installed."
+            yield "⚠️ **Error during chat:** Ollama could not complete the request."
         return
 
 
@@ -1353,47 +1553,143 @@ def chat(prompt: str):
 ###################################
 
 
+def _map_retrieval_planner(llm, tokenizer, settings):
+    if settings.get("retrieval_map_planner_mode") != MAP_PLANNER_LLM:
+        return None
+    try:
+        return LlmMapPlanner(
+            llm,
+            tokenizer=tokenizer,
+            max_selected_sections=settings["retrieval_map_max_selected_sections"],
+        )
+    except (TypeError, ValueError):
+        logs.log.warning("Map planner was unavailable; using deterministic routing")
+        return None
+
+
+def _active_document_map(state, identity):
+    stored = state.get("retrieval_map")
+    if (
+        isinstance(stored, DocumentMap)
+        and identity
+        and stored.source_identity == identity
+    ):
+        return stored
+    return None
+
+
+def _build_map_agent(state, retriever, llm, tokenizer, settings, identity):
+    planner = _map_retrieval_planner(llm, tokenizer, settings)
+    agent_config = map_agent_config(settings)
+    map_config = map_document_config(settings)
+    document_map = _active_document_map(state, identity)
+    if document_map is not None and document_map.config == map_config:
+        return MapRetrievalAgent(
+            retriever,
+            document_map,
+            tokenizer=tokenizer,
+            planner=planner,
+            agent_config=agent_config,
+        )
+    agent = build_map_retrieval_agent(
+        retriever,
+        tokenizer=tokenizer,
+        planner=planner,
+        map_config=map_config,
+        agent_config=agent_config,
+        source_identity=identity,
+    )
+    with contextlib.suppress(Exception):
+        state["retrieval_map"] = agent.document_map
+    return agent
+
+
+def map_routed_retrieval(prompt, retriever, history, llm=None, tokenizer=None):
+    """Return bounded map-routed results, or None when raw retrieval must be used."""
+    state = st.session_state
+    settings = normalize_map_settings(state)
+    if not settings["retrieval_map_enabled"]:
+        return None
+    if not retriever_supports_map(retriever):
+        return None
+    identity = state_map_source_identity(state) or map_source_identity(
+        "local-session", state.get("index_generation")
+    )
+    try:
+        agent = _build_map_agent(state, retriever, llm, tokenizer, settings, identity)
+        results, trace = agent.retrieve(prompt, history=history)
+    except Exception as err:
+        logs.log.warning(
+            "Map retrieval routing was unavailable: %s",
+            logs.safe_log_exception(err),
+        )
+        return None
+    return results, trace, agent
+
+
+def _raw_retrieval(prompt, retriever, messages_state):
+    query_candidates = retrieval_query_candidates(prompt, messages_state)
+    nodes = retriever.retrieve(query_candidates[0])
+    if not nodes and len(query_candidates) > 1:
+        nodes = retriever.retrieve(query_candidates[1])
+    return list(nodes or [])
+
+
+def _baseline_retrieval(prompt, agent, history, limit):
+    if agent is None or not limit:
+        return []
+    try:
+        return agent.global_baseline(prompt, history=history, limit=limit)
+    except Exception as err:
+        logs.log.warning(
+            "Global retrieval baseline was unavailable: %s",
+            logs.safe_log_exception(err),
+        )
+        return []
+
+
+def _record_retrieval_route(trace, planner=None, accounting=None, route_sink=None):
+    route = annotate_planner_trace(trace, planner)
+    if accounting:
+        route["token_accounting"] = json_safe(accounting)
+    return set_retrieval_route(route, route_sink=route_sink)
+
+
 def context_chat(
     prompt: str,
     query_engine: RetrieverQueryEngine,
     evidence_sink: list | None = None,
+    route_sink=None,
 ):
     _clear_rag_state()
+    clear_retrieval_route(route_sink)
     try:
         system_prompt = st.session_state.get("system_prompt", "")
-        llm = create_llm(
-            _active_chat_model(),
-            _active_base_url(),
-            _active_api_key(),
-            system_prompt=system_prompt,
-        )
+        llm = _session_llm()
+        if llm is None:
+            llm = create_llm(
+                _active_chat_model(),
+                _active_base_url(),
+                _active_api_key(),
+                system_prompt=system_prompt,
+                set_global=False,
+            )
 
         retriever = st.session_state.get("retriever")
         if retriever is None:
             retriever = getattr(query_engine, "_retriever", None)
         if retriever is None:
+            clear_retrieval_route(route_sink)
             st.session_state["last_rag_no_result"] = False
             st.session_state["last_rag_question"] = None
             yield "⚠️ **No retriever available.** Please re-ingest your documents."
             return
 
         messages_state = st.session_state.get("messages", [])
-        query_candidates = retrieval_query_candidates(prompt, messages_state)
         t0 = time.time()
-        nodes = retriever.retrieve(query_candidates[0])
-        if not nodes and len(query_candidates) > 1:
-            nodes = retriever.retrieve(query_candidates[1])
-        nodes = [
-            node
-            for node in list(nodes)
-            if _chunk_content(node).strip()
-        ]
-        if not nodes:
-            _clear_rag_state()
-            st.session_state["last_rag_no_result"] = True
-            st.session_state["last_rag_question"] = prompt
-            yield "I could not find this information in the documents."
-            return
+        tokenizer = _resolve_tokenizer(llm)
+        context_window = _llm_context_window(llm)
+        output_tokens = _num_predict()
 
         history = []
         for message in messages_state:
@@ -1405,25 +1701,53 @@ def context_chat(
                 continue
             history.append(
                 ChatMessage(
-                    role=MessageRole.ASSISTANT if role == "assistant" else MessageRole.USER,
+                    role=(
+                        MessageRole.ASSISTANT
+                        if role == "assistant"
+                        else MessageRole.USER
+                    ),
                     content=content,
                 )
             )
         if history and _message_text(history[-1]) == str(prompt or "").strip():
             history = history[:-1]
 
+        routed = map_routed_retrieval(prompt, retriever, history, llm, tokenizer)
+        if routed is None:
+            nodes = _raw_retrieval(prompt, retriever, messages_state)
+            trace = None
+            planner = None
+            agent = None
+        else:
+            nodes, trace, agent = routed
+            if isinstance(trace, dict) and agent is not None:
+                trace["map_id"] = agent.document_map.map_id
+                trace["map_source_identity"] = agent.document_map.source_identity
+            planner = (
+                agent.planner if isinstance(agent.planner, LlmMapPlanner) else None
+            )
+        nodes = [node for node in list(nodes) if _chunk_content(node).strip()]
+        if not nodes:
+            _clear_rag_state()
+            clear_retrieval_route(route_sink)
+            st.session_state["last_rag_no_result"] = True
+            st.session_state["last_rag_question"] = prompt
+            yield "I could not find this information in the documents."
+            return
+
         plan = plan_rag_prompt(
             prompt,
             nodes,
             history,
             system_prompt,
-            output_tokens=_num_predict(),
-            context_window=_llm_context_window(llm),
-            tokenizer=_resolve_tokenizer(llm),
+            output_tokens=output_tokens,
+            context_window=context_window,
+            tokenizer=tokenizer,
         )
         selected_nodes = list(plan.get("selected_chunks") or [])
         if not selected_nodes:
             _clear_rag_state()
+            clear_retrieval_route(route_sink)
             st.session_state["last_rag_no_result"] = True
             st.session_state["last_rag_question"] = prompt
             yield "I could not find this information in the documents."
@@ -1433,6 +1757,33 @@ def context_chat(
             normalize_evidence(selected_nodes),
             evidence_sink=evidence_sink,
         )
+        if trace is not None:
+            try:
+                settings = normalize_map_settings(st.session_state)
+                accounting = measure_rag_token_accounting(
+                    prompt,
+                    plan,
+                    tokenizer=tokenizer,
+                    history=history,
+                    system_prompt=system_prompt,
+                    baseline_chunks=_baseline_retrieval(
+                        prompt,
+                        agent if settings["retrieval_map_measure_baseline"] else None,
+                        history,
+                        settings["retrieval_map_max_results"],
+                    ),
+                    output_tokens=output_tokens,
+                    context_window=context_window,
+                )
+                _record_retrieval_route(
+                    trace, planner=planner, accounting=accounting, route_sink=route_sink
+                )
+            except Exception as err:
+                clear_retrieval_route(route_sink)
+                logs.log.warning(
+                    "Retrieval route metrics were unavailable: %s",
+                    logs.safe_log_exception(err),
+                )
         st.session_state["last_rag_no_result"] = False
         st.session_state["last_rag_question"] = None
         top_score = getattr(selected_nodes[0], "score", 0.0)
@@ -1455,18 +1806,15 @@ def context_chat(
         logs.log.info(f"Doc query answered in {time.time() - t0:.1f}s")
     except Exception as err:
         _clear_rag_state()
+        clear_retrieval_route(route_sink)
         try:
             st.session_state["last_rag_no_result"] = False
             st.session_state["last_rag_question"] = None
         except Exception:
             pass
-        logs.log.error(f"Ollama chat stream error: {err}")
+        logs.log.error("Document chat stream failed: %s", logs.safe_log_exception(err))
         if provider_kind() != OLLAMA:
-            yield (
-                f"⚠️ **Error generating response:** {err}. Please ensure the "
-                f"configured provider is running and model "
-                f"'{_active_chat_model()}' is available on it."
-            )
+            yield "⚠️ **Error generating response:** The configured provider could not complete the request."
         else:
-            yield f"⚠️ **Error generating response:** {err}. If the model is taking longer to respond on CPU, please try again."
+            yield "⚠️ **Error generating response:** Ollama could not complete the request."
         return

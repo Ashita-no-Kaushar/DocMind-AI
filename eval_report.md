@@ -1,6 +1,6 @@
 # DocMind AI — Full Project Evaluation Report
 
-_Generated 2026-09-24 01:03 — 42/42 scored checks passed, 1 skipped, raw score **100.0%**_
+_Generated 2026-09-26 14:32 — 42/42 scored checks passed, 1 skipped, raw score **100.0%**_
 
 This harness uses small local fixtures. It is not a browser test, a production load test, or proof that generated answers are always factually grounded.
 
@@ -29,7 +29,7 @@ _Embedding: `hash-mock` — hit = expected doc in top-3, correct rejection = no-
 | # | Query | Expected | Feature | Plain | Hybrid | Plain top | Hybrid top |
 |---|---|---|---|:---:|:---:|---|---|
 | 1 | What is the refund policy? | refund_policy.txt | basic | ✓ | ✓ | refund_policy.txt | refund_policy.txt |
-| 2 | money back rules | refund_policy.txt | synonym | ✗ | ✓ | python_guide.txt | hr_policy.txt |
+| 2 | money back rules | refund_policy.txt | synonym | ✗ | ✓ | — | hr_policy.txt |
 | 3 | 30-day returns | refund_policy.txt | hyphen | ✓ | ✓ | refund_policy.txt | refund_policy.txt |
 | 4 | refund policy batao | refund_policy.txt | hinglish | ✓ | ✓ | refund_policy.txt | refund_policy.txt |
 | 5 | annual report revenue growth | annual_report.txt | title-aware | ✓ | ✓ | annual_report.txt | annual_report.txt |
@@ -45,32 +45,32 @@ _Embedding: `hash-mock` — hit = expected doc in top-3, correct rejection = no-
 
 | Test | Pass | Detail |
 |---|:---:|---|
-| excluded_patterns | PASS | loaded=1 patterns=34 331ms |
+| excluded_patterns | PASS | loaded=1 patterns=34 355ms |
 | title_aware | PASS | title='Annual Report' 0ms |
-| dedupe | PASS | 3 -> 2 154ms |
-| multiformat_index | PASS | docs=4 docx=yes 193ms |
-| cache_key_and_persist | PASS | key=addcf0894136d88ff3c4 persist=hit 49ms |
-| min_chunk_filter | PASS | MIN_CHARS=15 docs_in=2 7ms |
-| helpers_github_normalize | PASS | owner/repo=True url=True reject_gitlab=True 5ms |
+| dedupe | PASS | 3 -> 2 269ms |
+| multiformat_index | PASS | docs=4 docx=yes 305ms |
+| cache_key_and_persist | PASS | key=f7756eff4949b3aa5378 persist=hit 215ms |
+| min_chunk_filter | PASS | MIN_CHARS=15 docs_in=2 65ms |
+| helpers_github_normalize | PASS | owner/repo=True url=True reject_gitlab=True 6ms |
 
 ## Suite: generation (5/5 scored, 1 skipped — 100.0%)
 
 | Test | Pass | Detail |
 |---|:---:|---|
-| qa_template_guards | PASS | has_guards=True len=738 0ms |
+| qa_template_guards | PASS | has_guards=True len=938 0ms |
 | query_helpers | PASS | hyphen=True hinglish=True synonym=True 0ms |
-| no_match_fallback | PASS | fallback=hit 21ms |
-| tone_presets | PASS | presets=6 distinct=True 7ms |
-| multi_turn_history | PASS | messages_in_prompt=4 6ms |
+| no_match_fallback | PASS | fallback=hit 30ms |
+| tone_presets | PASS | presets=6 distinct=True 6ms |
+| multi_turn_history | PASS | messages_in_prompt=4 15ms |
 | e2e_real_llm | SKIP | skipped (mock mode) 0ms |
 
 ## Suite: performance (5/5 scored, 0 skipped — 100.0%)
 
 | Test | Pass | Detail |
 |---|:---:|---|
-| ingest_5_docs | PASS | 0.0s for 5 docs 23ms |
-| cache_round_trip | PASS | cold 0.0s vs cache load 0.04s 49ms |
-| retrieval_latency | PASS | vector 0ms hybrid 1ms 15ms |
+| ingest_5_docs | PASS | 0.1s for 5 docs 107ms |
+| cache_round_trip | PASS | cold 0.0s vs cache load 0.02s 121ms |
+| retrieval_latency | PASS | vector 0ms hybrid 1ms 71ms |
 | eco_mode_trims | PASS | ctx 4800->3200 pred 512->256 batch 16->4 0ms |
 | batch_oom_resilience | PASS | shrunk to 4 after OOM 0ms |
 
@@ -80,7 +80,7 @@ _Embedding: `hash-mock` — hit = expected doc in top-3, correct rejection = no-
 |---|:---:|---|
 | github_validation | PASS | 5/5 cases |
 | url_validation | PASS | https=True bad=True xss=True |
-| empty_docs_rejected | PASS | Index creation failed: No usable content was extracted from the documents. The f |
+| empty_docs_rejected | PASS | Index creation failed safely. |
 | binary_exclusion | PASS | loaded 1 (png excluded) |
 | special_chars_tokenization | PASS | tokens=['30', 'day', 'money', 'back', 'refund'] |
 | hinglish_filler_filter | PASS | rewritten='refund polici plea' |
@@ -91,7 +91,7 @@ _Embedding: `hash-mock` — hit = expected doc in top-3, correct rejection = no-
 |---|:---:|---|
 | backend_preset_definitions | PASS | definitions=['Ollama', 'OpenAI', 'LM Studio (Local AI)', 'TabbyAPI', 'OpenAI-compatible'] |
 | export_docx | PASS | docx 36712 bytes |
-| browser_settings_contract | PASS | settings=30 secrets_excluded=True |
+| browser_settings_contract | PASS | settings=39 secrets_excluded=True |
 | ollama_helpers | PASS | estimate=2 trim=1 |
 | embedding_verify | PASS | mock verify |
 | r2r_health | PASS | health mocked |

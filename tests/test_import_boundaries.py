@@ -6,8 +6,7 @@ import unittest
 
 class ImportBoundaryTests(unittest.TestCase):
     def test_lightweight_modules_do_not_import_torch_at_module_load(self):
-        script = textwrap.dedent(
-            """
+        script = textwrap.dedent("""
             import builtins
 
             original_import = builtins.__import__
@@ -28,8 +27,7 @@ class ImportBoundaryTests(unittest.TestCase):
             import utils.rag_pipeline
             import components.tabs.github_repo
             import components.tabs.local_files
-            """
-        )
+            """)
 
         result = subprocess.run(
             [sys.executable, "-c", script],
@@ -43,6 +41,57 @@ class ImportBoundaryTests(unittest.TestCase):
             0,
             msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
         )
+
+    def _run(self, script):
+        return subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    def test_llama_index_does_not_import_the_retrieval_map(self):
+        script = textwrap.dedent("""
+            import sys
+
+            import utils.llama_index
+
+            assert "utils.retrieval_map" not in sys.modules, sorted(
+                key for key in sys.modules if "retrieval_map" in key
+            )
+            print("acyclic")
+            """)
+
+        result = self._run(script)
+
+        self.assertEqual(
+            result.returncode,
+            0,
+            msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+        )
+        self.assertIn("acyclic", result.stdout)
+
+    def test_retrieval_map_may_import_llama_index_and_is_used_by_the_rag_path(self):
+        script = textwrap.dedent("""
+            import sys
+
+            import utils.retrieval_map
+            import utils.ollama
+            import utils.rag_pipeline
+
+            assert "utils.llama_index" in sys.modules
+            assert "utils.retrieval_map" in sys.modules
+            print("acyclic")
+            """)
+
+        result = self._run(script)
+
+        self.assertEqual(
+            result.returncode,
+            0,
+            msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+        )
+        self.assertIn("acyclic", result.stdout)
 
 
 if __name__ == "__main__":

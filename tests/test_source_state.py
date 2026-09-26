@@ -84,9 +84,8 @@ class ChunkSettingsTests(unittest.TestCase):
 
     def test_non_finite_and_out_of_bounds_values_are_rejected(self):
         for value in (math.nan, math.inf, -math.inf):
-            with self.subTest(value=value):
-                with self.assertRaises(ValueError):
-                    normalize_chunk_settings({"chunk_size": value})
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                normalize_chunk_settings({"chunk_size": value})
         with self.assertRaises(ValueError):
             normalize_chunk_settings({"chunk_size": 10, "chunk_overlap_pct": 50.1})
         with self.assertRaises(ValueError):
@@ -207,26 +206,31 @@ class TransactionalPipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             work_dir = os.path.join(temp_dir, "operation")
             os.mkdir(work_dir)
-            with patch.object(rag_pipeline, "st", FakeStreamlit()), patch.object(
-                rag_pipeline, "render_pipeline_status"
-            ), patch.object(rag_pipeline, "render_embedding_progress"), patch.object(
-                rag_pipeline, "render_completed_ingestion_status"
-            ), patch.object(
-                rag_pipeline.llama_index,
-                "load_documents",
-                return_value=(["new-document"], []),
-            ), patch.object(
-                rag_pipeline.llama_index, "setup_embedding_model"
-            ), patch.object(
-                rag_pipeline.llama_index,
-                "create_query_engine",
-                side_effect=RuntimeError("embedding failed"),
-            ), patch.object(
-                rag_pipeline.ollama, "verify_chat_model", return_value=True
-            ), patch.object(
-                rag_pipeline.ollama, "create_llm", return_value="new-llm"
-            ), patch.object(
-                rag_pipeline.func, "create_ingestion_work_dir", return_value=work_dir
+            with (
+                patch.object(rag_pipeline, "st", FakeStreamlit()),
+                patch.object(rag_pipeline, "render_pipeline_status"),
+                patch.object(rag_pipeline, "render_embedding_progress"),
+                patch.object(rag_pipeline, "render_completed_ingestion_status"),
+                patch.object(
+                    rag_pipeline.llama_index,
+                    "load_documents",
+                    return_value=(["new-document"], []),
+                ),
+                patch.object(rag_pipeline.llama_index, "setup_embedding_model"),
+                patch.object(
+                    rag_pipeline.llama_index,
+                    "create_query_engine",
+                    side_effect=RuntimeError("embedding failed"),
+                ),
+                patch.object(
+                    rag_pipeline.ollama, "verify_chat_model", return_value=True
+                ),
+                patch.object(rag_pipeline.ollama, "create_llm", return_value="new-llm"),
+                patch.object(
+                    rag_pipeline.func,
+                    "create_ingestion_work_dir",
+                    return_value=work_dir,
+                ),
             ):
                 error = rag_pipeline.rag_pipeline(
                     [FakeUpload()],

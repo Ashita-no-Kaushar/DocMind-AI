@@ -3,6 +3,7 @@ import copy
 import streamlit as st
 
 import utils.r2r as r2r
+from components.retrieval_map_view import render_retrieval_route
 from utils.ollama import (
     chat,
     context_chat,
@@ -38,7 +39,9 @@ def _style_to_prompt(style: str) -> str:
         "Technical": " Use precise terminology; assume a technical audience.",
         "Simple / ELI5": " Explain simply, like you're talking to a 12-year-old. Avoid jargon.",
     }
-    return base + style_instructions.get(style, style_instructions["Balanced (default)"])
+    return base + style_instructions.get(
+        style, style_instructions["Balanced (default)"]
+    )
 
 
 def _sync_answer_style(source_key: str):
@@ -89,6 +92,7 @@ def _suggested_questions():
 def _clear_turn_state():
     st.session_state["last_doc_sources"] = []
     st.session_state["last_rag_evidence"] = []
+    st.session_state["last_retrieval_route"] = {}
     st.session_state["last_rag_no_result"] = False
     st.session_state["last_rag_question"] = None
 
@@ -156,6 +160,7 @@ def _process_prompt(prompt):
         st.markdown(prompt)
 
     turn_evidence = []
+    turn_route = {}
     with st.chat_message("assistant"):
         if use_r2r:
             st.caption("R2R response (complete, non-streaming)")
@@ -167,6 +172,7 @@ def _process_prompt(prompt):
                     prompt=prompt,
                     query_engine=st.session_state["query_engine"],
                     evidence_sink=turn_evidence,
+                    route_sink=turn_route,
                 )
             else:
                 stream = chat(prompt=prompt)
@@ -179,9 +185,7 @@ def _process_prompt(prompt):
             turn_evidence = [
                 dict(item)
                 for item in (
-                    turn_evidence
-                    or st.session_state.get("last_rag_evidence")
-                    or []
+                    turn_evidence or st.session_state.get("last_rag_evidence") or []
                 )
                 if isinstance(item, dict)
             ]
@@ -190,11 +194,18 @@ def _process_prompt(prompt):
                 for item in turn_evidence
             ]
         _render_sources(turn_sources)
+        if not use_r2r:
+            render_retrieval_route(
+                turn_route or st.session_state.get("last_retrieval_route") or {},
+                st.session_state.get("retrieval_map"),
+                key="current-route",
+            )
 
-    if st.session_state.get("last_rag_no_result"):
-        if st.button("💬 Ask without documents", key="ask_without_docs_btn"):
-            st.session_state["ask_without_docs"] = True
-            st.rerun()
+    if st.session_state.get("last_rag_no_result") and st.button(
+        "💬 Ask without documents", key="ask_without_docs_btn"
+    ):
+        st.session_state["ask_without_docs"] = True
+        st.rerun()
 
     if response:
         message = {"role": "assistant", "content": response}
@@ -203,15 +214,25 @@ def _process_prompt(prompt):
             message["r2r"] = copy.deepcopy(r2r_metadata)
         elif not use_r2r:
             message["evidence"] = copy.deepcopy(turn_evidence)
+            message["retrieval_route"] = copy.deepcopy(
+                turn_route or st.session_state.get("last_retrieval_route") or {}
+            )
         st.session_state["messages"].append(message)
 
 
 def chatbox():
     # Sync tone between Settings (answer_style) and chatbox (quick_answer_style) — single source
-    if st.session_state.get("answer_style") is not None and st.session_state.get("quick_answer_style") != st.session_state.get("answer_style"):
+    if st.session_state.get("answer_style") is not None and st.session_state.get(
+        "quick_answer_style"
+    ) != st.session_state.get("answer_style"):
         st.session_state["quick_answer_style"] = st.session_state["answer_style"]
-        st.session_state["system_prompt"] = _style_to_prompt(st.session_state["answer_style"])
-    elif st.session_state.get("quick_answer_style") is not None and st.session_state.get("answer_style") is None:
+        st.session_state["system_prompt"] = _style_to_prompt(
+            st.session_state["answer_style"]
+        )
+    elif (
+        st.session_state.get("quick_answer_style") is not None
+        and st.session_state.get("answer_style") is None
+    ):
         st.session_state["answer_style"] = st.session_state["quick_answer_style"]
 
     if st.session_state.get("system_prompt") is None:
@@ -221,15 +242,20 @@ def chatbox():
         prompt = st.session_state.get("last_rag_question")
         st.session_state["last_doc_sources"] = []
         st.session_state["last_rag_evidence"] = []
+        st.session_state["last_retrieval_route"] = {}
         st.session_state["last_rag_no_result"] = False
         st.session_state["last_rag_question"] = None
         if prompt:
-            with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
-                    response = st.write_stream(chat(prompt=prompt))
+            with st.chat_message("assistant"), st.spinner("Thinking..."):
+                response = st.write_stream(chat(prompt=prompt))
             if response:
                 st.session_state["messages"].append(
-                    {"role": "assistant", "content": response, "evidence": []}
+                    {
+                        "role": "assistant",
+                        "content": response,
+                        "evidence": [],
+                        "retrieval_route": {},
+                    }
                 )
 
     messages = st.session_state.get("messages", [])
@@ -253,7 +279,9 @@ def chatbox():
 
     if is_empty_chat:
         with st.expander("Answer style", expanded=False):
-            st.caption("How should answers sound? You can also change this anytime in Settings.")
+            st.caption(
+                "How should answers sound? You can also change this anytime in Settings."
+            )
             st.selectbox(
                 "Answer tone",
                 options=ANSWER_STYLE_OPTIONS,

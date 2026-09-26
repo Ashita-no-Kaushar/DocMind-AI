@@ -11,4 +11,6 @@ def set_page_header():
         """,
         unsafe_allow_html=True,
     )
-    st.caption("Local document chat with Ollama; external providers send data to the server you configure.")
+    st.caption(
+        "Local document chat with Ollama; external providers send data to the server you configure."
+    )

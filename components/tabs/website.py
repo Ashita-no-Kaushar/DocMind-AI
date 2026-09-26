@@ -4,7 +4,9 @@ import streamlit as st
 
 from components.ingestion_prerequisites import ingestion_is_configured
 from utils import helpers as func
+from utils import logs
 from utils import rag_pipeline as rag
+from utils.ingestion_lock import lifecycle_lock
 from utils.source_state import (
     effective_indexing_settings,
     ensure_active_source,
@@ -95,19 +97,17 @@ def website():
         )
     with col_clr:
         if len(st.session_state.get("websites", [])) > 0:
-            st.button(
-                "Clear List", key="clear_websites", on_click=clear_websites
-            )
+            st.button("Clear List", key="clear_websites", on_click=clear_websites)
 
     if process_button:
         if len(st.session_state.get("websites", [])) == 0:
-            st.warning("Please enter a website URL (e.g. https://docs.python.org/3/) before processing.")
+            st.warning(
+                "Please enter a website URL (e.g. https://docs.python.org/3/) before processing."
+            )
             return
 
         try:
-            urls = func.validate_website_url_limit(
-                st.session_state.get("websites", [])
-            )
+            urls = func.validate_website_url_limit(st.session_state.get("websites", []))
             deadline = func.website_ingestion_deadline()
         except ValueError as err:
             st.error(func.website_error_message(err))
@@ -116,7 +116,7 @@ def website():
         status_container = st.empty()
         completed_stages = []
 
-        with st.spinner("Processing..."):
+        with st.spinner("Processing..."), lifecycle_lock():
             try:
                 st.session_state["last_ingestion_error"] = None
                 rag.render_pipeline_status(
@@ -130,15 +130,13 @@ def website():
                 completed_stages.append("Websites Fetched")
                 rag.render_pipeline_status(status_container, completed_stages)
             except Exception as err:
-                st.session_state["last_ingestion_error"] = func.website_error_message(err)
-                st.error(f"Failed to fetch website content: {func.website_error_message(err)}")
+                st.session_state["last_ingestion_error"] = logs.safe_user_error(err)
+                st.error("Website content could not be retrieved safely.")
                 st.stop()
                 return
 
             if len(documents) > 0:
-                urls = sorted(
-                    entry["filename"] for entry in website_report
-                )
+                urls = sorted(entry["filename"] for entry in website_report)
                 content_signature = source_identity("website", urls)
                 error = rag.rag_pipeline(
                     documents=documents,
@@ -156,10 +154,7 @@ def website():
                 )
 
                 if error is not None:
-                    if getattr(error, "category", None):
-                        st.error(func.website_error_message(error))
-                    else:
-                        st.exception(error)
+                    st.error("Website content could not be indexed safely.")
                 else:
                     st.session_state["processed_website_urls"] = urls
                     active_source = ensure_active_source(st.session_state)

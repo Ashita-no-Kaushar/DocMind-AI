@@ -139,9 +139,7 @@ class ProviderConfigurationTests(unittest.TestCase):
             "openai_base_url": "https://api.openai.com/v1",
         }
         initialize_provider_state(state)
-        self.assertEqual(
-            state["lm_studio_base_url"], "http://localhost:1234/v1"
-        )
+        self.assertEqual(state["lm_studio_base_url"], "http://localhost:1234/v1")
 
     def test_embedding_profile_is_independent_after_first_migration(self):
         state = {
@@ -178,15 +176,22 @@ class ProviderConfigurationTests(unittest.TestCase):
             capture_output=True,
             text=True,
             check=False,
-            env={key: value for key, value in os.environ.items() if key != "OPENAI_API_KEY"},
+            env={
+                key: value
+                for key, value in os.environ.items()
+                if key != "OPENAI_API_KEY"
+            },
         )
         self.assertEqual(result.returncode, 0, msg=result.stderr)
 
     def test_official_adapter_requires_explicit_key_even_with_environment(self):
-        with patch.dict(
-            os.environ,
-            {"OPENAI_API_KEY": "environment-key"},
-        ), self.assertRaisesRegex(ValueError, "explicit API key"):
+        with (
+            patch.dict(
+                os.environ,
+                {"OPENAI_API_KEY": "environment-key"},
+            ),
+            self.assertRaisesRegex(ValueError, "explicit API key"),
+        ):
             ollama_module.create_openai_llm(
                 "gpt-4o-mini",
                 "https://api.openai.com/v1",
@@ -314,7 +319,11 @@ class _CompatibleHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         body = json.loads(self.rfile.read(length))
         self.__class__.requests.append(
-            {"path": self.path, "body": body, "authorization": self.headers.get("Authorization")}
+            {
+                "path": self.path,
+                "body": body,
+                "authorization": self.headers.get("Authorization"),
+            }
         )
         if self.path != "/v1/chat/completions":
             self._json(404, {"error": "not found"})
@@ -324,7 +333,9 @@ class _CompatibleHandler(BaseHTTPRequestHandler):
             "object": "chat.completion.chunk",
             "created": 1,
             "model": body.get("model"),
-            "choices": [{"index": 0, "delta": {"content": "ok"}, "finish_reason": None}],
+            "choices": [
+                {"index": 0, "delta": {"content": "ok"}, "finish_reason": None}
+            ],
         }
         data = f"data: {json.dumps(payload)}\n\ndata: [DONE]\n\n".encode()
         self.send_response(200)
@@ -373,9 +384,7 @@ class OpenAICompatibleServerTests(unittest.TestCase):
             backend="LM Studio (Local AI)",
         )
         responses = list(
-            llm.stream_chat(
-                [ChatMessage(role=MessageRole.USER, content="hello")]
-            )
+            llm.stream_chat([ChatMessage(role=MessageRole.USER, content="hello")])
         )
         self.assertTrue(responses)
         self.assertEqual(_CompatibleHandler.requests[0]["path"], "/v1/chat/completions")
@@ -420,8 +429,13 @@ class OllamaDiscoveryTests(unittest.TestCase):
 
     def test_discovery_reuses_list_and_isolates_metadata_failure(self):
         state = {"ollama_endpoint": "http://localhost:11434"}
-        with patch.object(ollama_module, "st", SimpleNamespace(session_state=state)), patch.object(
-            ollama_module, "create_client", side_effect=lambda endpoint: _OllamaClient(endpoint)
+        with (
+            patch.object(ollama_module, "st", SimpleNamespace(session_state=state)),
+            patch.object(
+                ollama_module,
+                "create_client",
+                side_effect=lambda endpoint: _OllamaClient(endpoint),
+            ),
         ):
             chat_models = ollama_module.get_models()
             embedding_models = ollama_module.get_embedding_models()
@@ -432,16 +446,21 @@ class OllamaDiscoveryTests(unittest.TestCase):
         self.assertEqual(embedding_models, ["nomic-embed-text:latest"])
 
     def test_ollama_client_uses_explicit_timeout(self):
-        with patch.object(ollama_module.ollama, "Client", return_value=object()) as client:
+        with patch.object(
+            ollama_module.ollama, "Client", return_value=object()
+        ) as client:
             ollama_module.create_client("http://localhost:11434")
-        client.assert_called_once_with(
-            host="http://localhost:11434", timeout=300
-        )
+        client.assert_called_once_with(host="http://localhost:11434", timeout=300)
 
     def test_default_chat_model_is_used_for_recovery_order(self):
         state = {"ollama_endpoint": "http://localhost:11434"}
-        with patch.object(ollama_module, "st", SimpleNamespace(session_state=state)), patch.object(
-            ollama_module, "create_client", side_effect=lambda endpoint: _OllamaClient(endpoint)
+        with (
+            patch.object(ollama_module, "st", SimpleNamespace(session_state=state)),
+            patch.object(
+                ollama_module,
+                "create_client",
+                side_effect=lambda endpoint: _OllamaClient(endpoint),
+            ),
         ):
             models = ollama_module.get_models()
         self.assertEqual(models[0], "llama3:8b")
@@ -529,7 +548,9 @@ class CacheKeyTests(unittest.TestCase):
         self.assertIs(first_ollama, second_ollama)
         ollama_module._create_ollama_llm_cached.clear()
 
-    def test_style_and_temperature_session_values_do_not_change_explicit_index_key(self):
+    def test_style_and_temperature_session_values_do_not_change_explicit_index_key(
+        self,
+    ):
         settings = {
             "chunk_size": 256,
             "chunk_overlap": 30,

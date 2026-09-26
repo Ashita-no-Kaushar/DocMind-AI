@@ -12,6 +12,7 @@ from utils.browser_settings import (
     restore_settings_from_browser_storage,
     should_refresh_models_for_endpoint,
 )
+from utils.ingestion_lock import lifecycle_lock
 from utils.llama_index import INDEX_CACHE_DIR
 from utils.ollama import default_embedding_model, get_embedding_models, get_models
 from utils.provider_config import (
@@ -19,6 +20,7 @@ from utils.provider_config import (
     get_embedding_profile,
     initialize_provider_state,
 )
+from utils.retrieval_map import normalize_map_settings
 from utils.source_state import (
     effective_indexing_settings,
     ensure_active_source,
@@ -61,9 +63,7 @@ def _owned_work_paths(state, explicit_paths=None):
     if explicit_paths:
         candidates.extend(Path(path) for path in explicit_paths)
     candidates.extend(
-        Path(path)
-        for path in state.get("_session_work_dirs", [])
-        if path
+        Path(path) for path in state.get("_session_work_dirs", []) if path
     )
     for key in ("ingestion_work_dir", "source_work_dir"):
         if state.get(key):
@@ -102,6 +102,7 @@ def _owned_work_paths(state, explicit_paths=None):
     return list(dict.fromkeys(result))
 
 
+@lifecycle_lock()
 def perform_project_reset(state, owned_dirs=None, delete_remote=True):
     """Reset session sources and, by default, owned remote R2R documents."""
     remote_result = None
@@ -171,11 +172,13 @@ def perform_project_reset(state, owned_dirs=None, delete_remote=True):
     state["last_r2r_metadata"] = None
     state["last_doc_sources"] = []
     state["last_rag_evidence"] = []
+    state["last_retrieval_route"] = {}
     state["last_rag_no_result"] = False
     state["last_rag_question"] = None
     state["ask_without_docs"] = False
     state["last_ingestion_error"] = None
     state["indexing_settings_error"] = None
+    state["retrieval_map"] = None
     state["messages"] = [dict(WELCOME_MESSAGE)]
     state["confirm_project_reset"] = False
     state["_session_work_dirs"] = failed
@@ -267,7 +270,6 @@ def set_initial_state():
             st.session_state["ollama_models"] = models
         except Exception:
             st.session_state["ollama_models"] = []
-            pass
         st.session_state["ollama_models_endpoint"] = st.session_state["ollama_endpoint"]
 
     embedding_profile = get_embedding_profile(st.session_state)
@@ -286,7 +288,6 @@ def set_initial_state():
             st.session_state["ollama_embedding_models"] = models
         except Exception:
             st.session_state["ollama_embedding_models"] = []
-            pass
         st.session_state["ollama_embedding_models_endpoint"] = (
             embedding_endpoint or st.session_state["ollama_endpoint"]
         )
@@ -312,6 +313,15 @@ def set_initial_state():
 
     if "last_rag_question" not in st.session_state:
         st.session_state["last_rag_question"] = None
+
+    if "last_retrieval_route" not in st.session_state:
+        st.session_state["last_retrieval_route"] = {}
+
+    if "retrieval_map" not in st.session_state:
+        st.session_state["retrieval_map"] = None
+
+    for map_key, map_value in normalize_map_settings(st.session_state).items():
+        st.session_state[map_key] = map_value
 
     ################################
     #  Files, Documents & Websites #
@@ -374,9 +384,7 @@ def set_initial_state():
     if "website_ingestion_stages" not in st.session_state:
         st.session_state["website_ingestion_stages"] = []
 
-    if "github_repo" not in st.session_state:
-        st.session_state["github_repo"] = ""
-    elif st.session_state["github_repo"] is None:
+    if "github_repo" not in st.session_state or st.session_state["github_repo"] is None:
         st.session_state["github_repo"] = ""
 
     if "processed_github_repo" not in st.session_state:
@@ -472,7 +480,9 @@ def set_initial_state():
         st.session_state["quick_answer_style"] = "Balanced (default)"
 
     if "answer_style" not in st.session_state:
-        st.session_state["answer_style"] = st.session_state.get("quick_answer_style", "Balanced (default)")
+        st.session_state["answer_style"] = st.session_state.get(
+            "quick_answer_style", "Balanced (default)"
+        )
 
     ##################
     # LLM Backends   #

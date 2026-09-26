@@ -38,10 +38,33 @@ PERSISTED_SETTING_TYPES = {
     "r2r_enabled": bool,
     "r2r_base_url": str,
     "r2r_workspace_id": str,
+    "retrieval_map_enabled": bool,
+    "retrieval_map_planner_mode": str,
+    "retrieval_map_measure_baseline": bool,
+    "retrieval_map_chunks_per_section": int,
+    "retrieval_map_target_sections": int,
+    "retrieval_map_max_selected_sections": int,
+    "retrieval_map_initial_sections": int,
+    "retrieval_map_neighbor_sections": int,
+    "retrieval_map_max_results": int,
 }
 BROWSER_STORAGE_KEY = "docmind:settings"
 DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434"
 PERSISTED_SETTINGS_HASH_STATE_KEY = "browser_settings_persisted_hash"
+RANGED_SETTING_BOUNDS = {
+    "candidate_depth": (1, 50),
+    "vector_candidate_depth": (1, 50),
+    "bm25_candidate_depth": (1, 50),
+    "retrieval_map_chunks_per_section": (1, 32),
+    "retrieval_map_target_sections": (0, 12),
+    "retrieval_map_max_selected_sections": (1, 16),
+    "retrieval_map_initial_sections": (1, 16),
+    "retrieval_map_neighbor_sections": (0, 4),
+    "retrieval_map_max_results": (1, 50),
+}
+CHOICE_SETTING_VALUES = {
+    "retrieval_map_planner_mode": ("deterministic", "llm"),
+}
 SENSITIVE_SETTING_KEYS = frozenset(
     {
         "openai_api_key",
@@ -78,6 +101,26 @@ def _coerce_bool(value):
         if normalized == "false":
             return False
     raise ValueError("invalid boolean")
+
+
+def _validate_ranged_setting(key, value):
+    bounds = RANGED_SETTING_BOUNDS.get(key)
+    if bounds is None:
+        return value
+    number = int(value)
+    if not bounds[0] <= number <= bounds[1]:
+        raise ValueError("out of range")
+    return number
+
+
+def _validate_choice_setting(key, value):
+    allowed = CHOICE_SETTING_VALUES.get(key)
+    if allowed is None:
+        return value
+    normalized = str(value).strip().lower()
+    if normalized not in allowed:
+        raise ValueError("unsupported value")
+    return normalized
 
 
 def normalize_ollama_endpoint(value):
@@ -119,11 +162,10 @@ def apply_persisted_settings(state, raw_settings):
                 value = _coerce_bool(raw_value)
             else:
                 value = expected_type(raw_value)
+            value = _validate_ranged_setting(key, value)
+            value = _validate_choice_setting(key, value)
         except (TypeError, ValueError, OverflowError):
             continue
-        if key in {"candidate_depth", "vector_candidate_depth", "bm25_candidate_depth"}:
-            if not 1 <= value <= 50:
-                continue
         state[key] = value
 
 
@@ -141,9 +183,8 @@ def serialize_persisted_settings(state):
                 value = _normalize_persisted_url(key, value)
                 if value is None:
                     continue
-            if key in {"candidate_depth", "vector_candidate_depth", "bm25_candidate_depth"}:
-                if not 1 <= int(value) <= 50:
-                    continue
+            value = _validate_ranged_setting(key, value)
+            value = _validate_choice_setting(key, value)
         except (TypeError, ValueError, OverflowError):
             continue
         serialized[key] = value

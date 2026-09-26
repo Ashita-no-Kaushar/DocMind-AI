@@ -1,15 +1,17 @@
 # Troubleshooting
 
-## Application Does Not Start
+## Application does not start
 
-Confirm Python dependencies are installed in the active environment:
+Confirm the locked environment is active and the lockfile is valid:
 
 ```bash
+pipenv verify
+pipenv install --deploy --dev --extra-pip-args="--require-hashes"
 pipenv run python -m pip check
-pipenv run python -m py_compile main.py
+pipenv run python -m compileall -q main.py components utils eval_harness.py tests
 ```
 
-Then start the app:
+Start a loopback smoke-test instance:
 
 ```bash
 pipenv run streamlit run main.py --server.headless=true --server.port=8520 --server.address=127.0.0.1
@@ -21,91 +23,174 @@ Check:
 http://127.0.0.1:8520/_stcore/health
 ```
 
-## Ingestion Is Disabled
+Stop the smoke-test process afterward. The current local gate left no Streamlit child process running.
 
-Local GitHub and website ingestion require valid local-provider chat and embedding settings. Local file uploads can use R2R without local models when R2R is enabled.
+The supported project target is Python 3.13.15. Python 3.12.10 passed the current local gate, but use the supported target for normal setup. If the lock install fails, restore the committed `Pipfile` and `Pipfile.lock` rather than bypassing hash enforcement.
 
-For Ollama:
+## Models or providers are unavailable
 
-1. Confirm Ollama is reachable.
-2. Confirm the endpoint, usually `http://localhost:11434`.
-3. Click **Refresh Models**.
-4. Select an installed chat-capable model.
-5. Select an installed embedding-capable model.
+### Ollama
 
-For OpenAI-compatible providers, configure the base URL, chat model, and embedding model. LM Studio and TabbyAPI use this routing path, but the model identifier must be supported by the server and installed LlamaIndex adapter.
+1. Confirm the Ollama server is reachable.
+2. Confirm the endpoint, normally `http://localhost:11434`.
+3. Select **Refresh Models**.
+4. Select an installed chat-capable model and an embedding-capable model.
 
-## Model Answers Are Vague or Miss the Context
+Ollama was unavailable in the current environment, so the current result does not include a live Ollama generation.
 
-Small local models can produce variable answers even when retrieval succeeds. The current evaluation observed the expected refund fact in 2/3 repeated live generations.
+### OpenAI-compatible providers
 
-Try:
+Confirm the provider base URL, model identifier, and optional key. LM Studio and TabbyAPI use the OpenAI-compatible path. A model name must be accepted by both the server and the installed LlamaIndex adapter. Non-loopback HTTP chat/embedding endpoints are rejected; use HTTPS for a remote chat/embedding provider. R2R accepts HTTP or HTTPS, so protect a remote R2R deployment with HTTPS and an appropriate network boundary.
 
-- A larger chat model
-- A lower temperature
-- Balanced or Detailed answer style
-- Re-running the same query
-- Checking the retrieved source labels
-- Verifying the document actually contains the requested fact
+The official OpenAI service was unavailable in the current environment. It requires an explicit key and the official OpenAI host. A key bound to one provider/endpoint is cleared or rejected when the endpoint changes.
 
-A citation marker does not prove that the generated claim is supported by the cited chunk.
+### R2R
 
-## No Usable Content
+R2R was unavailable in the current environment. Confirm the URL, optional key, and **Test Connection**. The implemented contract is R2R 3.6.5 / API v3. Local fake-server tests do not establish live compatibility.
 
-The index builder rejects content that produces no usable chunks. Try a text-based TXT, Markdown, CSV, JSON, or DOCX export. Scanned PDFs require OCR, which is not included.
+## Ingestion controls are disabled
 
-The current minimum retained chunk length is 15 non-whitespace characters.
+Local GitHub and website ingestion require valid local chat and embedding settings. Local file uploads can use R2R without local models when R2R is enabled.
 
-## Local Upload Errors
+For local ingestion:
 
-- More than 10 files
-- File larger than 25 MiB
-- Total batch larger than 100 MiB
-- Unsupported filename characters
-- Unsupported extension
-- A parser or optional dependency cannot extract the file
+- Confirm the provider and model are selected.
+- Confirm the embedding provider and model are selected.
+- Confirm the endpoint is valid.
+- Resolve any provider credential binding error.
 
-Accepted extensions are listed in [Usage](usage.md#local-files). Acceptance does not guarantee reliable parsing for every format.
+A source can remain visible while its index is stale after a provider, embedding, chunk, or endpoint change. Re-select or re-process the source after fixing the setting.
 
-## Website Import Errors
+## No usable content
+
+The index builder rejects content that produces no usable chunks. Try a text-based TXT, Markdown, CSV, JSON, DOCX, or converted document first. Image-only PDF, DOCX, and PPTX content requires external OCR or conversion. No OCR engine is bundled.
+
+Inspect the **Extraction report**. It distinguishes loaded, skipped, and unsupported files and includes safe warning/error text without copying document content. The minimum retained chunk length is 15 non-whitespace characters.
+
+## Local upload errors
+
+Common causes are:
+
+- More than 10 files in a batch.
+- A file larger than 25 MiB.
+- A batch larger than 100 MiB.
+- Unsupported filename characters, path separators, control characters, trailing spaces/periods, or Windows reserved names.
+- An unsupported extension.
+- A parser dependency that is unavailable.
+- Malformed, encrypted, empty, or archive-unsafe content.
+- A source, JSON, MIME, table, PDF, or archive limit being exceeded.
+
+The accepted 25-extension matrix is listed in [Usage](usage.md#local-files). Extension acceptance does not guarantee a reliable parser. Valid legacy XLS and real MSG fixtures were not generated in the current format tests; encrypted Office/ZIP content and OCR ground truth remain untested.
+
+## Parser and archive failures
+
+- `.doc` and `.ppt` are intentionally unsupported without conversion. Convert them to `.docx` and `.pptx`.
+- Image-only PDF, DOCX, and PPTX files are reported as requiring OCR or conversion.
+- ZIP-based formats are preflighted for member count, compressed size, total/per-member uncompressed size, compression ratio, traversal, duplicate paths, symlink/special members, and encrypted members.
+- A malformed file in a mixed batch should not force valid files to be discarded. Review each report entry and retry the failed file separately.
+
+Supported parser and archive limits are configurable in code through the `DOCMIND_MAX_*` and `DOCMIND_ZIP_*` environment variables. Use the exact names in `utils/format_ingestion.py`; invalid or non-positive values fall back to safe defaults.
+
+## Website import errors
 
 Common causes:
 
-- URL is not HTTPS
-- URL contains credentials
-- DNS resolves to a blocked address
-- Redirect limit was exceeded
-- Content-Type is not HTML or plain text
-- Response exceeds 5 MiB
+- The URL is not HTTPS or contains embedded credentials.
+- The hostname is local, a metadata name, or resolves to a blocked address.
+- DNS returns no usable public address or fails.
+- A redirect is missing, exceeds the three-redirect limit, or points to a blocked destination.
+- The content type is not HTML or plain text.
+- The response exceeds 5 MiB.
+- The site returns an anti-bot/challenge response.
+- The request or total ingestion deadline expires.
+- The page has no readable text.
 
-DNS validation and the later request resolve independently, so changing DNS between checks can still create an edge case.
+The current public fetch of `https://docs.python.org/3/` passed. A site that requires JavaScript, authentication, or anti-bot approval is not guaranteed to work. DNS and network changes can still produce failures; the application checks all addresses and pins the validated address for its HTTPS request, but it is not a network sandbox.
 
-## GitHub Import Errors
+## GitHub import errors
 
-- Use `owner/repo` or `https://github.com/owner/repo`
-- Do not include issue, pull-request, branch, or extra path segments
-- The repository must be public and reachable
-- `git` must be installed and available on PATH
-- Large repositories may take longer or exceed local parser resources
+- Use `owner/repo` or `https://github.com/owner/repo`.
+- Do not include credentials, ports, query strings, fragments, issue/pull-request paths, or extra path segments.
+- The repository must be public and reachable; private authentication is not implemented.
+- `git` must be installed and available to the application process.
+- The clone may exceed the 120-second timeout or 64 KiB output bound.
+- The repository may exceed the 100 MiB download, 10,000-file, 10 MiB per-file, or 250 MiB unpacked checkout bound.
+- The checkout may contain a symlink/reparse point, special file, hidden/excluded path, or unsafe source-root path.
+- The repository may be valid but contain only unsupported or image-only files.
 
-## Settings Do Not Persist
+Metadata preflight can reject a known private or oversized repository. If metadata is unavailable, the code can attempt a bounded clone. A current bounded clone and validation of `Ashita-no-Kaushar/DocMind-AI` passed in a temporary directory.
 
-Only the settings listed in `PERSISTED_SETTING_TYPES` are saved to browser `localStorage`. API keys, chat history, indexes, R2R IDs, and answer-style state are not persisted.
+## RAG answers are vague or miss the context
 
-Use the DOCX export for the current transcript. Re-enter API keys after a process/session restart when required.
+Small local models can vary even when retrieval succeeds. Check:
 
-## Reset Project Does Not Remove Everything
+- The source actually contains the requested fact.
+- The active source is current and not stale.
+- The selected evidence chunks and source labels.
+- Top K, candidate depths, and similarity cutoff.
+- Whether a follow-up query needs more explicit wording.
+- A larger or more capable chat model.
+- A lower temperature, understanding that this does not guarantee determinism.
 
-Reset Project deletes local `data/` and `.index_cache/` directories and clears most local index state. It intentionally retains some settings and session-only API keys. It also does not delete documents already uploaded to an external R2R server.
+A source label or citation marker does not prove factual support. The evidence rule is not an entailment checker.
+
+## No-match behavior
+
+If local retrieval returns no credible nodes, the response is:
+
+```text
+I could not find this information in the documents.
+```
+
+The one-time **Ask without documents** action sends the same question through direct chat. It is a deliberate fallback, not a claim that the documents support the answer.
+
+## Citations
+
+DocMind asks the model to cite evidence and sanitizes references outside the selected evidence set. It does not force a citation and does not automatically verify that a cited chunk entails a claim. A citation can therefore be absent or still be insufficient; inspect the source excerpt and answer together.
+
+## Settings do not persist
+
+Only fields defined by `PERSISTED_SETTING_TYPES` are saved to browser `localStorage`. API keys, chat history, source indexes, evidence, answer-style state, and R2R document IDs are not persisted there.
+
+Re-enter API keys after a process or session restart when required. Use the DOCX export for the current transcript, and review it for sensitive content before sharing.
+
+## Reset Project behavior
+
+**Clear Chat** clears only the conversation.
+
+**Reset Project** clears the current local source/index/session state and owned work directories. It retains browser settings, current-session API keys, shared caches, logs, other sessions, and the R2R ownership registry.
+
+The recommended reset attempts deletion of R2R documents owned by the current workspace and current endpoint/credential identity. The registry is retained. If deletion is partial, local state is still cleared but the UI reports incomplete cleanup; restore the same R2R identity and retry. Documents associated with another endpoint/credential are not claimed or deleted.
+
+The local-only reset option does not contact R2R and leaves remote documents tracked by the registry.
 
 ## Logs
 
-By default, DocMind writes `docmind.log` in the current working directory. Set `DOCMIND_LOG_FILE` to another writable path when needed.
+By default, DocMind writes `docmind.log` in the current working directory. Supported settings are:
 
-The logger always writes to stdout. If the configured file path is not writable, file logging is skipped rather than preventing application import.
+- `DOCMIND_LOG_FILE`
+- `DOCMIND_LOG_MAX_BYTES`
+- `DOCMIND_LOG_BACKUP_COUNT`
 
-Do not share logs without reviewing them for document content, prompts, local paths, internal addresses, and credentials.
+Logs rotate, redact credential-shaped values, and fall back to stdout if the configured file is not writable. Redaction is defense in depth. Review logs for document content, prompts, local paths, internal addresses, and any sensitive provider response before sharing.
 
-## Application State
+## Runtime binding refused
 
-There is no Application State viewer in Settings. Relevant state is visible indirectly through the mode badge, ingestion stages, source labels, and error messages. Inspect `components/page_state.py` when debugging source code.
+The default address is `127.0.0.1`. A non-loopback or wildcard address requires:
+
+```text
+DOCMIND_ALLOW_REMOTE_BIND=true
+DOCMIND_BIND_ADDRESS=0.0.0.0
+```
+
+Use those settings only behind a user-configured authenticated reverse proxy. The application does not provide built-in authentication. Compose publishes `127.0.0.1:8501:8501` by default; do not change it to a wildcard without the same proxy and network controls.
+
+## Docker is unavailable
+
+The current environment had no Docker CLI. Docker/Compose was statically validated and CI performs a build-only check, but no local image build, runtime, health check, or read-only-volume exercise was possible. Treat runtime behavior as unverified until a Docker host completes those checks.
+
+## External validation status
+
+The current live Ollama, LM Studio, TabbyAPI, official OpenAI, and R2R services were unavailable. The current real Ollama/LLM evaluation was not rerun. The 43/43 result dated 2026-09-23 is historical, not current. The current mock evaluation passed 42/42 scored checks with one real-LLM skip, and the local real-Chrome E2E run passed.
+
+See [Setup](setup.md) for locked installation, [Usage](usage.md) for source behavior, and [Pipeline](pipeline.md) for implementation details.

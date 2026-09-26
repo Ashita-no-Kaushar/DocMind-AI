@@ -1,8 +1,8 @@
 import streamlit as st
 
 from components.page_state import WELCOME_MESSAGE
-from components.tabs.sources import sources
 from components.tabs.settings import settings
+from components.tabs.sources import sources
 from utils.browser_settings import persist_settings_to_browser_storage
 from utils.source_state import active_index_matches_settings, ensure_active_source
 
@@ -56,8 +56,13 @@ def sidebar():
                 )
 
         active_source = ensure_active_source(st.session_state)
-        if st.session_state.get("r2r_enabled") and st.session_state.get("r2r_document_ids"):
-            if active_source.get("kind") == "r2r" and active_source.get("status") == "ready":
+        if st.session_state.get("r2r_enabled") and st.session_state.get(
+            "r2r_document_ids"
+        ):
+            if (
+                active_source.get("kind") == "r2r"
+                and active_source.get("status") == "ready"
+            ):
                 st.success("R2R Mode: using documents on the external R2R server")
             else:
                 st.info("R2R is enabled but its active documents are not ready.")
@@ -76,6 +81,7 @@ def sidebar():
                 st.session_state["messages"] = [dict(WELCOME_MESSAGE)]
                 st.session_state["last_doc_sources"] = []
                 st.session_state["last_rag_evidence"] = []
+                st.session_state["last_retrieval_route"] = {}
                 st.session_state["last_rag_no_result"] = False
                 st.session_state["last_rag_question"] = None
                 st.rerun()
@@ -109,8 +115,11 @@ def sidebar():
                     if delete_remote
                     else "Reset local project only"
                 )
-                if st.button(button_label, use_container_width=True):
-                    reset_project(delete_remote=delete_remote)
-                    st.rerun()
+                st.button(
+                    button_label,
+                    use_container_width=True,
+                    on_click=reset_project,
+                    args=(delete_remote,),
+                )
 
         persist_settings_to_browser_storage()

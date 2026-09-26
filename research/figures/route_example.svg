@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="450" viewBox="0 0 1120 450" font-family="Helvetica,Arial,sans-serif">
+<rect width="1120" height="450" fill="#ffffff"/>
+<text x="40" y="46" font-size="24" font-weight="600" fill="#14181f">Agentic route for “What is the default API rate limit quota?”</text>
+<text x="40" y="72" font-size="14" fill="#4a5568">Map id map_86baadee4edd95c7759a &#183; 2 selected &#183; 2 planned &#183; 8 considered &#183; 1 route steps</text>
+<text x="44" y="116" font-size="12" font-weight="600" fill="#232a34">refund_policy.txt</text>
+<rect x="40" y="130" width="132" height="34" rx="4" fill="#bcd8ff" stroke="#1f5fd0" stroke-width="1.2"/>
+<text x="48" y="145" font-size="10.5" fill="#1b2330">Refund Policy - Sect</text>
+<text x="48" y="157" font-size="9" fill="#5b6675">seq 1 &#183; 6 chunks</text>
+<text x="194" y="116" font-size="12" font-weight="600" fill="#232a34">shipping_times.txt</text>
+<rect x="190" y="130" width="132" height="34" rx="4" fill="#e4edff" stroke="#7aa2f7" stroke-width="1.2"/>
+<text x="198" y="145" font-size="10.5" fill="#1b2330">Shipping Times - Sec</text>
+<text x="198" y="157" font-size="9" fill="#5b6675">seq 1 &#183; 6 chunks</text>
+<text x="344" y="116" font-size="12" font-weight="600" fill="#232a34">warranty_terms.txt</text>
+<rect x="340" y="130" width="132" height="34" rx="4" fill="#e4edff" stroke="#7aa2f7" stroke-width="1.2"/>
+<text x="348" y="145" font-size="10.5" fill="#1b2330">Warranty Terms - Sec</text>
+<text x="348" y="157" font-size="9" fill="#5b6675">seq 1 &#183; 6 chunks</text>
+<text x="494" y="116" font-size="12" font-weight="600" fill="#232a34">incident_runbook.t</text>
+<rect x="490" y="130" width="132" height="34" rx="4" fill="#e4edff" stroke="#7aa2f7" stroke-width="1.2"/>
+<text x="498" y="145" font-size="10.5" fill="#1b2330">Incident Runbook - S</text>
+<text x="498" y="157" font-size="9" fill="#5b6675">seq 1 &#183; 6 chunks</text>
+<text x="644" y="116" font-size="12" font-weight="600" fill="#232a34">release_checklist.</text>
+<rect x="640" y="130" width="132" height="34" rx="4" fill="#e4edff" stroke="#7aa2f7" stroke-width="1.2"/>
+<text x="648" y="145" font-size="10.5" fill="#1b2330">Release Checklist - </text>
+<text x="648" y="157" font-size="9" fill="#5b6675">seq 1 &#183; 6 chunks</text>
+<text x="794" y="116" font-size="12" font-weight="600" fill="#232a34">payroll_policy.txt</text>
+<rect x="790" y="130" width="132" height="34" rx="4" fill="#e4edff" stroke="#7aa2f7" stroke-width="1.2"/>
+<text x="798" y="145" font-size="10.5" fill="#1b2330">Payroll Policy - Sec</text>
+<text x="798" y="157" font-size="9" fill="#5b6675">seq 1 &#183; 6 chunks</text>
+<text x="944" y="116" font-size="12" font-weight="600" fill="#232a34">api_rate_limits.tx</text>
+<rect x="940" y="130" width="132" height="34" rx="4" fill="#bcd8ff" stroke="#1f5fd0" stroke-width="1.2"/>
+<text x="948" y="145" font-size="10.5" fill="#1b2330">Api Rate Limits - Se</text>
+<text x="948" y="157" font-size="9" fill="#5b6675">seq 1 &#183; 6 chunks</text>
+<text x="1094" y="116" font-size="12" font-weight="600" fill="#232a34">access_control.txt</text>
+<rect x="1090" y="130" width="132" height="34" rx="4" fill="#e4edff" stroke="#7aa2f7" stroke-width="1.2"/>
+<text x="1098" y="145" font-size="10.5" fill="#1b2330">Access Control - Sec</text>
+<text x="1098" y="157" font-size="9" fill="#5b6675">seq 1 &#183; 6 chunks</text>
+<polyline points="1006.0,147.0 106.0,147.0" fill="none" stroke="#d64545" stroke-width="2" stroke-dasharray="6 4" opacity="0.85"/>
+<circle cx="1006.0" cy="147.0" r="6" fill="#ffffff" stroke="#d64545" stroke-width="2"/>
+<text x="1016.0" y="151.0" font-size="10" fill="#a12b2b">1</text>
+<circle cx="106.0" cy="147.0" r="6" fill="#ffffff" stroke="#d64545" stroke-width="2"/>
+<text x="116.0" y="151.0" font-size="10" fill="#a12b2b">2</text>
+<rect x="40" y="404" width="14" height="14" rx="3" fill="#bcd8ff" stroke="#8f9bab"/>
+<text x="60" y="415" font-size="12" fill="#232a34">selected</text>
+<rect x="190" y="404" width="14" height="14" rx="3" fill="#d7e6ff" stroke="#8f9bab"/>
+<text x="210" y="415" font-size="12" fill="#232a34">planned</text>
+<rect x="340" y="404" width="14" height="14" rx="3" fill="#e4edff" stroke="#8f9bab"/>
+<text x="360" y="415" font-size="12" fill="#232a34">considered</text>
+<rect x="490" y="404" width="14" height="14" rx="3" fill="#f1f3f6" stroke="#8f9bab"/>
+<text x="510" y="415" font-size="12" fill="#232a34">not considered</text>
+</svg>

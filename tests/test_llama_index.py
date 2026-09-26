@@ -76,9 +76,11 @@ class QueryEngineCandidateTests(unittest.TestCase):
         state = {"query_engine": object(), "retriever": object(), "top_k": 3}
         original_engine = state["query_engine"]
         original_retriever = state["retriever"]
-        with patch.object(llama_index, "st", SimpleNamespace(session_state=state)), patch.object(
-            llama_index, "index_cache_dir", return_value=None
-        ), patch.object(llama_index, "create_index", return_value=FakeIndex()):
+        with (
+            patch.object(llama_index, "st", SimpleNamespace(session_state=state)),
+            patch.object(llama_index, "index_cache_dir", return_value=None),
+            patch.object(llama_index, "create_index", return_value=FakeIndex()),
+        ):
             bundle = llama_index.create_query_engine(
                 [Document(text="a document with enough content")],
                 settings={"chunk_size": 256, "chunk_overlap": 30},
@@ -141,19 +143,21 @@ class EmbeddingModelValidationTests(unittest.TestCase):
             )
 
     def test_verify_embedding_model_false_when_server_down(self):
-        with patch(
-            "utils.llama_index.ollama.Client", side_effect=RuntimeError("boom")
-        ):
+        with patch("utils.llama_index.ollama.Client", side_effect=RuntimeError("boom")):
             self.assertFalse(
-                verify_embedding_model("nomic-embed-text:latest", "http://localhost:11434")
+                verify_embedding_model(
+                    "nomic-embed-text:latest", "http://localhost:11434"
+                )
             )
 
     def test_setup_embedding_model_raises_for_missing_model(self):
-        with patch("utils.llama_index.ollama.Client", _FakeOllamaClient):
-            with self.assertRaises(ValueError) as context:
-                setup_embedding_model(
-                    "missing:latest", ollama_endpoint="http://localhost:11434"
-                )
+        with (
+            patch("utils.llama_index.ollama.Client", _FakeOllamaClient),
+            self.assertRaises(ValueError) as context,
+        ):
+            setup_embedding_model(
+                "missing:latest", ollama_endpoint="http://localhost:11434"
+            )
         self.assertIn("missing:latest", str(context.exception))
 
     def test_setup_embedding_model_uses_openai_backend(self):
@@ -228,7 +232,9 @@ class OllamaEmbeddingTests(unittest.TestCase):
 
 class QueryUnderstandingTests(unittest.TestCase):
     def test_bm25_tokens_are_stemmed(self):
-        self.assertEqual(_bm25_tokens("Running documents quickly"), ["run", "document", "quickli"])
+        self.assertEqual(
+            _bm25_tokens("Running documents quickly"), ["run", "document", "quickli"]
+        )
 
     def test_bm25_tokens_split_hyphens_and_drop_single_letters(self):
         self.assertEqual(
@@ -281,8 +287,12 @@ class QueryUnderstandingTests(unittest.TestCase):
 
     def test_dedupe_drops_near_duplicate_chunks_keeps_distinct(self):
         chunks = [
-            Document(text="Welcome to our annual report. The company grew a lot this year."),
-            Document(text="Welcome to our annual report. The company grew a lot this year!"),
+            Document(
+                text="Welcome to our annual report. The company grew a lot this year."
+            ),
+            Document(
+                text="Welcome to our annual report. The company grew a lot this year!"
+            ),
             Document(text="Revenues increased by 12 percent over the fiscal year."),
         ]
         deduped = _dedupe_near_duplicate_nodes(chunks)
@@ -348,9 +358,7 @@ class HybridRetrieverCredibilityTests(unittest.TestCase):
                 NodeWithScore(node=boilerplate, score=vector_scores[1]),
             ]
         )
-        return HybridRetriever(
-            vector, docstore, corpus, top_k=3, similarity_cutoff=0.3
-        )
+        return HybridRetriever(vector, docstore, corpus, top_k=3, similarity_cutoff=0.3)
 
     def test_unrelated_query_with_weak_scores_is_rejected(self):
         # 0.46 scores, no keyword overlap with "quantum physics equations".

@@ -19,6 +19,14 @@ from utils.provider_config import (
     profile_keys,
     provider_label,
 )
+from utils.retrieval_map import (
+    MAP_PLANNER_DETERMINISTIC,
+    MAP_PLANNER_LLM,
+    MAP_PLANNER_MODES,
+    MAP_SETTING_DEFAULTS,
+    MAP_SETTING_RANGES,
+    normalize_map_settings,
+)
 from utils.source_state import normalize_chunk_settings
 
 
@@ -47,7 +55,9 @@ def _style_to_prompt(style: str) -> str:
         "Technical": " Use precise terminology; assume a technical audience.",
         "Simple / ELI5": " Explain simply, like you're talking to a 12-year-old. Avoid jargon.",
     }
-    return base + style_instructions.get(style, style_instructions["Balanced (default)"])
+    return base + style_instructions.get(
+        style, style_instructions["Balanced (default)"]
+    )
 
 
 BACKEND_PRESETS = {
@@ -78,6 +88,131 @@ BACKEND_PRESETS = {
     },
 }
 EMBEDDING_BACKENDS = list(BACKEND_PRESETS)
+
+MAP_PLANNER_LABELS = {
+    MAP_PLANNER_DETERMINISTIC: "Deterministic — no extra model call",
+    MAP_PLANNER_LLM: "LLM — one extra planner call",
+}
+
+
+def _map_planner_label(value):
+    return MAP_PLANNER_LABELS.get(value, str(value))
+
+
+def _map_range(key):
+    low, high = MAP_SETTING_RANGES[key]
+    return int(low), int(high)
+
+
+def _map_value(key):
+    normalized = normalize_map_settings(st.session_state)
+    return int(normalized.get(key, MAP_SETTING_DEFAULTS[key]))
+
+
+def _map_slider(label, key, help_text):
+    low, high = _map_range(key)
+    return st.slider(
+        label,
+        min_value=low,
+        max_value=high,
+        value=max(low, min(high, _map_value(key))),
+        key=key,
+        help=help_text,
+    )
+
+
+def _map_controls():
+    st.markdown("**Agentic Map Retrieval**")
+    st.caption(
+        "A compact document map groups chunks into ordered sections so each question "
+        "can route to a few sections instead of the whole index. Turning it off uses "
+        "plain top-k retrieval. These controls change routing layout only — they are "
+        "not accuracy claims."
+    )
+    st.toggle(
+        "Route retrieval with the document map",
+        key="retrieval_map_enabled",
+        help="On: plan a few map sections, then retrieve only those chunks. "
+        "Off: plain top-k retrieval without a map route.",
+    )
+    st.selectbox(
+        "Planner",
+        options=list(MAP_PLANNER_MODES),
+        key="retrieval_map_planner_mode",
+        format_func=_map_planner_label,
+        help="Deterministic ranks sections with keyword scores and makes no extra "
+        "model call. LLM asks your chat model to choose sections and falls back to "
+        "deterministic ranking when the reply cannot be used.",
+    )
+    st.toggle(
+        "Measure global baseline",
+        key="retrieval_map_measure_baseline",
+        help="Runs one extra unrestricted local retrieval per question so the route "
+        "panel can show a measured token comparison. It adds local retrieval work and "
+        "no extra answer-model call.",
+    )
+    if st.session_state.get("retrieval_map_measure_baseline"):
+        st.caption(
+            "On: each question also runs one unrestricted local retrieval pass. No "
+            "extra answer-model call, and no answer-quality change is claimed."
+        )
+    else:
+        st.caption(
+            "Off: no extra retrieval work. The route panel shows actual token counts "
+            "without a baseline comparison."
+        )
+    _map_slider(
+        "Chunks per map section",
+        "retrieval_map_chunks_per_section",
+        "How many document chunks are grouped into one map section. Ignored while "
+        "adaptive sections are on.",
+    )
+    target_sections = _map_slider(
+        "Adaptive sections per document",
+        "retrieval_map_target_sections",
+        "0 turns adaptive sizing off and uses a fixed chunk count. Above zero, each "
+        "document is divided into about this many sections, so short documents are "
+        "not collapsed into a single section and long ones stay bounded.",
+    )
+    if target_sections:
+        st.caption(
+            "Adaptive sizing is on, so each document becomes about "
+            f"{target_sections} map sections regardless of its length. "
+            "'Chunks per map section' is not used."
+        )
+    max_selected = _map_slider(
+        "Max sections the route may select",
+        "retrieval_map_max_selected_sections",
+        "Upper bound on sections one question can route to, including neighbours and "
+        "any expansion.",
+    )
+    initial_low, initial_high = _map_range("retrieval_map_initial_sections")
+    allowed_initial = max(initial_low, min(initial_high, int(max_selected)))
+    if _map_value("retrieval_map_initial_sections") > allowed_initial:
+        st.session_state["retrieval_map_initial_sections"] = allowed_initial
+    st.slider(
+        "Sections planned before the first fetch",
+        min_value=initial_low,
+        max_value=allowed_initial,
+        value=allowed_initial,
+        key="retrieval_map_initial_sections",
+        help="How many sections the planner proposes first. It cannot exceed the "
+        "maximum selected sections.",
+    )
+    _map_slider(
+        "Neighbour sections per pick",
+        "retrieval_map_neighbor_sections",
+        "Sections on either side of a planned section that are added to the route.",
+    )
+    _map_slider(
+        "Max routed results",
+        "retrieval_map_max_results",
+        "Upper bound on chunks the routed retrieval returns for one question.",
+    )
+    st.caption(
+        "Layout changes rebuild the compact map on your next question. Your documents "
+        "do not need to be ingested again."
+    )
 
 
 def _chat_profile(backend=None):
@@ -130,7 +265,10 @@ def _on_chat_url_change():
         return
     st.session_state["provider_endpoint_error"] = None
     binding_key = f"{keys['api_key']}_endpoint"
-    if st.session_state.get(keys["api_key"]) and st.session_state.get(binding_key) != endpoint:
+    if (
+        st.session_state.get(keys["api_key"])
+        and st.session_state.get(binding_key) != endpoint
+    ):
         st.session_state[keys["api_key"]] = ""
     st.session_state[keys["base_url"]] = endpoint
     st.session_state[binding_key] = endpoint
@@ -169,7 +307,9 @@ def _fetch_openai_models():
     st.session_state["openai_models_provider"] = profile["provider_kind"]
     st.session_state["provider_model_error"] = None
     if profile["model"] not in catalog["chat"]:
-        st.session_state[keys["model"]] = catalog["chat"][0] if catalog["chat"] else profile["model"]
+        st.session_state[keys["model"]] = (
+            catalog["chat"][0] if catalog["chat"] else profile["model"]
+        )
 
 
 def _refresh_models():
@@ -186,7 +326,9 @@ def _refresh_models():
             st.session_state["ollama_models"]
         )
     st.session_state["ollama_models_endpoint"] = st.session_state["ollama_endpoint"]
-    st.session_state["ollama_embedding_models_endpoint"] = st.session_state["ollama_endpoint"]
+    st.session_state["ollama_embedding_models_endpoint"] = st.session_state[
+        "ollama_endpoint"
+    ]
 
 
 def _on_embedding_backend_change():
@@ -330,11 +472,17 @@ def settings():
                 ollama_models,
                 key="selected_model",
                 disabled=len(ollama_models) == 0,
-                placeholder="Select Chat Model" if ollama_models else "No Models Available",
+                placeholder=(
+                    "Select Chat Model" if ollama_models else "No Models Available"
+                ),
             )
-            st.button("Refresh Models", key="refresh_chat_models", on_click=_refresh_models)
+            st.button(
+                "Refresh Models", key="refresh_chat_models", on_click=_refresh_models
+            )
             if not ollama_models:
-                st.info("No models found. In a terminal run: `ollama pull qwen2.5:0.5b`")
+                st.info(
+                    "No models found. In a terminal run: `ollama pull qwen2.5:0.5b`"
+                )
             with st.expander("Connection", expanded=False):
                 st.text_input(
                     "Ollama Endpoint",
@@ -385,15 +533,15 @@ def settings():
             found = st.session_state.get("openai_models") or []
             if found:
                 st.caption(
-                    "Found: "
-                    + ", ".join(found[:10])
-                    + ("…" if len(found) > 10 else "")
+                    "Found: " + ", ".join(found[:10]) + ("…" if len(found) > 10 else "")
                 )
         if st.session_state.get("provider_endpoint_error"):
             st.error(st.session_state["provider_endpoint_error"])
 
     st.subheader("Document Search")
-    st.caption("Embedding chat and document models can use independent provider profiles.")
+    st.caption(
+        "Embedding chat and document models can use independent provider profiles."
+    )
     with st.container(border=True):
         embedding_backend = st.session_state.get("embedding_backend", "Ollama")
         if embedding_backend not in EMBEDDING_BACKENDS:
@@ -597,9 +745,14 @@ def settings():
                 )
             st.caption(f"→ {normalized['chunk_overlap']} tokens overlap")
 
+        st.divider()
+        _map_controls()
+
     # ── 6. R2R (collapsed by default) ──────────────────────────────
     with st.expander("External RAG server (R2R) — optional", expanded=False):
-        st.caption("Use an external R2R server instead of local indexing. Most users can ignore this.")
+        st.caption(
+            "Use an external R2R server instead of local indexing. Most users can ignore this."
+        )
         st.caption(
             f"Wire contract: R2R {r2r.R2R_SERVER_CONTRACT} / API {r2r.R2R_API_CONTRACT}. "
             "Live compatibility is not claimed without an integration test."
@@ -629,7 +782,9 @@ def settings():
             st.success("R2R server reachable.")
         elif st.session_state.get("r2r_connection_ok") is False:
             st.error("Could not reach R2R. Check the URL or disable R2R.")
-        if st.session_state.get("r2r_enabled") and not st.session_state.get("r2r_document_ids"):
+        if st.session_state.get("r2r_enabled") and not st.session_state.get(
+            "r2r_document_ids"
+        ):
             st.info("R2R is on — upload files in Data Sources → Local Files.")
 
     # ── 7. Export ──────────────────────────────────────────────────
@@ -638,7 +793,9 @@ def settings():
         st.caption("Save your conversation as a Word file.")
         st.download_button(
             label="Download chat (.docx)",
-            data=chat_history_docx(_chat_history_signature(st.session_state["messages"])),
+            data=chat_history_docx(
+                _chat_history_signature(st.session_state["messages"])
+            ),
             file_name=f"docmind-chat-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )

@@ -56,9 +56,13 @@ foreach ($conn in $existing) {
 Start-Sleep -Seconds 2
 
 # Start Streamlit application
-Write-Host "[3/3] Launching DocMind AI on http://localhost:8501..." -ForegroundColor Yellow
+$bindAddress = if ([string]::IsNullOrWhiteSpace($env:DOCMIND_BIND_ADDRESS)) { "127.0.0.1" } else { $env:DOCMIND_BIND_ADDRESS }
+$env:DOCMIND_BIND_ADDRESS = $bindAddress
+Write-Host "[3/3] Launching DocMind AI..." -ForegroundColor Yellow
 if (Test-Path ".\.venv\Scripts\python.exe") {
-    & ".\.venv\Scripts\python.exe" -m streamlit run main.py --server.port=8501 --server.address=127.0.0.1 --server.fileWatcherType=none
+    & ".\.venv\Scripts\python.exe" -c "from utils.runtime_policy import enforce_runtime_bind_policy; enforce_runtime_bind_policy()"
+    if ($LASTEXITCODE -ne 0) { throw "Runtime bind policy refused the requested address." }
+    & ".\.venv\Scripts\python.exe" -m streamlit run main.py --server.port=8501 --server.address=$bindAddress --server.fileWatcherType=none
 } else {
-    streamlit run main.py --server.port=8501 --server.address=127.0.0.1 --server.fileWatcherType=none
+    streamlit run main.py --server.port=8501 --server.address=$bindAddress --server.fileWatcherType=none
 }

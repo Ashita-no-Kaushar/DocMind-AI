@@ -1,0 +1,8 @@
+chunks_per_section,target_sections_per_document,label,sections,nodes,map_index_tokens,hit_at_1,hit_at_k,hit_at_k_refine,mean_evidence_tokens_refine,mean_precision,mean_recall,mean_evidence_tokens,mean_total_context_tokens,mean_nodes_scored,mean_route_steps,no_match_rejection_rate,mean_latency_ms
+1,0,Highest (1 chunk/section),48,48,2484,1.0,1.0,0.76,83.64,0.4333,1.0,85.96,2569.96,10.0,1.129,0.6667,25.4701
+2,0,High (2 chunks/section),24,48,1358,1.0,1.0,0.76,102.8,0.3547,1.0,120.48,1478.48,14.2581,1.1613,0.6667,15.044
+3,0,Medium-high (3 chunks/section),16,48,927,0.92,0.92,0.88,114.08,0.3067,0.92,117.52,1044.52,17.0323,1.1935,0.6667,10.3376
+4,0,Medium (4 chunks/section),16,48,922,0.96,0.96,0.92,117.64,0.325,0.96,121.04,1043.04,18.5806,1.2258,0.6667,10.3254
+5,0,Medium-low (5 chunks/section),16,48,877,0.96,0.96,0.92,120.28,0.3167,0.96,121.96,998.96,18.5806,1.2258,0.6667,9.553
+6,0,Production default (6 chunks/section),8,48,467,0.92,0.92,0.96,132.0,0.2907,0.92,125.68,592.68,23.4194,1.2581,0.6667,5.4398
+6,3,Adaptive (3 sections/document),24,48,1358,1.0,1.0,0.76,102.8,0.3547,1.0,120.48,1478.48,14.2581,1.1613,0.6667,14.9866
