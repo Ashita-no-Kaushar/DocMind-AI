@@ -35,10 +35,9 @@ This list contains only external validation and maintenance items that remain op
 
 ## Known defect: Settings provider display after restore
 
-- [ ] Fix the low-frequency case where the Settings tab renders the default `Ollama` provider even though the browser-storage restore already applied and re-persisted a different provider.
-- Observed roughly 1 run in 10 of `tests.test_e2e_integration.BrowserProviderTests` on this Windows host, including after switching to another tab and back, so it is not only a first-paint effect.
-- The persisted state is correct when this happens: `localStorage['docmind:settings']` contains the restored `llm_backend` and provider endpoints, so the configuration is not lost. Only the rendered selectbox disagrees.
-- Evidence collected in the failing run: widget value `Ollama`, restored `llm_backend` present in localStorage, no page errors, no Streamlit exception, and a Streamlit child that owned its port for the whole test.
-- Next step: instrument the `restore_settings_from_browser_storage` -> `st.selectbox(key="llm_backend")` sequence to find which run renders the stale value, then fix the app rather than the assertion. The browser test now waits for an app-level restore signal before asserting, and reports the stored payload on failure.
+- [ ] Fix the case where the Settings provider selectbox renders the default `Ollama` even though the browser-storage restore applied the correct provider.
+- **Narrowed diagnosis.** The CI failure log for commit `713e090` captured the persisted payload at the moment of failure. It contains `"llm_backend": "LM Studio (Local AI)"` **and** `"openai_model": "fake-model"`. That second key is written by `initialize_provider_state` only when the chat backend is not Ollama, so **session state was provably correct**. The restore layer and the persistence layer are therefore both working; the disagreement is isolated to widget rendering, where the selectbox ignores the correct session value.
+- An explicit `index` derived from session state has been added to the provider selectbox as the standard remedy for a stale widget render. This is an **unverified hypothesis**: it has not been confirmed against a real browser, and CI is the test. If it does not resolve the failure, the next place to look is Streamlit's widget-state identity for the `llm_backend` key across the `st.stop()` that the restore performs while the storage component is still pending.
+- Reproduce with `python -m unittest tests.test_e2e_integration.BrowserProviderTests`, which failed roughly 1 run in 10 before the `index` change.
 
 See [Troubleshooting](troubleshooting.md) for current failure categories, [Setup](setup.md) for locked environment commands, and [handover](handover.md) for the ordered work list and the invariants that must survive future edits.

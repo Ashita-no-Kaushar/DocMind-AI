@@ -465,22 +465,25 @@ This section is the most important one in the README.
 Both are in `tests.test_e2e_integration`, both are **timing-sensitive rather than logically
 wrong**, and both are worse on a loaded machine. They are not fixed.
 
-**1. First streamed token exceeds the 30 s wait (~1 in 6 runs, measured in isolation).**
-Affects `BrowserSmokeTests.test_real_browser_smoke_clears_chat_and_local_resets` and sometimes
-the provider test below. Each test spawns a fresh Streamlit process, ingests, and waits for the
-first streamed token against a local fake provider. On a busy machine that budget is not enough.
-`Playwright TimeoutError: Locator.wait_for: Timeout 30000ms exceeded`. No app exception is
-raised and no assertion about correctness fails — the answer simply arrives late.
+**1. First streamed token exceeds the wait budget.** Affects
+`BrowserSmokeTests.test_real_browser_smoke_clears_chat_and_local_resets` and sometimes the provider
+test. Each test spawns a fresh Streamlit process, ingests, builds an index and a document map, then
+waits for the first streamed token against a local fake provider. On a loaded machine or a 2-core CI
+runner that needs more than the 30 s the test originally allowed, and it failed in CI with
+`TimeoutError: Locator.wait_for: Timeout 30000ms exceeded`. The budget is now a named 120 s constant
+(`FIRST_TOKEN_TIMEOUT_MS`) rather than an inline literal. This does not weaken the test: the response
+must still arrive, no Streamlit exception is tolerated, and the fake provider must still have
+received the request.
 
 **2. Settings provider selectbox shows the default after a successful restore (~1 in 10 runs).**
 Affects `BrowserProviderTests.test_real_browser_streams_from_threaded_fake_openai_provider`.
-This one is an **application-side defect, not a test artifact**: the browser-storage restore
-completes and re-persists the injected provider correctly — verified by reading
-`localStorage['docmind:settings']` in the failing run, which contains
-`llm_backend = "LM Studio (Local AI)"` and all injected endpoints — yet the Settings selectbox
-renders `Ollama`, and switching tabs away and back does not correct it. The persisted
-configuration is never lost; only the rendered widget disagrees. Tracked in `docs/todo.md` with
-the evidence and next step.
+The CI failure log narrowed this considerably. The persisted payload captured at the moment of
+failure contains `"llm_backend": "LM Studio (Local AI)"` **and** `"openai_model": "fake-model"` —
+and that second key is only written when the chat backend is not Ollama. So **session state was
+provably correct**; the restore and persistence layers both work, and the disagreement is isolated
+to the selectbox rendering a stale value. An explicit `index` derived from session state has been
+added as the standard remedy, which is an **unverified hypothesis** until CI confirms it. The
+persisted configuration is never lost either way. Tracked in `docs/todo.md` with the evidence.
 
 Along the way we did fix two genuine harness bugs that were inflating and misattributing
 results: a port-reuse race where a stale Streamlit instance could answer the health check, and an

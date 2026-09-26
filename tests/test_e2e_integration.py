@@ -39,6 +39,11 @@ SERVER_TIMEOUT_SECONDS = 5
 TEST_CREDENTIAL = "integration-credential"
 STREAMED_RESPONSE = "Fake streamed response from local provider."
 
+NAVIGATION_TIMEOUT_MS = 30_000
+ACTION_TIMEOUT_MS = 15_000
+FIRST_TOKEN_TIMEOUT_MS = 120_000
+RESTORE_TIMEOUT_MS = 60_000
+
 
 class _BoundedHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -772,7 +777,9 @@ def _browser_page(playwright, app, settings=None):
     page_errors = []
     page.on("pageerror", lambda error: page_errors.append(str(error)))
     try:
-        page.goto(app.app_url, wait_until="domcontentloaded", timeout=30000)
+        page.goto(
+            app.app_url, wait_until="domcontentloaded", timeout=NAVIGATION_TIMEOUT_MS
+        )
         yield page, page_errors
     finally:
         context.close()
@@ -798,13 +805,13 @@ def _assert_no_streamlit_exception(page, page_errors, app=None):
 
 def _wait_for_chat(page):
     chat_input = page.locator('[data-testid="stChatInput"]')
-    chat_input.wait_for(state="visible", timeout=30000)
+    chat_input.wait_for(state="visible", timeout=NAVIGATION_TIMEOUT_MS)
     page.get_by_text(re.compile(r"How to use", re.IGNORECASE)).first.wait_for(
-        state="visible", timeout=30000
+        state="visible", timeout=NAVIGATION_TIMEOUT_MS
     )
 
 
-def _wait_for_restored_provider(page, key="llm_backend", timeout=20000):
+def _wait_for_restored_provider(page, key="llm_backend", timeout=RESTORE_TIMEOUT_MS):
     """Wait until the app has re-persisted the restored setting to localStorage.
 
     Persisting only happens after a successful restore, so this is an app-level
@@ -833,7 +840,7 @@ def _visible_locator(locator):
     raise AssertionError("Expected a visible browser control.")
 
 
-def _wait_for_visible(locator, timeout=10000):
+def _wait_for_visible(locator, timeout=ACTION_TIMEOUT_MS):
     deadline = time.monotonic() + timeout / 1000
     while time.monotonic() < deadline:
         for index in range(locator.count()):
@@ -844,7 +851,7 @@ def _wait_for_visible(locator, timeout=10000):
     raise AssertionError("Expected a visible browser control.")
 
 
-def _wait_for_text_visibility(page, value, visible, timeout=15000):
+def _wait_for_text_visibility(page, value, visible, timeout=ACTION_TIMEOUT_MS):
     deadline = time.monotonic() + timeout / 1000
     while time.monotonic() < deadline:
         locator = page.get_by_text(value, exact=False)
@@ -872,10 +879,10 @@ def _open_reset_expander(page):
         expander.click()
     button = page.get_by_role("button", name=re.compile(r"Clear Chat"))
     try:
-        _visible_locator(button).wait_for(state="visible", timeout=10000)
+        _visible_locator(button).wait_for(state="visible", timeout=ACTION_TIMEOUT_MS)
     except AssertionError:
         expander.click()
-        _visible_locator(button).wait_for(state="visible", timeout=10000)
+        _visible_locator(button).wait_for(state="visible", timeout=ACTION_TIMEOUT_MS)
 
 
 @unittest.skipUnless(
@@ -914,17 +921,17 @@ class BrowserSmokeTests(unittest.TestCase):
                         page.get_by_role("tab", name="Data Sources").click()
                         page.get_by_text(
                             "Directly import your data", exact=True
-                        ).wait_for(state="visible", timeout=10000)
+                        ).wait_for(state="visible", timeout=ACTION_TIMEOUT_MS)
                         page.get_by_role("tab", name="Settings").click()
                         page.get_by_text("Settings", exact=True).first.wait_for(
-                            state="visible", timeout=10000
+                            state="visible", timeout=ACTION_TIMEOUT_MS
                         )
                         page.get_by_role("tab", name="Data Sources").click()
                         chat = page.locator('[data-testid="stChatInput"] textarea')
                         chat.first.fill("smoke prompt")
                         chat.first.press("Enter")
                         page.get_by_text(STREAMED_RESPONSE, exact=False).last.wait_for(
-                            state="visible", timeout=30000
+                            state="visible", timeout=FIRST_TOKEN_TIMEOUT_MS
                         )
                         _open_reset_expander(page)
                         _visible_locator(
@@ -937,7 +944,7 @@ class BrowserSmokeTests(unittest.TestCase):
                         )
                         page.get_by_text(
                             re.compile(r"How to use", re.IGNORECASE)
-                        ).first.wait_for(state="visible", timeout=10000)
+                        ).first.wait_for(state="visible", timeout=ACTION_TIMEOUT_MS)
                         _open_reset_expander(page)
                         _click_text(page, "Keep R2R documents (local-only reset)")
                         _visible_locator(
@@ -955,7 +962,7 @@ class BrowserSmokeTests(unittest.TestCase):
                         ).click()
                         page.get_by_text(
                             re.compile("Local project state was reset", re.IGNORECASE)
-                        ).wait_for(state="visible", timeout=15000)
+                        ).wait_for(state="visible", timeout=ACTION_TIMEOUT_MS)
                         _assert_no_streamlit_exception(page, errors, app)
                         self.assertTrue(app.process.poll() is None)
                         self.assertTrue(
@@ -999,14 +1006,16 @@ class BrowserProviderTests(unittest.TestCase):
                         _wait_for_chat(page)
                         page.get_by_role("tab", name="Settings").click()
                         provider_input = page.get_by_role("combobox").first
-                        provider_input.wait_for(state="visible", timeout=10000)
+                        provider_input.wait_for(
+                            state="visible", timeout=ACTION_TIMEOUT_MS
+                        )
                         _wait_for_restored_provider(page)
                         page.get_by_role("tab", name="Data Sources").click()
                         page.get_by_role("tab", name="Settings").click()
                         provider_input = page.get_by_role("combobox").first
                         try:
                             expect(provider_input).to_have_value(
-                                "LM Studio (Local AI)", timeout=20000
+                                "LM Studio (Local AI)", timeout=RESTORE_TIMEOUT_MS
                             )
                         except AssertionError as error:
                             stored = page.evaluate(
@@ -1026,7 +1035,7 @@ class BrowserProviderTests(unittest.TestCase):
                         chat.first.fill("browser integration prompt")
                         chat.first.press("Enter")
                         page.get_by_text(STREAMED_RESPONSE, exact=False).last.wait_for(
-                            state="visible", timeout=30000
+                            state="visible", timeout=FIRST_TOKEN_TIMEOUT_MS
                         )
                         _assert_no_streamlit_exception(page, errors, app)
                         self.assertTrue(

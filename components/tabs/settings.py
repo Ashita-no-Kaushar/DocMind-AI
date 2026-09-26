@@ -7,7 +7,7 @@ import streamlit as st
 import utils.ollama as ollama
 import utils.r2r as r2r
 from components.page_state import default_chat_model
-from utils.browser_settings import ensure_ollama_endpoint
+from utils.browser_settings import ensure_ollama_endpoint, option_index
 from utils.endpoint_policy import normalize_provider_endpoint
 from utils.provider_config import (
     OLLAMA,
@@ -458,9 +458,11 @@ def settings():
     st.subheader("Chat")
     st.caption("The model that writes your answers.")
     with st.container(border=True):
+        backends = list(BACKEND_PRESETS.keys())
         backend = st.selectbox(
             "Provider",
-            options=list(BACKEND_PRESETS.keys()),
+            options=backends,
+            index=option_index(backends, st.session_state.get("llm_backend")),
             key="llm_backend",
             on_change=_on_chat_provider_change,
             help="Ollama runs offline. OpenAI-compatible providers use their own endpoint and credentials.",
