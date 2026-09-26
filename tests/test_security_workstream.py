@@ -215,7 +215,13 @@ class CacheTransactionTests(unittest.TestCase):
                 llama_index._prune_index_cache()
             entries = [path for path in root.iterdir() if path.is_dir()]
             self.assertLessEqual(len(entries), 1)
-            self.assertLessEqual(sum(path.stat().st_size for path in entries), 15)
+            content_bytes = sum(
+                item.stat().st_size
+                for entry in entries
+                for item in entry.rglob("*")
+                if item.is_file()
+            )
+            self.assertLessEqual(content_bytes, 15)
 
     def test_cache_path_escape_is_refused(self):
         with tempfile.TemporaryDirectory() as temp_dir:
