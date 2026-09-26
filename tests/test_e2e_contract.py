@@ -41,7 +41,7 @@ class E2EContractTests(unittest.TestCase):
             "pipenv verify",
             "pipenv install --deploy --dev",
             '--extra-pip-args="--require-hashes"',
-            "python -m playwright install chromium",
+            "python -m playwright install --with-deps chromium",
             "pipenv run python -m unittest tests.test_e2e_integration",
         )
         for value in required:

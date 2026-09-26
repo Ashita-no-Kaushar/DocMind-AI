@@ -1758,15 +1758,26 @@ def stable_snapshot(out_dir: Path | str) -> dict:
 
 
 def check_artifacts(
-    out_dir: Path | str = "research", top_k: int = TOP_K_DEFAULT
+    out_dir: Path | str = "research",
+    top_k: int = TOP_K_DEFAULT,
+    fresh_dir: Path | str | None = None,
 ) -> list:
-    """Regenerate the study and return a list of human-readable mismatches."""
+    """Return a list of human-readable mismatches against the committed study.
+
+    ``fresh_dir`` lets a caller supply an already-regenerated study instead of
+    paying for another full run. The study is deterministic, so repeating it
+    inside a test suite is pure waste, and on a two-core CI runner that waste is
+    large enough to threaten the job timeout.
+    """
     committed = Path(out_dir)
     if not (committed / "results" / "ablation.json").is_file():
         return [f"no committed study found under {committed}"]
-    with tempfile.TemporaryDirectory(prefix="docmind_ablation_check_") as temp_dir:
-        run_study(top_k=top_k, out_dir=temp_dir)
-        fresh = stable_snapshot(temp_dir)
+    if fresh_dir is None:
+        with tempfile.TemporaryDirectory(prefix="docmind_ablation_check_") as temp_dir:
+            run_study(top_k=top_k, out_dir=temp_dir)
+            fresh = stable_snapshot(temp_dir)
+    else:
+        fresh = stable_snapshot(fresh_dir)
     recorded = stable_snapshot(committed)
     mismatches = []
     for key in sorted(set(recorded) | set(fresh)):

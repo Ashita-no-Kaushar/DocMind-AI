@@ -44,8 +44,8 @@ jobs:
           pipenv verify
           pipenv install --deploy --dev --extra-pip-args="--require-hashes"
 
-      - name: Install Chromium
-        run: pipenv run python -m playwright install chromium
+      - name: Install Chromium and its system dependencies
+        run: pipenv run python -m playwright install --with-deps chromium
 
       - name: Run browser and integration tests
         run: pipenv run python -m unittest tests.test_e2e_integration

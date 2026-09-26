@@ -376,18 +376,31 @@ class MapAblationCliTests(unittest.TestCase):
 
     def test_check_passes_for_the_committed_research_artifacts(self):
         self.assertEqual(map_ablation.main(["--check", "--quiet"]), 0)
-        self.assertEqual(map_ablation.check_artifacts(out_dir="research"), [])
+        self.assertEqual(
+            map_ablation.check_artifacts(out_dir="research", fresh_dir=_TEMP_ROOT),
+            [],
+        )
 
     def test_check_detects_a_stale_committed_artifact(self):
-        target = Path(tempfile.mkdtemp(prefix="docmind_ablation_stale_"))
-        self.addCleanup(shutil.rmtree, target, True)
-        map_ablation.run_study(top_k=TOP_K, out_dir=target)
-        self.assertEqual(map_ablation.check_artifacts(out_dir=target), [])
-        aggregates = (target / "results" / "ablation.csv").read_text(encoding="utf-8")
-        (target / "results" / "ablation.csv").write_text(
+        fresh = Path(tempfile.mkdtemp(prefix="docmind_ablation_fresh_"))
+        self.addCleanup(shutil.rmtree, fresh, True)
+        map_ablation.run_study(top_k=TOP_K, out_dir=fresh)
+        committed = fresh.with_name(fresh.name + "_committed")
+        shutil.copytree(fresh, committed)
+        self.addCleanup(shutil.rmtree, committed, True)
+        self.assertEqual(
+            map_ablation.check_artifacts(out_dir=committed, fresh_dir=fresh), []
+        )
+        aggregates = (committed / "results" / "ablation.csv").read_text(
+            encoding="utf-8"
+        )
+        (committed / "results" / "ablation.csv").write_text(
             aggregates.replace("1.0", "0.9", 1), encoding="utf-8"
         )
-        self.assertIn("ablation_csv", map_ablation.check_artifacts(out_dir=target))
+        self.assertIn(
+            "ablation_csv",
+            map_ablation.check_artifacts(out_dir=committed, fresh_dir=fresh),
+        )
 
     def test_check_reports_a_missing_study(self):
         target = Path(tempfile.mkdtemp(prefix="docmind_ablation_absent_"))
