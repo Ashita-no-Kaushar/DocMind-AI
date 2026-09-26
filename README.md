@@ -457,8 +457,19 @@ This section is the most important one in the README.
 | Research artifacts current | `python -m research.map_ablation --check` | Artifacts match the code |
 | Live Python docs fetch | `https://docs.python.org/3/` | Passed |
 | Bounded GitHub clone | `Ashita-no-Kaushar/DocMind-AI` | Passed, temporary directory |
-| Docker build and run | — | **Not possible here; no Docker CLI. Statically validated and covered by CI build-only checks.** |
+| Docker build and run | — | **Image builds in CI. Never run locally; no Docker CLI here.** |
 | Live Ollama / LM Studio / TabbyAPI / OpenAI / R2R | — | **Not available in this environment. No live-service result is claimed.** |
+| App launched on loopback | `streamlit run main.py --server.address=127.0.0.1 --server.port=8501` | Health `200 ok`, 0 Streamlit exceptions, 0 page errors in real Chrome |
+
+### What the browser run did and did not cover
+
+The shell was launched on `127.0.0.1:8501` and screenshotted in real Chrome: wordmark, status chips,
+sidebar card, both tabs, starter chips, answer-style expander, and the chat input all render. It was
+verified in the **empty, direct-chat state only**.
+
+**The retrieval map, the per-answer route summary, and the source/map status badges have never been
+looked at on screen.** They are covered by unit tests and by the provider E2E test, but no human has
+confirmed what a real agentic answer actually looks like. Treat the map UI as unverified visually.
 
 ### The one known flaky test we are not hiding
 
@@ -506,8 +517,8 @@ assertion that read the widget before the restore had landed.
 
 ## 12. What has been built so far
 
-**By size:** 30 Python modules in the application and research code (~19,500 lines), 28 test
-modules (~10,700 lines), 498 tests, 3 CI workflows, and 9 infrastructure files. The last commit
+**By size:** 32 Python modules in the application and research code (19,762 lines), 28 test
+modules (10,700 lines), 498 tests, 3 CI workflows, and 9 infrastructure files. The last commit
 (`713e090`) was 92 files and roughly +37,900 / −2,500 lines.
 
 ### 12.1 Implementation inventory
@@ -531,12 +542,13 @@ subsystem and for one that has never touched a live service.
 | Logging (rotation + redaction) | **Implemented** | `utils/logs.py` (209) | Redaction and rotation tests |
 | Browser settings persistence | **Implemented** | `utils/browser_settings.py` (239) | Unit tests; restore display defect resolved and confirmed by CI |
 | Settings / sources UI | **Implemented** | `components/tabs/settings.py` (740) and 4 more tab modules | AppTest + real Chrome E2E |
+| Application shell / status | **Implemented, browser-validated** | `components/status.py`, `sidebar.py`, `header.py`, `page_config.py` | 16 unit tests; launched on loopback and screenshotted in real Chrome |
 | Research harness (3 studies) | **Implemented, self-verifying** | `research/` (2,849) | 37 tests; CI fails on artifact drift |
 | Multimodal resolution study | **Harness only, no measurement** | `research/multimodal.py` | 9 tests assert it refuses to fabricate |
 | Evaluation harness | **Implemented** | `eval_harness.py` | 42/42 mock; real run is historical only |
 | Dependency locking | **Implemented** | `Pipfile`, `Pipfile.lock`, `pyproject.toml` | `pipenv verify` + hash-enforced installs |
 | Container + Compose | **Image builds in CI; never run locally** | `Dockerfile`, 2 Compose files | Static checks plus a real CI build; no local Docker runtime |
-| CI workflows | **Observed green** | 3 workflows in `.github/workflows/` | Quality, E2E, and Docker Build all passed at `6bc5f7d` |
+| CI workflows | **Quality and Docker green; E2E flaky** | 3 workflows in `.github/workflows/` | Quality and Docker Build passed at `4be3c35`; E2E hit the known chat-submission flake |
 
 ### 12.2 Not done, stated plainly
 
@@ -553,8 +565,10 @@ subsystem and for one that has never touched a live service.
 - **No accuracy crossover demonstrated** between map routing and naive top-*k*.
 - **One flaky browser E2E test**, timing-sensitive, detailed in
   [section 10](#10-test-results-in-full). The provider restore display defect it was blamed on is fixed and CI-green.
-- **CI was observed green at `6bc5f7d`** (Quality, E2E, and Docker Build). One browser E2E test is
-  still intermittently flaky on a loaded machine.
+- **CI is not reliably green.** All three workflows passed at `6bc5f7d`. At `4be3c35` (the UI redesign)
+  Quality and Docker Build passed and the E2E workflow hit the chat-submission flake described in
+  [section 10](#10-test-results-in-full). One intermittently flaky browser test means a red E2E badge
+  is expected on some pushes and should not be read as a new regression.
 - **No multi-session isolation.** LlamaIndex `Settings` and adapter caches are process-global.
 - **No authentication.** Remote binding is opt-in and expects a user-supplied reverse proxy.
 
@@ -656,7 +670,12 @@ pipenv run python -m unittest tests.test_e2e_contract
 ├── components/
 │   ├── chatbox.py              Chat, sources, and per-message route rendering
 │   ├── retrieval_map_view.py   Escaped visual map, route trace, metrics
+│   ├── status.py               Shared mode, provider, source, and map state
+│   ├── sidebar.py              Status card, source/settings tabs, reset control
+│   ├── header.py               Wordmark and status strip
+│   ├── page_config.py          Page setup and theme-aware styling
 │   ├── page_state.py           Initial state, browser-storage restore, reset
+│   ├── ingestion_prerequisites.py  Provider readiness warnings
 │   └── tabs/                   Data sources and settings
 ├── research/
 │   ├── fixtures.py             Deterministic corpus, ground truth, retrievers, baselines
