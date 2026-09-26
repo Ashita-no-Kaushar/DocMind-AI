@@ -442,8 +442,8 @@ This section is the most important one in the README.
 
 | Check | Command | Result |
 |---|---|---|
-| Unit and integration suite | `python -m unittest discover -s tests` | **482 tests, 481 passed, 1 intentional opt-in live-R2R skip** |
-| Browser E2E | `python -m unittest tests.test_e2e_integration` | 18 tests — **two are timing-sensitive, see below. Passes when the machine is idle; observed ~1-in-6 failure rate under sustained load** |
+| Unit and integration suite | `python -m unittest discover -s tests` | **498 tests, 480 non-browser tests pass, 1 intentional opt-in live-R2R skip** |
+| Browser E2E | `python -m unittest tests.test_e2e_integration` | 18 tests — **one remains timing-sensitive, see below. Passes when the machine is idle; observed failure rate roughly 1-in-4 under sustained load** |
 | E2E workflow contract | `python -m unittest tests.test_e2e_contract` | 3 tests, passing |
 | Retrieval-map research | `python -m unittest tests.test_map_ablation` | 37 tests, passing |
 | Map core, integration, UI, resolution | `4 modules` | 114 tests, passing |
@@ -460,30 +460,27 @@ This section is the most important one in the README.
 | Docker build and run | — | **Not possible here; no Docker CLI. Statically validated and covered by CI build-only checks.** |
 | Live Ollama / LM Studio / TabbyAPI / OpenAI / R2R | — | **Not available in this environment. No live-service result is claimed.** |
 
-### Two known flaky tests we are not hiding
+### The one known flaky test we are not hiding
 
-Both are in `tests.test_e2e_integration`, both are **timing-sensitive rather than logically
-wrong**, and both are worse on a loaded machine. They are not fixed.
+It is in `tests.test_e2e_integration`, it is **timing-sensitive rather than logically wrong**, and it is
+worse on a loaded machine. It is not fixed.
 
-**1. First streamed token exceeds the wait budget.** Affects
-`BrowserSmokeTests.test_real_browser_smoke_clears_chat_and_local_resets` and sometimes the provider
-test. Each test spawns a fresh Streamlit process, ingests, builds an index and a document map, then
-waits for the first streamed token against a local fake provider. On a loaded machine or a 2-core CI
-runner that needs more than the 30 s the test originally allowed, and it failed in CI with
-`TimeoutError: Locator.wait_for: Timeout 30000ms exceeded`. The budget is now a named 120 s constant
-(`FIRST_TOKEN_TIMEOUT_MS`) rather than an inline literal. This does not weaken the test: the response
-must still arrive, no Streamlit exception is tolerated, and the fake provider must still have
-received the request.
+**Chat submission is silently dropped by the frontend.** Affects
+`BrowserSmokeTests.test_real_browser_smoke_clears_chat_and_local_resets`. Streamlit discards a chat
+submission that arrives while the app is still running a script, and this Streamlit build exposes **no
+element, attribute, or `aria-busy` state** that indicates a run is in progress, so the test cannot wait
+its way out of the race. The failure is total, not partial: the prompt never reaches the app, so the
+fake provider records **zero** `/v1/chat/completions` requests, no user message bubble appears, and no
+Streamlit exception is raised. The first streamed-token budget is a named 120 s constant
+(`FIRST_TOKEN_TIMEOUT_MS`) and is not the cause; the wait simply expires because the turn never started.
 
-**2. Settings provider selectbox shows the default after a successful restore (~1 in 10 runs).**
-Affects `BrowserProviderTests.test_real_browser_streams_from_threaded_fake_openai_provider`.
-The CI failure log narrowed this considerably. The persisted payload captured at the moment of
-failure contains `"llm_backend": "LM Studio (Local AI)"` **and** `"openai_model": "fake-model"` —
-and that second key is only written when the chat backend is not Ollama. So **session state was
-provably correct**; the restore and persistence layers both work, and the disagreement is isolated
-to the selectbox rendering a stale value. An explicit `index` derived from session state has been
-added as the standard remedy, which is an **unverified hypothesis** until CI confirms it. The
-persisted configuration is never lost either way. Tracked in `docs/todo.md` with the evidence.
+The test now uses `_send_chat_prompt`, which confirms the user message bubble actually appeared and
+retries up to three times, clearing the field first because a dropped submit leaves its text behind and
+re-filling an unchanged value is invisible to the widget's own state. On failure it reports the chat
+input value, the submit button state, the message count, the exception count, and the app log tail, so
+the next occurrence is diagnosable instead of an opaque 120 s timeout. This narrows the symptom and
+makes the test self-documenting; it does **not** eliminate the flake, and the measured rate is
+unchanged. Tracked in `docs/todo.md`.
 
 Along the way we did fix two genuine harness bugs that were inflating and misattributing
 results: a port-reuse race where a stale Streamlit instance could answer the health check, and an
@@ -509,8 +506,8 @@ assertion that read the widget before the restore had landed.
 
 ## 12. What has been built so far
 
-**By size:** 30 Python modules in the application and research code (~19,500 lines), 27 test
-modules (~10,400 lines), 482 tests, 5 CI workflows, and 9 infrastructure files. The last commit
+**By size:** 30 Python modules in the application and research code (~19,500 lines), 28 test
+modules (~10,700 lines), 498 tests, 3 CI workflows, and 9 infrastructure files. The last commit
 (`713e090`) was 92 files and roughly +37,900 / −2,500 lines.
 
 ### 12.1 Implementation inventory
@@ -532,14 +529,14 @@ subsystem and for one that has never touched a live service.
 | Cross-process lifecycle lock | **Implemented** | `utils/ingestion_lock.py` (158) | Concurrency and lock-file handling tests |
 | Runtime bind policy | **Implemented** | `utils/runtime_policy.py` (110) | Policy tests; not a deployment |
 | Logging (rotation + redaction) | **Implemented** | `utils/logs.py` (209) | Redaction and rotation tests |
-| Browser settings persistence | **Implemented** | `utils/browser_settings.py` (239) | Unit tests; one live-browser display defect open |
+| Browser settings persistence | **Implemented** | `utils/browser_settings.py` (239) | Unit tests; restore display defect resolved and confirmed by CI |
 | Settings / sources UI | **Implemented** | `components/tabs/settings.py` (740) and 4 more tab modules | AppTest + real Chrome E2E |
 | Research harness (3 studies) | **Implemented, self-verifying** | `research/` (2,849) | 37 tests; CI fails on artifact drift |
 | Multimodal resolution study | **Harness only, no measurement** | `research/multimodal.py` | 9 tests assert it refuses to fabricate |
 | Evaluation harness | **Implemented** | `eval_harness.py` | 42/42 mock; real run is historical only |
 | Dependency locking | **Implemented** | `Pipfile`, `Pipfile.lock`, `pyproject.toml` | `pipenv verify` + hash-enforced installs |
-| Container + Compose | **Written, never built or run** | `Dockerfile`, 2 Compose files | Static checks and CI build-only |
-| CI workflows | **Written, never observed green** | 5 files in `.github/workflows/` | Pushed; status not yet read |
+| Container + Compose | **Image builds in CI; never run locally** | `Dockerfile`, 2 Compose files | Static checks plus a real CI build; no local Docker runtime |
+| CI workflows | **Observed green** | 3 workflows in `.github/workflows/` | Quality, E2E, and Docker Build all passed at `6bc5f7d` |
 
 ### 12.2 Not done, stated plainly
 
@@ -554,10 +551,10 @@ subsystem and for one that has never touched a live service.
 - **The shipped default map resolution is not the best setting measured.** Adaptive resolution
   is implemented and available but ships off pending real-corpus confirmation.
 - **No accuracy crossover demonstrated** between map routing and naive top-*k*.
-- **Two flaky browser E2E tests**, both timing-sensitive, detailed in
-  [section 10](#10-test-results-in-full). One is an unfixed application-side display defect.
-- **CI has never been observed green.** The workflows were pushed but their status has not been
-  read.
+- **One flaky browser E2E test**, timing-sensitive, detailed in
+  [section 10](#10-test-results-in-full). The provider restore display defect it was blamed on is fixed and CI-green.
+- **CI was observed green at `6bc5f7d`** (Quality, E2E, and Docker Build). One browser E2E test is
+  still intermittently flaky on a loaded machine.
 - **No multi-session isolation.** LlamaIndex `Settings` and adapter caches are process-global.
 - **No authentication.** Remote binding is opt-in and expects a user-supplied reverse proxy.
 
@@ -683,7 +680,7 @@ pipenv run python -m unittest tests.test_e2e_contract
 │   ├── browser_settings.py     Non-secret browser persistence
 │   ├── logs.py                 Rotating, redacted logging
 │   └── runtime_policy.py       Loopback bind enforcement
-├── tests/                      482 tests across unit, integration, research, and browser
+├── tests/                      498 tests across unit, integration, research, and browser
 ├── docs/                       Setup, usage, pipeline, contributing, residual work
 ├── .github/workflows/          quality.yml, e2e.yml, main.yaml
 ├── Pipfile / Pipfile.lock / pyproject.toml
@@ -712,8 +709,8 @@ pipenv run python -m unittest tests.test_e2e_contract
   active at a time.
 - The retrieval study is offline and synthetic. See
   [section 8](#8-what-we-honestly-do-not-claim) for the full list of claims we do not make.
-- One browser E2E test is flaky due to an unfixed application-side display defect, and a second
-  is timing-sensitive; both are described in [section 10](#10-test-results-in-full).
+- One browser E2E test remains flaky because Streamlit can drop a chat submission made while the
+  app is still running; it is described in [section 10](#10-test-results-in-full).
 - Current live Ollama, LM Studio, TabbyAPI, official OpenAI, R2R, and Docker runtime validation
   was unavailable in this environment.
 

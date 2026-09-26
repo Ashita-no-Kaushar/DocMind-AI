@@ -6,8 +6,9 @@ uncommitted, and the order I would work in next.
 ## Repo state
 
 - Path: `C:\Users\Kaushar\Downloads\DocMind-AI-main\DocMind-AI-main`
-- Last pushed commit: `a75f42f` on `main`. **Everything since then is uncommitted.**
-- Working tree is large and dirty by design. Nothing has been staged or committed.
+- Remote: `https://github.com/Ashita-no-Kaushar/DocMind-AI.git`, branch `main`.
+- Pushed through `6bc5f7d`, where CI was green across all three workflows. The Streamlit UI redesign
+  landed on top of that and is the most recent commit.
 - **A GitHub PAT was pasted into chat earlier and must be revoked.** It was never written to
   a file, but treat it as compromised.
 
@@ -15,40 +16,41 @@ uncommitted, and the order I would work in next.
 
 | Check | Result |
 |---|---|
-| `unittest discover -s tests` | 482 tests, 481 pass, 1 opt-in live-R2R skip |
-| `tests.test_e2e_integration` | 18 tests, **two flaky** (see below); green when the machine is idle |
+| `unittest discover -s tests` | 498 tests, 480 non-browser pass, 1 opt-in live-R2R skip |
+| `tests.test_e2e_integration` | 18 tests, **one flaky** (see below); green when the machine is idle |
 | `tests.test_e2e_contract` | 3 pass |
 | `eval_harness.py --mock` | 42/42, 1 real-LLM skip |
 | `ruff check .` / `black --check .` | pass, 61 files |
 | `compileall`, `pip check`, `pipenv verify` | pass |
 | `python -m research.map_ablation --check` | artifacts match code |
 | Docker / live providers | unavailable here; no live result claimed |
+| CI at `6bc5f7d` | Quality, E2E, and Docker Build all green |
 
-## The known failures — do not claim they are fixed
 
-Two browser E2E tests in `tests.test_e2e_integration` are flaky, both worse on a loaded machine.
+## The known failure — do not claim it is fixed
 
-**1. First streamed token exceeds the 30 s wait (~1 in 6, measured in isolation).**
-`BrowserSmokeTests.test_real_browser_smoke_clears_chat_and_local_resets` and sometimes the
-provider test. Each test spawns a fresh Streamlit process, ingests, and waits 30 s for the first
-streamed token from a local fake provider. `Playwright TimeoutError: Locator.wait_for: Timeout
-30000ms exceeded`. No app exception, no failed assertion — the answer arrives late. Fix by
-raising the budget and/or waiting on an app-level signal rather than a fixed timeout.
+One browser E2E test in `tests.test_e2e_integration` is flaky, worse on a loaded machine.
 
-**2. Settings provider selectbox shows the default after a successful restore (~1 in 10).**
-`BrowserProviderTests.test_real_browser_streams_from_threaded_fake_openai_provider`. This one is
-an **application-side defect**, not a test artifact:
+**Chat submission is dropped by the frontend.**
+`BrowserSmokeTests.test_real_browser_smoke_clears_chat_and_local_resets` intermittently never sends
+the prompt at all. Measured signature from a diagnostic run:
 
-- The restore completes and re-persists the injected provider correctly — verified by reading
-  `localStorage['docmind:settings']` inside the failing run, which contains
-  `llm_backend = "LM Studio (Local AI)"` and all injected endpoints.
-- Yet the Settings selectbox renders `Ollama`.
-- Switching tabs away and back does **not** correct it, so it is not a first-paint effect.
-- No page errors, no Streamlit exception, the child owns its port for the whole test.
+- user message bubbles: `1` (the "How to use" placeholder only)
+- fake-provider `/v1/chat/completions` requests: `0`
+- Streamlit exceptions: `0`, page errors: `0`
 
-Next step: instrument `utils/browser_settings.restore_settings_from_browser_storage` →
-`st.selectbox(key="llm_backend")` in `components/tabs/settings.py` to find which run paints the
-stale value, then fix the app rather than the assertion.
+Nothing is wrong with the app, the provider, or the answer path — the turn never starts. Streamlit
+discards a chat submission that arrives while the app is still running a script, and this build
+exposes **no** element, attribute, or `aria-busy` state to detect that, so a test cannot wait it out.
+Verified absent: `stStatusWidget` appeared in 0 of 48 polls and `[aria-busy="true"]` was never present.
+Ruled out by experiment: idle waiting, value-stability polling, `press_sequentially`, explicit focus,
+and clicking the enabled submit button all still drop.
+
+The first-token budget was raised to a named 120 s and is **not** the cause; the wait expires because
+no turn began. `_send_chat_prompt` now confirms the user bubble, retries up to three times, and dumps
+widget state plus the app log on failure, so the next occurrence is diagnosable instead of an opaque
+timeout. The failure rate is unchanged. A real fix needs an app-side readiness signal or a Streamlit
+version that exposes one.
 
 Two genuine harness bugs were already found and fixed here, so do not re-chase them: port-reuse
 race (a stale Streamlit answering the health check) and an assertion that read the widget before

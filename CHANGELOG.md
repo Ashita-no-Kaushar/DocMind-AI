@@ -6,6 +6,39 @@ Release tags use semantic versioning, for example `v1.5.0`. This file records ch
 
 ## Unreleased - 2026-09-25
 
+### Interface
+
+- Redesign the Streamlit shell around a wide `1240px` content column, a `DocMind` wordmark with an
+  agentic-map subtitle, and a theme-aware status strip that reports chat mode, provider, active source,
+  and map state. The status strip uses `var(--text-color, ...)` fallbacks so it stays legible under both
+  the dark and light themes, and the sidebar repeats the same state in a card above the tabs.
+- Split the sidebar's destructive control from routine chat management. `Clear Chat` is now a plain
+  action; `Reset Project (destructive)` is isolated inside its own expander, so an accidental expand
+  cannot wipe the project.
+- Add a compact per-answer route summary line (sections routed, steps, prompt-context tokens,
+  reflection) so an agentic answer states what the map did without opening the map view.
+- Add `components/status.py` as the single source of truth for mode, provider, source, and map state,
+  with `_map_summary` tolerating a missing or malformed map instead of raising during a render.
+
+### Verification
+
+- Fix a regression the redesign would have introduced: the E2E reset helper still searched for the old
+  `Clear Chat & Reset` expander label and now follows the renamed `Reset Project` control.
+- Add `tests/test_ui_status.py` with 14 tests covering mode resolution, provider and source labelling,
+  map summaries, clipping of long values, status-strip and mode-card rendering, and route-summary
+  formatting including hostile route shapes.
+- Harden `_route_summary` so a non-list `selected_section_ids` or a non-mapping `metrics` can no longer
+  raise mid-render.
+- Give the browser chat submission a real oracle. `_send_chat_prompt` waits for the user message bubble
+  instead of assuming the key press landed, clears the field before retrying because a dropped submit
+  leaves its text behind, and reports the input value, submit-button state, message count, exception
+  count, and app log tail on failure.
+- Record the current gate: 498 tests, 480 non-browser tests pass with one intentional opt-in live-R2R
+  skip, Black checked 61 files unchanged, Ruff and `compileall` passed.
+- One browser E2E test is still intermittently flaky: Streamlit discards a chat submission made while
+  the app is running a script, and this build exposes no indicator to wait on. The symptom is measured
+  and documented rather than hidden, and the failure rate is unchanged by the work above.
+
 ### Current verification
 
 - Record the Windows local gate on Python 3.12.10: configured Ruff passed, Black checked 56 files unchanged, `compileall` passed, `pip check` passed, and `pipenv verify` passed.

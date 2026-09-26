@@ -125,6 +125,39 @@ def _render_sources(sources):
         st.caption("📄 **Sources:** " + ", ".join(labels))
 
 
+def _route_summary(route) -> str:
+    """Return a one-line description of what the route actually did."""
+    if not isinstance(route, dict) or not route:
+        return ""
+    selected = route.get("selected_section_ids")
+    if not isinstance(selected, (list, tuple)) or not selected:
+        return ""
+    metrics = route.get("metrics")
+    if not isinstance(metrics, dict):
+        metrics = {}
+    try:
+        steps = int(route.get("step_count") or 0)
+    except (TypeError, ValueError):
+        steps = 0
+    tokens = metrics.get("selected_evidence_tokens")
+    parts = [f"🗺 {len(selected)} section{'s' if len(selected) != 1 else ''} routed"]
+    if steps:
+        parts.append(f"{steps} step{'s' if steps != 1 else ''}")
+    if isinstance(tokens, (int, float)) and not isinstance(tokens, bool) and tokens > 0:
+        parts.append(f"{int(tokens)} context tokens")
+    if route.get("reflection_flag"):
+        parts.append("reflected")
+    return " · ".join(parts)
+
+
+def _render_turn_footer(sources, route):
+    """Render the compact answer footer: sources, then what retrieval did."""
+    _render_sources(sources)
+    summary = _route_summary(route)
+    if summary:
+        st.caption(summary)
+
+
 def _process_prompt(prompt):
     _clear_turn_state()
     use_r2r = r2r.r2r_is_ready(st.session_state)
@@ -193,7 +226,10 @@ def _process_prompt(prompt):
                 (item.get("source", "document"), item.get("score", 0.0))
                 for item in turn_evidence
             ]
-        _render_sources(turn_sources)
+        _render_turn_footer(
+            turn_sources,
+            turn_route or st.session_state.get("last_retrieval_route") or {},
+        )
         if not use_r2r:
             render_retrieval_route(
                 turn_route or st.session_state.get("last_retrieval_route") or {},

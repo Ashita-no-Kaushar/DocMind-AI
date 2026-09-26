@@ -872,8 +872,93 @@ def _click_text(page, value):
     _visible_locator(page.get_by_role("radio", name=value, exact=True)).click()
 
 
+_PLAYWRIGHT_ERRORS = None
+
+
+def _playwright_errors():
+    """Resolve Playwright exception types lazily, like the browser tests do."""
+    global _PLAYWRIGHT_ERRORS
+    if _PLAYWRIGHT_ERRORS is None:
+        from playwright.sync_api import Error
+
+        _PLAYWRIGHT_ERRORS = (Error,)
+    return _PLAYWRIGHT_ERRORS
+
+
+def _chat_textarea(page):
+    return page.locator('[data-testid="stChatInput"] textarea').first
+
+
+def _user_message_count(page):
+    return page.locator('[data-testid="stChatMessage"]').count()
+
+
+def _submit_button(page):
+    return page.locator('[data-testid="stChatInputSubmitButton"]').first
+
+
+def _send_chat_prompt(page, prompt, app=None, attempts=3, attempt_timeout_ms=45000):
+    """Submit a chat prompt and confirm the user turn actually landed.
+
+    Streamlit can drop a submission that arrives while the app is still running
+    a script, and it exposes no element to poll for that state, so the user
+    message bubble is the only trustworthy confirmation. The text fill and the
+    Enter press must stay back to back, otherwise Streamlit commits the text as
+    its own script run and discards the key press.
+    """
+    observed = []
+    for attempt in range(1, attempts + 1):
+        before = _user_message_count(page)
+        area = _chat_textarea(page)
+        area.wait_for(state="visible", timeout=ACTION_TIMEOUT_MS)
+        if attempt > 1:
+            # A dropped submit leaves the text behind, and re-filling an
+            # unchanged value is invisible to the widget's own state, so the
+            # retry would never submit. Clear it first.
+            area.fill("")
+        area.fill(prompt)
+        area.press("Enter")
+        deadline = time.monotonic() + attempt_timeout_ms / 1000.0
+        while time.monotonic() < deadline:
+            if _user_message_count(page) > before:
+                return
+            time.sleep(0.25)
+        observed.append(f"attempt {attempt}: no user turn after {attempt_timeout_ms}ms")
+    raise AssertionError(
+        f"the chat input dropped {prompt!r} on all {attempts} attempts\n"
+        + "\n".join(observed)
+        + _submission_diagnostics(page, app)
+    )
+
+
+def _submission_diagnostics(page, app=None):
+    """Describe the chat widget state so a dropped submission is explainable."""
+    try:
+        area = _chat_textarea(page)
+        value = area.input_value()
+        disabled = area.is_disabled()
+    except _playwright_errors() as error:
+        return f"\nchat input unreachable: {error}"
+    button = _submit_button(page)
+    try:
+        button_state = (
+            "missing" if button.count() == 0 else f"disabled={button.is_disabled()}"
+        )
+    except _playwright_errors() as error:
+        button_state = f"unreadable: {error}"
+    detail = (
+        f"\nchat input: value={value!r} disabled={disabled}"
+        f"\nsubmit button: {button_state}"
+        f"\nmessages={_user_message_count(page)}"
+        f"\nexceptions={page.locator('[data-testid=\"stException\"]').count()}"
+    )
+    if app is not None:
+        detail += f"\napp log tail:\n{app.log_text[-1500:]}"
+    return detail
+
+
 def _open_reset_expander(page):
-    expander = _visible_locator(page.get_by_text(re.compile(r"Clear Chat & Reset")))
+    expander = _visible_locator(page.get_by_text(re.compile(r"Reset Project")))
     details = expander.locator("xpath=ancestor::details[1]")
     if not details.evaluate("(element) => element.open"):
         expander.click()
@@ -927,9 +1012,7 @@ class BrowserSmokeTests(unittest.TestCase):
                             state="visible", timeout=ACTION_TIMEOUT_MS
                         )
                         page.get_by_role("tab", name="Data Sources").click()
-                        chat = page.locator('[data-testid="stChatInput"] textarea')
-                        chat.first.fill("smoke prompt")
-                        chat.first.press("Enter")
+                        _send_chat_prompt(page, "smoke prompt", app)
                         page.get_by_text(STREAMED_RESPONSE, exact=False).last.wait_for(
                             state="visible", timeout=FIRST_TOKEN_TIMEOUT_MS
                         )
@@ -1027,13 +1110,7 @@ class BrowserProviderTests(unittest.TestCase):
                                 f"stored={stored!r}\napp log:\n{app.log_text[-2000:]}"
                             ) from error
                         page.get_by_role("tab", name="Data Sources").click()
-                        chat = page.locator('[data-testid="stChatInput"] textarea')
-                        if not chat.count():
-                            chat = page.get_by_placeholder(
-                                "Ask about your documents or just chat..."
-                            )
-                        chat.first.fill("browser integration prompt")
-                        chat.first.press("Enter")
+                        _send_chat_prompt(page, "browser integration prompt", app)
                         page.get_by_text(STREAMED_RESPONSE, exact=False).last.wait_for(
                             state="visible", timeout=FIRST_TOKEN_TIMEOUT_MS
                         )
