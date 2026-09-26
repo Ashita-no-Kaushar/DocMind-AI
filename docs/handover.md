@@ -16,7 +16,7 @@ uncommitted, and the order I would work in next.
 | Check | Result |
 |---|---|
 | `unittest discover -s tests` | 482 tests, 481 pass, 1 opt-in live-R2R skip |
-| `tests.test_e2e_integration` | 18 pass, but **one flaky test, ~1 in 10** (see below) |
+| `tests.test_e2e_integration` | 18 tests, **two flaky** (see below); green when the machine is idle |
 | `tests.test_e2e_contract` | 3 pass |
 | `eval_harness.py --mock` | 42/42, 1 real-LLM skip |
 | `ruff check .` / `black --check .` | pass, 61 files |
@@ -24,27 +24,35 @@ uncommitted, and the order I would work in next.
 | `python -m research.map_ablation --check` | artifacts match code |
 | Docker / live providers | unavailable here; no live result claimed |
 
-## The one known failure — do not claim it is fixed
+## The known failures — do not claim they are fixed
 
-`tests.test_e2e_integration.BrowserProviderTests.test_real_browser_streams_from_threaded_fake_openai_provider`
-fails roughly 1 run in 10, **including in isolation**. Evidence already collected:
+Two browser E2E tests in `tests.test_e2e_integration` are flaky, both worse on a loaded machine.
 
-- The browser-storage restore completes and re-persists the injected provider correctly —
-  verified by reading `localStorage['docmind:settings']` inside `localStorage`, which contains
+**1. First streamed token exceeds the 30 s wait (~1 in 6, measured in isolation).**
+`BrowserSmokeTests.test_real_browser_smoke_clears_chat_and_local_resets` and sometimes the
+provider test. Each test spawns a fresh Streamlit process, ingests, and waits 30 s for the first
+streamed token from a local fake provider. `Playwright TimeoutError: Locator.wait_for: Timeout
+30000ms exceeded`. No app exception, no failed assertion — the answer arrives late. Fix by
+raising the budget and/or waiting on an app-level signal rather than a fixed timeout.
+
+**2. Settings provider selectbox shows the default after a successful restore (~1 in 10).**
+`BrowserProviderTests.test_real_browser_streams_from_threaded_fake_openai_provider`. This one is
+an **application-side defect**, not a test artifact:
+
+- The restore completes and re-persists the injected provider correctly — verified by reading
+  `localStorage['docmind:settings']` inside the failing run, which contains
   `llm_backend = "LM Studio (Local AI)"` and all injected endpoints.
-- Yet the Settings tab's provider selectbox renders `Ollama`.
-- Switching to another tab and back does **not** correct it, so it is not a first-paint effect.
-- No page errors, no Streamlit exception, the child process owns its port for the whole test.
+- Yet the Settings selectbox renders `Ollama`.
+- Switching tabs away and back does **not** correct it, so it is not a first-paint effect.
+- No page errors, no Streamlit exception, the child owns its port for the whole test.
 
-This is an **application-side display defect**, tracked in `docs/todo.md` under
-"Known defect: Settings provider display after restore". Next step: instrument
-`utils/browser_settings.restore_settings_from_browser_storage` →
-`st.selectbox(key="llm_backend")` in `components/tabs/settings.py` to find which run paints
-the stale value, then fix the app rather than the assertion.
+Next step: instrument `utils/browser_settings.restore_settings_from_browser_storage` →
+`st.selectbox(key="llm_backend")` in `components/tabs/settings.py` to find which run paints the
+stale value, then fix the app rather than the assertion.
 
-Two genuine harness bugs were already found and fixed here, so do not re-chase them:
-port-reuse race (stale Streamlit answering the health check) and an assertion that read the
-widget before the restore landed.
+Two genuine harness bugs were already found and fixed here, so do not re-chase them: port-reuse
+race (a stale Streamlit answering the health check) and an assertion that read the widget before
+the restore landed.
 
 ## What the research actually shows
 
@@ -84,16 +92,18 @@ disabled path pays nothing.
 
 ## Order I would work in next
 
-1. Fix the Settings provider display defect and get the E2E suite to 18/18 repeatedly.
-2. Commit everything, then decide the PAT.
-3. Confirm the resolution default on a real corpus before changing the shipped default —
+1. Fix both flaky browser E2E tests: de-flake the 30 s first-token wait, then fix the Settings
+   provider display defect, and get the suite to 18/18 repeatedly on a loaded machine.
+2. Read the CI run status. The workflows were pushed but have never been observed green.
+3. Revoke the exposed PAT. A credential for this repo is still live and was used to push.
+4. Confirm the resolution default on a real corpus before changing the shipped default —
    do not change it on synthetic evidence.
-4. Bootstrap confidence intervals. With 25 answerable questions one hit is 4 points and no
+5. Bootstrap confidence intervals. With 25 answerable questions one hit is 4 points and no
    current difference is statistically established.
-5. Build a corpus that produces a real accuracy crossover (documents with hundreds of chunks,
+6. Build a corpus that produces a real accuracy crossover (documents with hundreds of chunks,
    or genuinely multi-hop questions). The harness already scales to any size.
-6. Live LLM-planner measurement so the upper-bound column becomes real.
-7. Multimodal is the big one and is blocked: needs a PDF rasteriser (`pypdfium2` is a pure
+7. Live LLM-planner measurement so the upper-bound column becomes real.
+8. Multimodal is the big one and is blocked: needs a PDF rasteriser (`pypdfium2` is a pure
    wheel) and a real vision encoder (none installed; project's Ollama/OpenAI-compatible
    providers could supply one). `python -m research.multimodal` reports the gap and refuses to
    fabricate. **No image-resolution number may be claimed anywhere.**

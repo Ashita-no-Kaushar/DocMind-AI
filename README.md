@@ -443,10 +443,10 @@ This section is the most important one in the README.
 | Check | Command | Result |
 |---|---|---|
 | Unit and integration suite | `python -m unittest discover -s tests` | **482 tests, 481 passed, 1 intentional opt-in live-R2R skip** |
-| Browser E2E | `python -m unittest tests.test_e2e_integration` | 18 tests, passing — **with one known flake, see below** |
+| Browser E2E | `python -m unittest tests.test_e2e_integration` | 18 tests — **two are timing-sensitive, see below. Passes when the machine is idle; observed ~1-in-6 failure rate under sustained load** |
 | E2E workflow contract | `python -m unittest tests.test_e2e_contract` | 3 tests, passing |
 | Retrieval-map research | `python -m unittest tests.test_map_ablation` | 37 tests, passing |
-| Map resolution and planner | `python -m unittest tests.test_retrieval_map_resolution` | 22 tests, passing |
+| Map core, integration, UI, resolution | `4 modules` | 114 tests, passing |
 | Multimodal harness | `python -m unittest tests.test_multimodal_research` | 9 tests, passing |
 | Mock evaluation | `python eval_harness.py --mock` | **42/42 scored checks, 1 real-LLM skip** |
 | Ruff | `ruff check .` | Passed |
@@ -460,20 +460,31 @@ This section is the most important one in the README.
 | Docker build and run | — | **Not possible here; no Docker CLI. Statically validated and covered by CI build-only checks.** |
 | Live Ollama / LM Studio / TabbyAPI / OpenAI / R2R | — | **Not available in this environment. No live-service result is claimed.** |
 
-### The one honest failure we are not hiding
+### Two known flaky tests we are not hiding
 
-`tests.test_e2e_integration.BrowserProviderTests.test_real_browser_streams_from_threaded_fake_openai_provider`
-is **flaky at roughly 1 failure in 10 runs** on this host, including when run in isolation. The
-browser-storage restore completes and re-persists the injected provider correctly — verified in
-`localStorage` — but the Settings tab's provider selectbox intermittently renders the default
-`Ollama` instead, and switching tabs away and back does not correct it. The persisted
-configuration is never lost; only the rendered widget disagrees.
+Both are in `tests.test_e2e_integration`, both are **timing-sensitive rather than logically
+wrong**, and both are worse on a loaded machine. They are not fixed.
 
-This is an **application-side display defect, not a test-harness artifact**, and it is **not
-fixed**. It is tracked in `docs/todo.md` with the collected evidence and the next step. Along the
-way we did fix two genuine harness bugs that were inflating and misattributing results: a
-port-reuse race where a stale Streamlit instance could answer the health check, and an assertion
-that read the widget before the restore had landed.
+**1. First streamed token exceeds the 30 s wait (~1 in 6 runs, measured in isolation).**
+Affects `BrowserSmokeTests.test_real_browser_smoke_clears_chat_and_local_resets` and sometimes
+the provider test below. Each test spawns a fresh Streamlit process, ingests, and waits for the
+first streamed token against a local fake provider. On a busy machine that budget is not enough.
+`Playwright TimeoutError: Locator.wait_for: Timeout 30000ms exceeded`. No app exception is
+raised and no assertion about correctness fails — the answer simply arrives late.
+
+**2. Settings provider selectbox shows the default after a successful restore (~1 in 10 runs).**
+Affects `BrowserProviderTests.test_real_browser_streams_from_threaded_fake_openai_provider`.
+This one is an **application-side defect, not a test artifact**: the browser-storage restore
+completes and re-persists the injected provider correctly — verified by reading
+`localStorage['docmind:settings']` in the failing run, which contains
+`llm_backend = "LM Studio (Local AI)"` and all injected endpoints — yet the Settings selectbox
+renders `Ollama`, and switching tabs away and back does not correct it. The persisted
+configuration is never lost; only the rendered widget disagrees. Tracked in `docs/todo.md` with
+the evidence and next step.
+
+Along the way we did fix two genuine harness bugs that were inflating and misattributing
+results: a port-reuse race where a stale Streamlit instance could answer the health check, and an
+assertion that read the widget before the restore had landed.
 
 ## 11. Tech stack
 
@@ -495,25 +506,67 @@ that read the widget before the restore had landed.
 
 ## 12. What has been built so far
 
-**Complete and verified:**
+**By size:** 30 Python modules in the application and research code (~19,500 lines), 27 test
+modules (~10,400 lines), 482 tests, 5 CI workflows, and 9 infrastructure files. The last commit
+(`713e090`) was 92 files and roughly +37,900 / −2,500 lines.
 
-- The full application listed in [section 9](#9-complete-feature-list), running locally.
-- The agentic map retrieval core, agent, retrievers, trace persistence, and visual map UI.
-- Adaptive map resolution, implemented and exposed in Settings → Advanced.
-- The complete offline research harness with three studies, generated artifacts, four SVG
-  figures, and a CI-enforced staleness check.
-- A gated multimodal harness that honestly reports its missing prerequisites.
-- Two real retrieval bugs found by the study and fixed at the root.
-- One tried-and-rejected planner variant retained as a documented negative result.
+### 12.1 Implementation inventory
 
-**Not done, and stated as such:**
+Status is stated precisely, because "done" means different things for a locally verified
+subsystem and for one that has never touched a live service.
 
-- No live LLM-planner measurement.
-- No answer-quality evaluation.
-- No confidence intervals on any reported difference.
-- No image-resolution or multimodal retrieval result.
-- No Docker build or runtime verification.
-- One known flaky browser test with an unfixed application-side display defect.
+| Subsystem | State | Where | How it was verified |
+|---|---|---|---|
+| Document map + routing agent | **Implemented, offline-validated** | `utils/retrieval_map.py` (2,046) | 114 dedicated tests + 12-variant ablation |
+| Visual map UI | **Implemented, browser-validated** | `components/retrieval_map_view.py` (752) | Escaping, bounds, AppTest, and real Chrome E2E |
+| Hybrid retrieval + RRF | **Implemented, fixture-validated** | `utils/llama_index.py` (2,331) | Unit + mock evaluation, **never against real embeddings** |
+| Chat pipeline + token budget | **Implemented, fixture-validated** | `utils/ollama.py` (1,613) | Unit tests, fake provider E2E |
+| Format ingestion (25 extensions) | **Implemented, fixture-validated** | `utils/format_ingestion.py` (2,197) | Malformed, archive, OCR-adjacent fixtures |
+| File / GitHub / website ingestion | **Implemented** | `utils/helpers.py` (1,552) | Live docs fetch and live bounded clone passed; parsers are not a sandbox |
+| R2R v3 client | **Implemented, never executed live** | `utils/r2r.py` (1,498) | Local fake R2R server only |
+| Provider profiles (5 backends) | **Implemented, never executed live** | `utils/provider_config.py` (392) | Endpoint/credential policy tests only |
+| Source state + transactional index | **Implemented** | `utils/source_state.py` (525), `rag_pipeline.py` (556) | Rollback, reset, generation tests |
+| Cross-process lifecycle lock | **Implemented** | `utils/ingestion_lock.py` (158) | Concurrency and lock-file handling tests |
+| Runtime bind policy | **Implemented** | `utils/runtime_policy.py` (110) | Policy tests; not a deployment |
+| Logging (rotation + redaction) | **Implemented** | `utils/logs.py` (209) | Redaction and rotation tests |
+| Browser settings persistence | **Implemented** | `utils/browser_settings.py` (239) | Unit tests; one live-browser display defect open |
+| Settings / sources UI | **Implemented** | `components/tabs/settings.py` (740) and 4 more tab modules | AppTest + real Chrome E2E |
+| Research harness (3 studies) | **Implemented, self-verifying** | `research/` (2,849) | 37 tests; CI fails on artifact drift |
+| Multimodal resolution study | **Harness only, no measurement** | `research/multimodal.py` | 9 tests assert it refuses to fabricate |
+| Evaluation harness | **Implemented** | `eval_harness.py` | 42/42 mock; real run is historical only |
+| Dependency locking | **Implemented** | `Pipfile`, `Pipfile.lock`, `pyproject.toml` | `pipenv verify` + hash-enforced installs |
+| Container + Compose | **Written, never built or run** | `Dockerfile`, 2 Compose files | Static checks and CI build-only |
+| CI workflows | **Written, never observed green** | 5 files in `.github/workflows/` | Pushed; status not yet read |
+
+### 12.2 Not done, stated plainly
+
+- **No live-service validation** of Ollama, LM Studio, TabbyAPI, official OpenAI, R2R, or
+  Docker. Every provider and container path is code plus fixtures, not evidence.
+- **No answer-quality evaluation.** Retrieval and tokens only.
+- **No confidence intervals.** With 25 answerable questions, one hit is 4 percentage points, so
+  no difference in these tables is statistically established.
+- **No image-resolution or multimodal retrieval result**, and none is claimable — the required
+  rasteriser and vision encoder are not installed.
+- **No LLM-planner measurement.** Every number comes from the deterministic planner.
+- **The shipped default map resolution is not the best setting measured.** Adaptive resolution
+  is implemented and available but ships off pending real-corpus confirmation.
+- **No accuracy crossover demonstrated** between map routing and naive top-*k*.
+- **Two flaky browser E2E tests**, both timing-sensitive, detailed in
+  [section 10](#10-test-results-in-full). One is an unfixed application-side display defect.
+- **CI has never been observed green.** The workflows were pushed but their status has not been
+  read.
+- **No multi-session isolation.** LlamaIndex `Settings` and adapter caches are process-global.
+- **No authentication.** Remote binding is opt-in and expects a user-supplied reverse proxy.
+
+### 12.3 Deliberately not built
+
+- **A synthetic image "embedding".** The multimodal harness refuses to emit a placeholder
+  vector, because numbers derived from pixel statistics would look like a finding while
+  measuring nothing.
+- **A second scorer.** Card scoring and full-text refinement were deliberately unified into one
+  IDF-weighted implementation so the two stages cannot drift apart.
+- **An unmeasured default change.** The resolution default was left alone rather than tuned to
+  win on a synthetic 8-document corpus.
 
 ## 13. Why you should use this
 
@@ -656,8 +709,8 @@ pipenv run python -m unittest tests.test_e2e_contract
   active at a time.
 - The retrieval study is offline and synthetic. See
   [section 8](#8-what-we-honestly-do-not-claim) for the full list of claims we do not make.
-- One browser E2E test is flaky due to an unfixed application-side display defect, described in
-  [section 10](#10-test-results-in-full).
+- One browser E2E test is flaky due to an unfixed application-side display defect, and a second
+  is timing-sensitive; both are described in [section 10](#10-test-results-in-full).
 - Current live Ollama, LM Studio, TabbyAPI, official OpenAI, R2R, and Docker runtime validation
   was unavailable in this environment.
 
