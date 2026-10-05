@@ -35,7 +35,7 @@ nltk = "==3.10.3"
 httpx = "==0.28.1"
 
 [dev-packages]
-ruff = "==0.16.8"
+ruff = "==0.16.9"
 black = "==26.5.1"
 pytest = "==9.1.1"
 playwright = "==1.63.0"
