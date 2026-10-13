@@ -4,8 +4,8 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-streamlit = "==1.64.0"
-ollama = "==0.6.2"
+streamlit = "==1.65.0"
+ollama = "==0.6.3"
 llama-index = "==0.14.25"
 llama-index-llms-ollama = "==0.11.0"
 llama-index-llms-openai = "==0.7.10"
@@ -35,8 +35,8 @@ nltk = "==3.10.3"
 httpx = "==0.28.1"
 
 [dev-packages]
-ruff = "==0.16.9"
-black = "==26.5.1"
+ruff = "==0.16.10"
+black = "==26.10.0"
 pytest = "==9.1.1"
 playwright = "==1.63.0"
 
