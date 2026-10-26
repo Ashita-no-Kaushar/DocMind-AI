@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-streamlit = "==1.65.0"
+streamlit = "==1.66.0"
 ollama = "==0.6.3"
 llama-index = "==0.14.25"
 llama-index-llms-ollama = "==0.11.0"
@@ -35,10 +35,10 @@ nltk = "==3.10.3"
 httpx = "==0.28.1"
 
 [dev-packages]
-ruff = "==0.17.0"
+ruff = "==0.17.1"
 black = "==26.10.1"
 pytest = "==9.1.1"
-playwright = "==1.63.0"
+playwright = "==1.64.0"
 
 [requires]
 python_version = "3.13"
